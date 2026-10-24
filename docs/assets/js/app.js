@@ -1,7 +1,7 @@
 // ValReport · NokyLabs — rotas, tema, filtros e eventos
 
 import { esc, imagem, imgCard, imgAgente, definirMeta, dataHora, vazio, larguraGrafico } from "./util.js";
-import { B, carregarBase, FILTROS_PADRAO, salvarNota } from "./dados.js";
+import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache } from "./dados.js";
 import { alternarOrdem } from "./componentes.js";
 import { viewJogador } from "./jogador.js";
 import { viewPartida } from "./partida.js";
@@ -194,6 +194,67 @@ function ajustarTopo() {
   document.documentElement.style.setProperty("--topo-altura", `${h}px`);
 }
 
+// ---------- Dados novos: o site confere sozinho a cada 20 min (e no botão Atualizar) ----------
+const INTERVALO_MS = 20 * 60 * 1000;
+const botaoAtualizar = document.getElementById("atualizar");
+const avisoDados = document.getElementById("aviso-dados");
+let ultimaConferida = Date.now(), conferindo = false, tempoAviso;
+
+function avisar(texto, tipo = "") {
+  clearTimeout(tempoAviso);
+  avisoDados.textContent = texto;
+  avisoDados.className = `aviso-flutuante ${tipo}`;
+  avisoDados.hidden = false;
+  requestAnimationFrame(() => avisoDados.classList.add("visivel"));
+  tempoAviso = setTimeout(() => { avisoDados.classList.remove("visivel"); setTimeout(() => { avisoDados.hidden = true; }, 300); }, 4200);
+}
+
+function preencherTopo() {
+  definirMeta(B.meta);
+  document.getElementById("lista-jogadores").innerHTML = B.equipe.map((e) =>
+    `<a class="pilula-jogador" data-slug="${esc(e.slug)}" href="#/j/${esc(e.slug)}">${imagem(imgCard(e.card) || imgAgente(e.agente), "", "", e.apelido)}${esc(e.apelido)}</a>`).join("");
+  document.getElementById("gerado-em").textContent = `Dados atualizados em ${dataHora(B.meta.gerado_em)} · ${B.meta.contagem.partidas} partidas · o site confere se há novidades a cada 20 minutos`;
+  ajustarTopo();
+}
+
+async function conferirDados(manual = false) {
+  if (conferindo || !B.meta) return;
+  conferindo = true;
+  botaoAtualizar.classList.add("girando-icone");
+  botaoAtualizar.disabled = true;
+  try {
+    const r = await fetch("data/meta.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(String(r.status));
+    const meta = await r.json();
+    ultimaConferida = Date.now();
+    if (meta.gerado_em === B.meta.gerado_em) {
+      if (manual) avisar(`Tudo em dia · dados de ${dataHora(B.meta.gerado_em)}`);
+      return;
+    }
+    if (main.querySelector(".nota--editor.pendente")) {  // não atrapalha quem está escrevendo
+      avisar("Chegaram dados novos. Salve a nota e toque em atualizar.", "novo");
+      return;
+    }
+    const antes = B.meta.contagem.partidas;
+    limparCache();
+    await carregarBase();
+    preencherTopo();
+    await renderizar(true, "nada");
+    const novas = B.meta.contagem.partidas - antes;
+    avisar(novas > 0 ? `${novas} partida${novas === 1 ? " nova chegou" : "s novas chegaram"} ✨` : "Dados atualizados ✨", "novo");
+  } catch (erro) {
+    if (manual) avisar("Sem conexão agora. Tento de novo daqui a pouco.", "erro");
+  } finally {
+    conferindo = false;
+    botaoAtualizar.classList.remove("girando-icone");
+    botaoAtualizar.disabled = false;
+  }
+}
+botaoAtualizar.addEventListener("click", () => conferirDados(true));
+// Confere só com a aba visível; ao voltar para o site depois de um tempo, confere na hora
+setInterval(() => { if (!document.hidden && Date.now() - ultimaConferida >= INTERVALO_MS) conferirDados(); }, 60 * 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - ultimaConferida >= INTERVALO_MS) conferirDados(); });
+
 // ---------- App instalável (PWA) ----------
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => null));
@@ -222,15 +283,12 @@ async function iniciar() {
     main.innerHTML = vazio("Ainda não há dados para mostrar", `<p>Os arquivos em <code>docs/data/</code> não foram encontrados. Rode <code>py exportar_site.py</code> no PC da equipe e publique de novo.</p><p class="pequeno suave">${esc(erro.message)}</p>`);
     return;
   }
-  definirMeta(B.meta);
   if (B.editor) {
     document.body.classList.add("modo-editor");
     main.insertAdjacentHTML("beforebegin", `<div class="faixa-editor" role="status">Modo editor das notas da IGL · o que você salvar aparece no site público depois de publicar. Evite citar pelo nome quem não autorizou aparecer.</div>`);
   }
-  document.getElementById("lista-jogadores").innerHTML = B.equipe.map((e) =>
-    `<a class="pilula-jogador" data-slug="${esc(e.slug)}" href="#/j/${esc(e.slug)}">${imagem(imgCard(e.card) || imgAgente(e.agente), "", "", e.apelido)}${esc(e.apelido)}</a>`).join("");
-  document.getElementById("gerado-em").textContent = `Dados atualizados em ${dataHora(B.meta.gerado_em)} · ${B.meta.contagem.partidas} partidas`;
-  ajustarTopo();
+  preencherTopo();
+  ultimaConferida = Date.now();
   ligarBrilho(main);
   renderizar();
 }

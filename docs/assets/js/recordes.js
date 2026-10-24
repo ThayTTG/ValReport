@@ -59,18 +59,66 @@ function sequencia(itens) {
   return melhor;
 }
 
+const NOVO_DIAS = 7;
+const eNovo = (t) => B.meta?.gerado_em && new Date(B.meta.gerado_em) - new Date(t) <= NOVO_DIAS * 86400000;
+
+/** Cartão de cada recorde: quem conseguiu fica em destaque (foto, nome e o card de jogador ao fundo) */
 export function gradeRecordes(recs, { mostrarNome = true } = {}) {
   if (!recs.length) return vazio("Sem recordes com estes filtros", "<p>Os recordes aparecem conforme as partidas entram no site.</p>");
-  return `<div class="recordes">${recs.map((r, i) => {
+  return `<div class="recordes${mostrarNome ? "" : " recordes--pessoal"}">${recs.map((r, i) => {
     const { p, m, slug } = r.it;
-    const e = B.porSlug.get(slug);
-    const quem = mostrarNome && e ? `<span class="recorde__quem">${imagem(imgCard(e.card) || imgAgente(e.agente), e.apelido, "", e.apelido)}${esc(e.apelido)}</span>` : "";
+    const e = r.id === "seq" ? null : B.porSlug.get(slug);
     const onde = r.id === "seq" ? `${dataCurta(r.seq.ini.p.t)} → ${dataCurta(r.seq.fim.p.t)}` : `${esc(p.mapa)} · ${esc(m.ag)} · ${dataCurta(p.t)}`;
-    return `<a class="recorde" style="--i:${i}" href="#/p/${esc(p.id)}">
-      <span class="recorde__icone">${icone(r.icone)}</span>
-      <span class="recorde__titulo">${esc(r.titulo)}</span>
+    const novo = eNovo(p.t);
+    const empates = r.empates ? ` · <span title="Outras partidas chegaram no mesmo número">+${r.empates} empate${r.empates === 1 ? "" : "s"}</span>` : "";
+    const fundo = mostrarNome && e ? imgCard(e.card, "wideart") : null;
+    const dono = !mostrarNome ? `<span class="recorde__onde suave">${onde}${empates}</span>`
+      : `<span class="recorde__dono">${e ? imagem(imgCard(e.card) || imgAgente(e.agente), e.apelido, "recorde__foto", e.apelido) : `<span class="recorde__foto recorde__foto--equipe">${icone("equipe")}</span>`}
+          <span class="recorde__quem"><strong>${e ? esc(e.apelido) : "Equipe"}</strong><small class="suave">${onde}${empates}</small></span></span>`;
+    return `<a class="recorde${novo ? " recorde--novo" : ""}" style="--i:${i}" href="#/p/${esc(p.id)}">
+      ${fundo ? `<span class="recorde__fundo" style="background-image:url('${esc(fundo)}')" aria-hidden="true"></span>` : ""}
+      <span class="recorde__topo"><span class="recorde__icone">${icone(r.icone)}</span><span class="recorde__titulo">${esc(r.titulo)}</span>
+        ${novo ? `<span class="recorde__novo" title="Conquistado nos últimos ${NOVO_DIAS} dias">novo</span>` : ""}</span>
       <strong class="recorde__valor">${r.texto}</strong>
-      <span class="recorde__rodape">${quem}<span class="suave">${onde}</span>${r.empates ? `<span class="suave" title="Outras partidas chegaram no mesmo número">+${r.empates} empate${r.empates === 1 ? "" : "s"}</span>` : ""}</span>
+      ${dono}
     </a>`;
   }).join("")}</div>`;
+}
+
+/** Quantos recordes cada jogador tem (a sequência de vitórias é da equipe e não entra) */
+export function contarDonos(recs) {
+  const n = new Map();
+  for (const r of recs) if (r.id !== "seq") n.set(r.it.slug, (n.get(r.it.slug) || 0) + 1);
+  return n;
+}
+
+/** Pódio "donos dos recordes": quem tem mais recordes aparece primeiro, com coroa */
+export function podioRecordes(recs) {
+  const n = contarDonos(recs);
+  const lista = [...n.entries()].map(([slug, q]) => ({ e: B.porSlug.get(slug), q, novos: recs.filter((r) => r.id !== "seq" && r.it.slug === slug && eNovo(r.it.p.t)).length }))
+    .filter((x) => x.e).sort((a, b) => b.q - a.q || b.novos - a.novos);
+  if (!lista.length) return "";
+  const topo = lista[0].q;
+  return `<div class="donos">${lista.map((x, i) => `<a class="dono${x.q === topo ? " dono--lider" : ""}" style="--i:${i}" href="#/j/${esc(x.e.slug)}/performance">
+      ${x.q === topo ? `<span class="dono__coroa" aria-hidden="true">${icone("trofeu")}</span>` : ""}
+      ${imagem(imgCard(x.e.card) || imgAgente(x.e.agente), x.e.apelido, "dono__foto", x.e.apelido)}
+      <strong class="dono__nome">${esc(x.e.apelido)}</strong>
+      <span class="dono__qtd"><b>${x.q}</b> recorde${x.q === 1 ? "" : "s"}</span>
+      ${x.novos ? `<span class="recorde__novo">${x.novos} novo${x.novos === 1 ? "" : "s"}</span>` : ""}
+    </a>`).join("")}</div>`;
+}
+
+/** Cartão grande do MVP da semana (usado na aba Semana e no Hall da fama) */
+export function cartaoMvp({ grande = false } = {}) {
+  const S = B.semana;
+  const mvp = S && B.porSlug.get(S.mvp);
+  const mv = mvp && S.jogadores.find((j) => j.slug === S.mvp)?.semana;
+  if (!mvp || !mv) return "";
+  const fundo = imgCard(mvp.card, "wideart");
+  return `<a class="mvp${grande ? " mvp--grande" : ""}" href="#/j/${esc(mvp.slug)}?periodo=7">
+      ${grande && fundo ? `<span class="mvp__fundo" style="background-image:url('${esc(fundo)}')" aria-hidden="true"></span>` : ""}
+      <span class="mvp__brilho" aria-hidden="true"></span>
+      ${imagem(imgCard(mvp.card) || imgAgente(mvp.agente), mvp.apelido, "avatar", mvp.apelido)}
+      <span class="mvp__texto"><small>${icone("trofeu")} MVP da semana${grande ? ` · ${dataCurta(S.ini)} a ${dataCurta(S.fim)}` : ""}</small><strong>${esc(mvp.apelido)}</strong>
+        <span class="pequeno">${sinal(mv.impacto, 1, "%")} por round · K/D ${num(mv.kd, 2)} · ADR ${num(mv.adr)}${grande ? ` · ${mv.partidas} partida${mv.partidas === 1 ? "" : "s"}` : ""}</span></span></a>`;
 }

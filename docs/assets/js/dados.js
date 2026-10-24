@@ -3,6 +3,8 @@
 import { div, chaveDia } from "./util.js";
 
 const cache = new Map();
+/** Esquece os JSONs guardados (usado quando chegam dados novos) */
+export const limparCache = () => cache.clear();
 async function json(caminho) {
   if (!cache.has(caminho)) {
     cache.set(caminho, fetch(caminho, { cache: "no-cache" }).then((r) => {

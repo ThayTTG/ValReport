@@ -6,7 +6,7 @@ export const semMovimento = () => reduzir.matches;
 
 // Blocos que entram em sequência (só o mais externo de cada grupo recebe o atraso)
 const BLOCOS = [".cabecalho", ".abas", ".filtros", ".semana-topo", ".destaque", ".membro-cartao", ".cartao", ".mapa-cartao",
-  ".dia", ".partida", ".recorde", ".nota", ".aviso", ".vazio", ".forma", ".chips", ".secao__titulo", ".rolagem"].join(",");
+  ".hall-topo", ".dia", ".partida", ".recorde", ".nota", ".aviso", ".vazio", ".forma", ".chips", ".secao__titulo", ".rolagem"].join(",");
 const MAX_ESCALONADOS = 16;
 
 /**
@@ -31,7 +31,7 @@ export function animar(main, modo) {
 }
 
 // ---------- Números contando ----------
-const ALVOS = ".destaque__valor, .tile__valor, .indice__valor, .placar-grande .nosso, .placar-grande .deles, .recorde__valor, .membro-cartao__indice strong, .vs-elo__topo strong";
+const ALVOS = ".destaque__valor, .tile__valor, .indice__valor, .placar-grande .nosso, .placar-grande .deles, .recorde__valor, .membro-cartao__indice strong, .vs-elo__topo strong, .dono__qtd b";
 const NUMERO = /^([^\d−-]*)([+−-]?)(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d+))?(.*)$/s;
 
 function contarNumeros(raiz) {
@@ -95,7 +95,7 @@ export async function trocarTema(botao, aplicar) {
 export function ligarBrilho(raiz) {
   if (!matchMedia("(hover: hover)").matches) return;
   raiz.addEventListener("pointermove", (ev) => {
-    const el = ev.target.closest(".recorde, .membro-cartao, .mvp");
+    const el = ev.target.closest(".recorde, .membro-cartao, .mvp, .dono");
     if (!el) return;
     const r = el.getBoundingClientRect();
     el.style.setProperty("--mx", `${ev.clientX - r.left}px`);

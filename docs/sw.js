@@ -2,7 +2,7 @@
 // Estratégia: o site e os dados vêm sempre da rede primeiro (nunca mostra versão velha quando há internet);
 // sem internet, usa a última cópia guardada. Imagens do valorant-api.com ficam guardadas (não mudam).
 
-const VERSAO = "valreport-v1";
+const VERSAO = "valreport-v2";
 const SITE = `${VERSAO}-site`, IMAGENS = `${VERSAO}-imagens`;
 const ESSENCIAL = ["./", "index.html", "assets/css/app.css", "assets/js/app.js", "assets/js/util.js", "assets/js/dados.js",
   "assets/js/componentes.js", "assets/js/graficos.js", "assets/js/jogador.js", "assets/js/partida.js", "assets/js/equipe.js",

@@ -4,12 +4,12 @@ import { esc, num, pct, sinal, div, imagem, imgAgente, imgCard, imgRank, imgMapa
   tile, destaque, vazio, cartao, secao, barra, selo, classeSinal, classeNivel, icone, dataCurta, TIPOS } from "./util.js";
 import { B, itensDe, stats, partidasDaEquipe, passaPartida, passaMembro, resultadoEquipe, placarEquipe, calor as carregarCalor, agrupar, notaMapa } from "./dados.js";
 import { barraFiltros, tabela, forma, celulaAgente, blocoNota, segmentoTipoRound, lerTipoRound, TIPO_COD, delta } from "./componentes.js";
-import { calcularRecordes, gradeRecordes } from "./recordes.js";
+import { calcularRecordes, gradeRecordes, podioRecordes, contarDonos, cartaoMvp } from "./recordes.js";
 import { moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { abas, filtrosQuery } from "./jogador.js";
 
 export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
-  ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Recordes"]];
+  ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Destaques"]];
 const membrosCom = () => B.equipe.filter((e) => e.partidas > 0);
 
 function cabecalhoEquipe(f) {
@@ -25,7 +25,7 @@ function cabecalhoEquipe(f) {
 }
 
 // ---------- Visão geral ----------
-function cartaoMembro(e, f) {
+function cartaoMembro(e, f, nRec = 0) {
   const itens = itensDe(e.slug, { ...f, agente: "todos", com: "todos" });
   const s = stats(itens);
   const av = (B.avaliacao[e.slug] || [])[0];
@@ -42,6 +42,7 @@ function cartaoMembro(e, f) {
         <div><small>K/D</small><strong>${num(s.kd, 2)}</strong></div><div><small>Vitórias</small><strong>${pct(s.win)}</strong></div>
         <div><small>ADR</small><strong>${num(s.adr)}</strong></div><div><small>Impacto</small><strong class="${classeSinal(s.impr, 1)}">${sinal(s.impr, 1, "%")}</strong></div></div>
       ${forma(itens)}
+      ${B.semana?.mvp === e.slug || nRec ? `<div class="membro-cartao__selos">${B.semana?.mvp === e.slug ? `<span class="selo selo--ouro">${icone("trofeu")} MVP da semana</span>` : ""}${nRec ? `<span class="selo selo--destaque">${icone("estrela")} ${nRec} recorde${nRec === 1 ? "" : "s"}</span>` : ""}</div>` : ""}
     </div></a>`;
 }
 
@@ -85,7 +86,8 @@ function visao(f) {
   ], { padrao: "imp" }) : "";
   const ps = partidasDaEquipe(f).slice(0, 8);
   const forms = (B.formacoes.formacoes || []).slice(0, 3);
-  return `<div class="elenco">${ms.map((e) => cartaoMembro(e, f)).join("")}</div>
+  const donos = contarDonos(calcularRecordes(membrosCom().flatMap((e) => itensDe(e.slug, f))));
+  return `<div class="elenco">${ms.map((e) => cartaoMembro(e, f, donos.get(e.slug) || 0)).join("")}</div>
     ${B.meta.ocultos ? `<div class="aviso" style="margin-top:12px">${icone("info")}<span>${B.meta.ocultos} jogador${B.meta.ocultos === 1 ? "" : "es"} da equipe ainda não ${B.meta.ocultos === 1 ? "autorizou" : "autorizaram"} aparecer no site. Nas partidas, aparece${B.meta.ocultos === 1 ? "" : "m"} como “Aliado”, sem nome.</span></div>` : ""}
     ${ranking ? secao("Ranking da equipe", `<div class="cartao">${ranking}</div>`, `<span class="suave pequeno">Índice = últimos ${B.meta.regras.janela_dias} dias; o resto segue os filtros</span>`) : ""}
     <div class="grade-lateral secao">
@@ -233,8 +235,6 @@ function itemRound(x, { nome = true } = {}) {
 function semana() {
   const S = B.semana;
   if (!S || !S.partidas) return vazio("Ninguém da equipe jogou nos últimos 7 dias", "<p>O resumo da semana aparece aqui quando houver partidas. Aos domingos ele também vai para o Discord.</p>");
-  const mvp = B.porSlug.get(S.mvp);
-  const mv = S.jogadores.find((j) => j.slug === S.mvp)?.semana;
   const linhas = S.jogadores.filter((j) => j.semana && B.porSlug.get(j.slug));
   const parados = S.jogadores.filter((j) => !j.semana && B.porSlug.get(j.slug));
   const mapas = Object.entries(S.mapas || {}).sort((a, b) => b[1][0] + b[1][1] - a[1][0] - a[1][1]);
@@ -250,11 +250,7 @@ function semana() {
       <div><span class="selo selo--destaque">${icone("relogio")} ${dataCurta(S.ini)} a ${dataCurta(S.fim)}</span>
         <h2 style="margin-top:8px">Resumo da semana</h2>
         <p class="suave pequeno">${S.partidas} partida${S.partidas === 1 ? "" : "s"} com alguém da equipe · <strong class="bom">${S.v}V</strong> · <strong class="ruim">${S.d}D</strong> · calculado em ${esc(dataHora(B.meta.gerado_em))} (não muda com os filtros)</p></div>
-      ${mvp && mv ? `<a class="mvp" href="#/j/${esc(mvp.slug)}?periodo=7">
-        <span class="mvp__brilho" aria-hidden="true"></span>
-        ${imagem(imgCard(mvp.card) || imgAgente(mvp.agente), mvp.apelido, "avatar", mvp.apelido)}
-        <span class="mvp__texto"><small>${icone("trofeu")} MVP da semana</small><strong>${esc(mvp.apelido)}</strong>
-          <span class="pequeno">${sinal(mv.impacto, 1, "%")} por round · K/D ${num(mv.kd, 2)} · ADR ${num(mv.adr)}</span></span></a>` : ""}
+      ${cartaoMvp()}
     </div>
     ${secao("Cada um na semana", `<div class="cartao">${tab}${parados.length ? `<p class="suave pequeno" style="margin-top:10px">Não jogou nesta semana: ${esc(parados.map((j) => B.porSlug.get(j.slug).apelido).join(", "))}.</p>` : ""}</div>`, `<span class="suave pequeno">▲▼ = comparado com a semana anterior</span>`)}
     ${mapas.length ? secao("Mapas da semana", `<div class="chips">${mapas.map(([m, [v, d]]) => `<span class="chip">${esc(m)} <strong class="${v >= d ? "bom" : "ruim"}">${v}V ${d}D</strong></span>`).join("")}</div>`) : ""}
@@ -268,7 +264,9 @@ function semana() {
 function recordesEquipe(f) {
   const itens = membrosCom().flatMap((e) => itensDe(e.slug, f));
   const recs = calcularRecordes(itens);
-  return `<p class="suave pequeno" style="margin-bottom:12px">O melhor número de cada estatística entre as partidas da equipe (segue os filtros). Médias por round só contam partidas com 10+ rounds. Toque num recorde para abrir a partida.</p>${gradeRecordes(recs)}`;
+  const mvp = cartaoMvp({ grande: true }), podio = podioRecordes(recs);
+  return `${mvp || podio ? `<div class="hall-topo">${mvp}${podio ? `<div class="hall-donos"><h2 class="hall-donos__titulo">${icone("estrela")} Donos dos recordes</h2>${podio}</div>` : ""}</div>` : ""}
+    ${secao("Hall da fama", gradeRecordes(recs), `<span class="suave pequeno">segue os filtros · médias por round só com 10+ rounds · toque para abrir a partida</span>`)}`;
 }
 
 // ---------- Mapas da equipe ----------

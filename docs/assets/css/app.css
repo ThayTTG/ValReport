@@ -454,28 +454,82 @@ main:focus, main:focus-visible { outline: none; }
 .delta { font-size: 11px; font-weight: 700; margin-left: 4px; color: var(--suave); }
 .delta.bom { color: var(--vitoria); } .delta.ruim { color: var(--derrota); }
 
-/* ---------- Recordes ---------- */
-.recordes { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
-@media (max-width: 560px) {
-  .recordes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .recorde { padding: 12px; }
-  .recorde__valor { font-size: 19px; }
-  .recorde__titulo { font-size: 11px; }
-  .recorde__icone { width: 30px; height: 30px; font-size: 16px; }
-  .recorde__rodape { font-size: 11.5px; display: grid; gap: 2px; }
-}
-.recorde { position: relative; overflow: hidden; display: grid; gap: 4px; align-content: start; padding: 14px; border-radius: var(--raio); background: var(--superficie); border: 1px solid var(--borda); color: var(--texto); transition: transform .2s ease, border-color .2s, box-shadow .2s; }
-.recorde::before { content: ""; position: absolute; inset: 0; background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--destaque) 15%, transparent), transparent 60%); opacity: 0; transition: opacity .25s; pointer-events: none; }
+/* ---------- Destaques: MVP, donos dos recordes e Hall da fama ---------- */
+:root { --ouro: #f2b33d; }
+.selo--ouro { background: color-mix(in srgb, var(--ouro) 24%, var(--superficie)); color: var(--texto); }
+.selo--ouro svg { color: var(--ouro); }
+.membro-cartao__selos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.membro-cartao__selos .selo--ouro { animation: pulsoOuro 2.6s ease-in-out 1s infinite; }
+@keyframes pulsoOuro { 0%, 70%, 100% { box-shadow: 0 0 0 0 transparent; } 35% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ouro) 30%, transparent); } }
+
+.hall-topo { display: grid; gap: 14px; margin-bottom: 6px; }
+@media (min-width: 900px) { .hall-topo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: stretch; } }
+.mvp--grande { min-height: 150px; padding: 20px 24px 20px 20px; gap: 18px; background: linear-gradient(120deg, color-mix(in srgb, var(--ouro) 30%, var(--superficie)) 0%, color-mix(in srgb, var(--destaque) 18%, var(--superficie)) 55%, var(--superficie) 100%);
+  border-color: color-mix(in srgb, var(--ouro) 55%, var(--borda)); }
+.mvp--grande .avatar { width: 88px; height: 88px; border-radius: 22px; box-shadow: 0 0 0 3px var(--ouro), var(--sombra); position: relative; }
+.mvp--grande .mvp__texto small { color: var(--texto-2); }
+.mvp--grande .mvp__texto small svg { color: var(--ouro); }
+.mvp--grande .mvp__texto strong { font-size: 34px; }
+.mvp__fundo { position: absolute; inset: 0; background-size: cover; background-position: center 30%; opacity: .16; mask-image: linear-gradient(90deg, transparent 25%, #000 85%); -webkit-mask-image: linear-gradient(90deg, transparent 25%, #000 85%); pointer-events: none; }
+.mvp--grande > :not(.mvp__fundo):not(.mvp__brilho) { position: relative; }
+
+.hall-donos { border: 1px solid var(--borda); border-radius: calc(var(--raio) + 4px); background: var(--superficie); padding: 14px 16px 16px; }
+.hall-donos__titulo { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); display: flex; align-items: center; gap: 6px; margin: 0 0 12px; }
+.hall-donos__titulo svg { color: var(--ouro); }
+.donos { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; }
+.dono { position: relative; display: grid; justify-items: center; gap: 3px; padding: 14px 8px 12px; border-radius: var(--raio); border: 1px solid var(--borda); background: var(--superficie-2); color: var(--texto); text-align: center; transition: transform .2s, box-shadow .2s, border-color .2s; }
+.dono:hover { text-decoration: none; transform: translateY(-3px); box-shadow: var(--sombra); border-color: var(--destaque); }
+.dono__foto { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; font-size: 16px; }
+.dono__nome { font-size: 14.5px; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dono__qtd { font-size: 12px; color: var(--suave); }
+.dono__qtd b { font-family: var(--fonte-titulo); font-size: 20px; color: var(--destaque-texto); margin-right: 2px; }
+.dono--lider { border-color: color-mix(in srgb, var(--ouro) 70%, var(--borda)); background: linear-gradient(180deg, color-mix(in srgb, var(--ouro) 18%, var(--superficie-2)), var(--superficie-2)); }
+.dono--lider .dono__foto { box-shadow: 0 0 0 3px var(--ouro); }
+.dono__coroa { position: absolute; top: -11px; left: 50%; translate: -50% 0; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ouro); color: #3a2600; font-size: 15px; box-shadow: var(--sombra); animation: flutuar 2.8s ease-in-out infinite; }
+@keyframes flutuar { 50% { transform: translateY(-3px); } }
+
+.recordes { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+.recorde { position: relative; overflow: hidden; isolation: isolate; display: grid; gap: 6px; align-content: start; padding: 14px; border-radius: var(--raio); background: var(--superficie); border: 1px solid var(--borda); color: var(--texto); transition: transform .2s ease, border-color .2s, box-shadow .2s; }
+.recorde::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--destaque) 15%, transparent), transparent 60%); opacity: 0; transition: opacity .25s; pointer-events: none; }
 .recorde:hover { text-decoration: none; border-color: color-mix(in srgb, var(--destaque) 55%, var(--borda)); transform: translateY(-2px); box-shadow: var(--sombra); }
 .recorde:hover::before { opacity: 1; }
-.recorde__icone { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--destaque-suave); color: var(--destaque-texto); font-size: 18px; margin-bottom: 4px; transition: transform .25s cubic-bezier(.2, .7, .2, 1.4); }
+.recorde__fundo { position: absolute; inset: 0; z-index: -2; background-size: cover; background-position: center 30%; opacity: .13; mask-image: linear-gradient(200deg, #000 0%, transparent 65%); -webkit-mask-image: linear-gradient(200deg, #000 0%, transparent 65%); transition: opacity .3s, transform .5s; }
+.recorde:hover .recorde__fundo { opacity: .22; transform: scale(1.04); }
+.recorde__topo { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.recorde__icone { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--destaque-suave); color: var(--destaque-texto); font-size: 16px; transition: transform .25s cubic-bezier(.2, .7, .2, 1.4); }
 .recorde:hover .recorde__icone { transform: rotate(-8deg) scale(1.1); }
-.recorde__titulo { color: var(--suave); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.recorde__titulo { color: var(--suave); font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; min-width: 0; }
+.recorde__novo { margin-left: auto; flex: none; padding: 2px 8px; border-radius: 999px; background: var(--ouro); color: #3a2600; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; animation: pulsoOuro 2.2s ease-in-out infinite; }
+.dono .recorde__novo { margin: 2px 0 0; }
+.recorde--novo { border-color: color-mix(in srgb, var(--ouro) 55%, var(--borda)); }
 .recorde__valor { font-family: var(--fonte-titulo); font-size: 24px; line-height: 1.15; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .recorde__valor small { font-family: var(--fonte); font-size: 13px; font-weight: 600; color: var(--suave); letter-spacing: 0; }
-.recorde__rodape { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 12.5px; margin-top: 4px; }
-.recorde__quem { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
-.recorde__quem img, .recorde__quem .avatar-vazio { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; font-size: 9px; }
+.recorde__dono { display: flex; align-items: center; gap: 10px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--borda); min-width: 0; }
+.recorde__foto { flex: none; width: 40px; height: 40px; border-radius: 12px; object-fit: cover; font-size: 13px; transition: transform .25s cubic-bezier(.2, .7, .2, 1.4); }
+.recorde:hover .recorde__foto { transform: scale(1.08) rotate(-3deg); }
+.recorde__foto--equipe { display: grid; place-items: center; background: var(--destaque-suave); color: var(--destaque-texto); font-size: 20px; }
+.recorde__quem { display: grid; min-width: 0; line-height: 1.25; }
+.recorde__quem strong { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recorde__quem small, .recorde__onde { font-size: 12px; }
+@media (max-width: 560px) {
+  .recordes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .recorde { padding: 11px; gap: 5px; }
+  .recorde__valor { font-size: 19px; }
+  .recorde__valor small { font-size: 11.5px; }
+  .recorde__titulo { font-size: 10.5px; }
+  .recorde__icone { width: 26px; height: 26px; font-size: 14px; }
+  .recorde__topo { flex-wrap: wrap; gap: 6px; }
+  .recorde__novo { margin-left: 0; }
+  .recorde__dono { gap: 8px; padding-top: 8px; }
+  .recorde__foto { width: 32px; height: 32px; border-radius: 10px; }
+  .recorde__quem strong { font-size: 14px; }
+  .recorde__quem small, .recorde__onde { font-size: 11px; }
+  .mvp--grande { padding: 16px; gap: 14px; min-height: 0; }
+  .mvp--grande .avatar { width: 68px; height: 68px; border-radius: 18px; }
+  .mvp--grande .mvp__texto strong { font-size: 26px; }
+  .donos { grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+  .dono__foto { width: 44px; height: 44px; }
+}
 
 /* ---------- Elo ---------- */
 .rank__rr { text-transform: none !important; letter-spacing: 0 !important; font-size: 12px !important; color: var(--texto-2) !important; font-weight: 600 !important; }
@@ -531,3 +585,13 @@ main:not([data-anim="nada"]) .grafico .ponto { animation: pipocar .3s ease backw
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 @media (min-width: 720px) { .cabecalho__corpo { padding: 70px 22px 20px; } .avatar { width: 104px; height: 104px; border-radius: 26px; } }
+
+/* ---------- Dados novos (botão Atualizar e aviso flutuante) ---------- */
+.botao-icone.girando-icone svg { animation: gira .9s linear infinite; }
+.botao-icone:disabled { cursor: progress; }
+.aviso-flutuante { position: fixed; left: 50%; width: max-content; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 60; max-width: min(92vw, 420px); padding: 11px 18px; border-radius: 999px;
+  background: var(--texto); color: var(--fundo); font-size: 14px; font-weight: 600; box-shadow: var(--sombra); text-align: center;
+  opacity: 0; transform: translate(-50%, 14px) scale(.96); transition: opacity .25s ease, transform .3s cubic-bezier(.2, .7, .2, 1.3); pointer-events: none; }
+.aviso-flutuante.visivel { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.aviso-flutuante.novo { background: var(--destaque); color: var(--sobre-destaque); }
+.aviso-flutuante.erro { background: var(--derrota); color: #fff; }
