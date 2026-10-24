@@ -66,6 +66,9 @@
       <symbol id="i-fogo" viewBox="0 0 24 24"><path d="M12 2.5c.6 3.4-1.2 5-2.6 6.6C8 10.6 6.5 12.4 6.5 15a5.5 5.5 0 0 0 11 0c0-2.2-1-3.9-2.2-5.1-.2 1.4-.9 2.4-2 2.9.6-3.6-.2-7.4-1.3-10.3Z" fill="currentColor"/></symbol>
       <symbol id="i-atualizar" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16m0 4v-4h-4" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-inicio" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1v-8.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+      <symbol id="i-coroa" viewBox="0 0 24 24"><path d="M3.5 8.5 8 12l4-6.5 4 6.5 4.5-3.5-1.8 10H5.3L3.5 8.5Z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="4.2" r="1.4" fill="currentColor"/><circle cx="3.4" cy="7.4" r="1.2" fill="currentColor"/><circle cx="20.6" cy="7.4" r="1.2" fill="currentColor"/></symbol>
+      <symbol id="i-medalha" viewBox="0 0 24 24"><path d="M7 2.5h4l1.6 5.2L9.6 9 7 2.5Zm10 0h-4l-1.6 5.2L14.4 9 17 2.5Z" fill="currentColor" opacity=".75"/><circle cx="12" cy="15" r="6.5" fill="currentColor"/><path d="m12 11.3 1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.3 1.2.5-2.5-1.8-1.7 2.5-.3 1.1-2.3Z" fill="#fff" opacity=".9"/></symbol>
+      <symbol id="i-nokylabs" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2" fill="currentColor"/></symbol>
       <symbol id="i-filtro" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
     </defs>
   </svg>
@@ -82,6 +85,9 @@
         <a href="#/equipe" data-nav="equipe"><svg aria-hidden="true"><use href="#i-equipe"/></svg><span>Equipe</span></a>
         <a href="#/sobre" data-nav="sobre"><svg aria-hidden="true"><use href="#i-info"/></svg><span>Sobre</span></a>
       </nav>
+      <a class="botao-icone botao-nokylabs" href="https://thayttg.github.io/nokylabs/" title="Voltar para o site da NokyLabs" aria-label="Voltar para o site da NokyLabs">
+        <svg aria-hidden="true"><use href="#i-nokylabs"/></svg><span>NokyLabs</span>
+      </a>
       <button class="botao-icone" id="atualizar" type="button" aria-label="Procurar dados novos agora" title="Procurar partidas novas (o site também confere sozinho a cada 20 minutos)">
         <svg aria-hidden="true"><use href="#i-atualizar"/></svg>
       </button>
@@ -94,6 +100,9 @@
       </button>
     </div>
     <div class="topo__jogadores" id="lista-jogadores" aria-label="Jogadores"></div>
+    <button class="topo__puxador" id="minimizar-topo" type="button" aria-expanded="true" aria-controls="lista-jogadores" aria-label="Esconder os jogadores do topo" title="Esconder jogadores">
+      <svg aria-hidden="true"><use href="#i-seta"/></svg>
+    </button>
   </header>
 
   <main id="conteudo" tabindex="-1">
@@ -109,6 +118,7 @@
     <p>Dados: <a href="https://github.com/Henrik-3/unofficial-valorant-api" rel="noopener" target="_blank">HenrikDev API (não oficial)</a> ·
       Imagens: <a href="https://valorant-api.com" rel="noopener" target="_blank">valorant-api.com</a> ·
       <a href="#/sobre">Créditos, privacidade e metodologia</a></p>
+    <p><a class="rodape__noky" href="https://thayttg.github.io/nokylabs/">← Voltar para a NokyLabs</a></p>
     <p class="rodape__gerado" id="gerado-em"></p>
   </footer>
 

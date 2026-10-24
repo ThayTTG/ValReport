@@ -15,6 +15,7 @@ const MAX_ESCALONADOS = 16;
  */
 export function animar(main, modo) {
   main.dataset.anim = semMovimento() ? "nada" : modo;
+  particulas(main);
   if (semMovimento() || modo === "nada" || modo === "suave") return;
   // Na troca de aba, o cabeçalho e as abas ficam parados; só o conteúdo entra
   const raiz = modo === "aba" ? [...main.children].filter((el) => !el.matches(".cabecalho, .abas, .voltar")) : [main];
@@ -101,4 +102,18 @@ export function ligarBrilho(raiz) {
     el.style.setProperty("--mx", `${ev.clientX - r.left}px`);
     el.style.setProperty("--my", `${ev.clientY - r.top}px`);
   });
+}
+
+// ---------- Partículas (faíscas subindo do Destaque do dia e do MVP) ----------
+export function particulas(raiz) {
+  if (semMovimento()) return;
+  for (const alvo of raiz.querySelectorAll(".com-particulas")) {
+    if (alvo.querySelector(":scope > .particulas")) continue;
+    const n = alvo.classList.contains("revela__alvo") ? 34 : 22;
+    const itens = Array.from({ length: n }, (_, i) => {
+      const dur = 2.6 + Math.random() * 2.4;
+      return `<i class="${i % 3 === 0 ? "p-ouro" : i % 3 === 1 ? "p-tema" : "p-claro"}" style="left:${(4 + Math.random() * 92).toFixed(1)}%;top:${(45 + Math.random() * 55).toFixed(1)}%;--t:${(3 + Math.random() * 4).toFixed(1)}px;--d:${dur.toFixed(2)}s;--a:-${(Math.random() * dur).toFixed(2)}s;--dx:${(Math.random() * 40 - 20).toFixed(0)}px;--sobe:${(90 + Math.random() * 90).toFixed(0)}px"></i>`;
+    }).join("");
+    alvo.insertAdjacentHTML("beforeend", `<span class="particulas" aria-hidden="true">${itens}</span>`);
+  }
 }

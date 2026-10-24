@@ -29,12 +29,12 @@ function cadaUm(dia) {
 
 function cartaoDestaqueDia(x) {
   const fundo = imgCard(x.e.card, "wideart");
-  return `<a class="mvp mvp--grande hoje-mvp" href="#/j/${esc(x.e.slug)}/partidas">
+  return `<div class="com-particulas"><a class="mvp mvp--grande hoje-mvp" href="#/j/${esc(x.e.slug)}/partidas">
     ${fundo ? `<span class="mvp__fundo" style="background-image:url('${esc(fundo)}')" aria-hidden="true"></span>` : ""}
     <span class="mvp__brilho" aria-hidden="true"></span>
     ${imagem(imgCard(x.e.card) || imgAgente(x.e.agente), x.e.apelido, "avatar", x.e.apelido)}
     <span class="mvp__texto"><small>${icone("estrela")} Destaque do dia</small><strong>${esc(x.e.apelido)}</strong>
-      <span class="pequeno">${sinal(x.s.impr, 1, "%")} por round · K/D ${num(x.s.kd, 2)} · ADR ${num(x.s.adr)} · ${x.s.n} partida${x.s.n === 1 ? "" : "s"}</span></span></a>`;
+      <span class="pequeno">${sinal(x.s.impr, 1, "%")} por round · K/D ${num(x.s.kd, 2)} · ADR ${num(x.s.adr)} · ${x.s.n} partida${x.s.n === 1 ? "" : "s"}</span></span></a></div>`;
 }
 
 function atalhos() {

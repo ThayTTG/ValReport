@@ -5,6 +5,7 @@ import { esc, num, pct, sinal, div, imagem, imgAgente, imgCard, imgRank, imgMapa
 import { B, itensDe, stats, partidasDaEquipe, passaPartida, passaMembro, resultadoEquipe, placarEquipe, calor as carregarCalor, agrupar, notaMapa } from "./dados.js";
 import { barraFiltros, tabela, forma, celulaAgente, blocoNota, segmentoTipoRound, lerTipoRound, TIPO_COD, delta } from "./componentes.js";
 import { calcularRecordes, gradeRecordes, podioRecordes, contarDonos, cartaoMvp } from "./recordes.js";
+import { temCoroa, coroaSobre } from "./coroa.js";
 import { moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { abas, filtrosQuery } from "./jogador.js";
 
@@ -33,7 +34,7 @@ function cartaoMembro(e, f, nRec = 0) {
   return `<a class="membro-cartao" href="#/j/${esc(e.slug)}${filtrosQuery({ fila: f.fila, temporada: f.temporada, periodo: f.periodo, mapa: f.mapa })}">
     <div class="membro-cartao__banner" style="${banner ? `background-image:url('${esc(banner)}')` : ""}"></div>
     <div class="membro-cartao__corpo">
-      <div class="membro-cartao__topo">${imagem(imgCard(e.card) || imgAgente(e.agente), e.apelido, "avatar", e.apelido)}
+      <div class="membro-cartao__topo"><span class="foto-coroa">${imagem(imgCard(e.card) || imgAgente(e.agente), e.apelido, "avatar", e.apelido)}${coroaSobre(e.slug)}</span>
         <div class="membro-cartao__nome"><strong>${esc(e.apelido)}</strong><small>${esc(e.funcao || "sem partidas")}${e.agente ? ` · ${esc(e.agente)}` : ""}</small></div>
         <div class="membro-cartao__indice">${av ? `<strong>${av.indice}</strong><small>índice</small>` : `<small>sem índice</small>`}</div></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px">${imagem(imgRank(e.tier), nomeTier(e.tn), "mini-rank", "")}<span class="pequeno">${esc(nomeTier(e.tn))}</span>
@@ -42,7 +43,7 @@ function cartaoMembro(e, f, nRec = 0) {
         <div><small>K/D</small><strong>${num(s.kd, 2)}</strong></div><div><small>Vitórias</small><strong>${pct(s.win)}</strong></div>
         <div><small>ADR</small><strong>${num(s.adr)}</strong></div><div><small>Impacto</small><strong class="${classeSinal(s.impr, 1)}">${sinal(s.impr, 1, "%")}</strong></div></div>
       ${forma(itens)}
-      ${B.semana?.mvp === e.slug || nRec ? `<div class="membro-cartao__selos">${B.semana?.mvp === e.slug ? `<span class="selo selo--ouro">${icone("trofeu")} MVP da semana</span>` : ""}${nRec ? `<span class="selo selo--destaque">${icone("estrela")} ${nRec} recorde${nRec === 1 ? "" : "s"}</span>` : ""}</div>` : ""}
+      ${temCoroa(e.slug) || nRec ? `<div class="membro-cartao__selos">${temCoroa(e.slug) ? `<span class="selo selo--ouro">${icone("coroa")} MVP da semana${B.coroa.seguidas > 1 ? ` · ${B.coroa.seguidas}×` : ""}</span>` : ""}${nRec ? `<span class="selo selo--destaque">${icone("estrela")} ${nRec} recorde${nRec === 1 ? "" : "s"}</span>` : ""}</div>` : ""}
     </div></a>`;
 }
 
@@ -250,7 +251,7 @@ function semana() {
       <div><span class="selo selo--destaque">${icone("relogio")} ${dataCurta(S.ini)} a ${dataCurta(S.fim)}</span>
         <h2 style="margin-top:8px">Resumo da semana</h2>
         <p class="suave pequeno">${S.partidas} partida${S.partidas === 1 ? "" : "s"} com alguém da equipe · <strong class="bom">${S.v}V</strong> · <strong class="ruim">${S.d}D</strong> · calculado em ${esc(dataHora(B.meta.gerado_em))} (não muda com os filtros)</p></div>
-      ${cartaoMvp()}
+      <div class="pilha-mvp">${cartaoMvp({ rolante: true })}${B.coroa ? `<button class="limpar ver-coroa" type="button" data-ver-coroa>${icone("coroa")} Ver de novo o MVP da semana fechada</button>` : ""}</div>
     </div>
     ${secao("Cada um na semana", `<div class="cartao">${tab}${parados.length ? `<p class="suave pequeno" style="margin-top:10px">Não jogou nesta semana: ${esc(parados.map((j) => B.porSlug.get(j.slug).apelido).join(", "))}.</p>` : ""}</div>`, `<span class="suave pequeno">▲▼ = comparado com a semana anterior</span>`)}
     ${mapas.length ? secao("Mapas da semana", `<div class="chips">${mapas.map(([m, [v, d]]) => `<span class="chip">${esc(m)} <strong class="${v >= d ? "bom" : "ruim"}">${v}V ${d}D</strong></span>`).join("")}</div>`) : ""}

@@ -137,3 +137,46 @@ export const vereditoSelo = (tipo, texto) => ({
   acima: selo("Acima da média da função", "vitoria"), abaixo: selo("Abaixo da média da função", "derrota"),
   media: selo("Na média da função", "destaque"), insuf: selo(esc(texto.replace("dados insuficientes", "Amostra pequena")), ""),
 }[tipo] || "");
+
+// ---------- Abas internas de um cartão (sem recarregar a página) ----------
+const escolhaMini = new Map();  // grupo -> aba escolhida (vale enquanto o site está aberto)
+/** abas: [[id, título, html]] (as vazias são ignoradas) */
+export function miniAbas(grupo, abas) {
+  const lista = abas.filter(([, , html]) => html);
+  if (!lista.length) return "";
+  const ativa = lista.some(([id]) => id === escolhaMini.get(grupo)) ? escolhaMini.get(grupo) : lista[0][0];
+  return `<div class="mini-abas" data-grupo="${esc(grupo)}">
+    <div class="mini-abas__lista" role="tablist">${lista.map(([id, t]) => `<button type="button" role="tab" data-mini-aba="${esc(id)}" aria-selected="${id === ativa}">${esc(t)}</button>`).join("")}</div>
+    ${lista.map(([id, , html]) => `<div class="mini-abas__painel" role="tabpanel" data-painel="${esc(id)}"${id === ativa ? "" : " hidden"}>${html}</div>`).join("")}
+  </div>`;
+}
+export function trocarMiniAba(botao) {
+  const caixa = botao.closest(".mini-abas");
+  const id = botao.dataset.miniAba;
+  escolhaMini.set(caixa.dataset.grupo, id);
+  caixa.querySelectorAll(":scope > .mini-abas__lista [data-mini-aba]").forEach((b) => b.setAttribute("aria-selected", String(b === botao)));
+  caixa.querySelectorAll(":scope > .mini-abas__painel").forEach((p) => { p.hidden = p.dataset.painel !== id; });
+}
+
+// ---------- Cartões que podem ser minimizados (lembra a escolha neste aparelho) ----------
+const CHAVE_MIN = "valreport.minimizados";
+function lerMin() { try { return new Set(JSON.parse(localStorage.getItem(CHAVE_MIN) || "[]")); } catch (e) { return new Set(); } }
+export const estaMinimizado = (chave) => lerMin().has(chave);
+export function cartaoMin(chave, titulo, corpo, extra = "") {
+  const min = estaMinimizado(chave);
+  return `<section class="cartao cartao--min${min ? " minimizado" : ""}" data-min="${esc(chave)}">
+    <div class="cartao__titulo"><h3>${esc(titulo)}</h3><div class="cartao__acoes">${extra}
+      <button class="minimizar" type="button" data-minimizar aria-expanded="${!min}" aria-label="${min ? "Mostrar" : "Minimizar"} ${esc(titulo)}" title="${min ? "Mostrar" : "Minimizar"}">${icone("seta")}</button></div></div>
+    <div class="cartao__corpo">${corpo}</div></section>`;
+}
+export function alternarMinimizado(botao) {
+  const cartao = botao.closest("[data-min]");
+  const chave = cartao.dataset.min;
+  const set = lerMin();
+  const min = !set.has(chave);
+  if (min) set.add(chave); else set.delete(chave);
+  try { localStorage.setItem(CHAVE_MIN, JSON.stringify([...set])); } catch (e) { /* sem armazenamento */ }
+  cartao.classList.toggle("minimizado", min);
+  botao.setAttribute("aria-expanded", String(!min));
+  botao.title = min ? "Mostrar" : "Minimizar";
+}

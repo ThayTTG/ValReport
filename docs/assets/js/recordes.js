@@ -108,17 +108,21 @@ export function podioRecordes(recs) {
     </a>`).join("")}</div>`;
 }
 
-/** Cartão grande do MVP da semana (usado na aba Semana e no Hall da fama) */
-export function cartaoMvp({ grande = false } = {}) {
-  const S = B.semana;
+/** Cartão do MVP: por padrão o da última semana fechada (dono da coroa); sem ela, o dos últimos 7 dias */
+export function cartaoMvp({ grande = false, rolante = false } = {}) {
+  const S = (!rolante && B.coroa) || B.semana;
+  const fechada = S && S === B.coroa;
   const mvp = S && B.porSlug.get(S.mvp);
   const mv = mvp && S.jogadores.find((j) => j.slug === S.mvp)?.semana;
   if (!mvp || !mv) return "";
   const fundo = imgCard(mvp.card, "wideart");
-  return `<a class="mvp${grande ? " mvp--grande" : ""}" href="#/j/${esc(mvp.slug)}?periodo=7">
+  const rotulo = fechada ? "MVP da semana" : rolante ? "MVP dos últimos 7 dias" : "MVP da semana (parcial)";
+  const cartao = `<a class="mvp${grande ? " mvp--grande" : ""}${fechada ? " mvp--coroa" : ""}" href="#/j/${esc(mvp.slug)}?periodo=7">
       ${grande && fundo ? `<span class="mvp__fundo" style="background-image:url('${esc(fundo)}')" aria-hidden="true"></span>` : ""}
       <span class="mvp__brilho" aria-hidden="true"></span>
-      ${imagem(imgCard(mvp.card) || imgAgente(mvp.agente), mvp.apelido, "avatar", mvp.apelido)}
-      <span class="mvp__texto"><small>${icone("trofeu")} MVP da semana${grande ? ` · ${dataCurta(S.ini)} a ${dataCurta(S.fim)}` : ""}</small><strong>${esc(mvp.apelido)}</strong>
-        <span class="pequeno">${sinal(mv.impacto, 1, "%")} por round · K/D ${num(mv.kd, 2)} · ADR ${num(mv.adr)}${grande ? ` · ${mv.partidas} partida${mv.partidas === 1 ? "" : "s"}` : ""}</span></span></a>`;
+      <span class="mvp__foto">${imagem(imgCard(mvp.card) || imgAgente(mvp.agente), mvp.apelido, "avatar", mvp.apelido)}${fechada ? `<span class="coroa coroa--mvp" aria-hidden="true">${icone("coroa")}</span>` : ""}</span>
+      <span class="mvp__texto"><small>${icone(fechada ? "coroa" : "trofeu")} ${rotulo}${grande ? ` · ${dataCurta(S.ini)} a ${dataCurta(S.fim)}` : ""}</small><strong>${esc(mvp.apelido)}</strong>
+        <span class="pequeno">${sinal(mv.impacto, 1, "%")} por round · K/D ${num(mv.kd, 2)} · ADR ${num(mv.adr)}${grande ? ` · ${mv.partidas} partida${mv.partidas === 1 ? "" : "s"}` : ""}</span>
+        ${fechada && grande && S.seguidas > 1 ? `<span class="pequeno mvp__seguidas">${icone("fogo")} ${S.seguidas} semanas seguidas com a coroa</span>` : ""}</span></a>`;
+  return grande ? `<div class="com-particulas">${cartao}</div>` : cartao;
 }

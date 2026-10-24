@@ -2,12 +2,17 @@
 
 import {
   esc, num, pct, sinal, div, imagem, imgAgente, imgCard, imgRank, imgMapaFaixa, imgArma, nomeTier, relativo, dataCurta,
-  tile, destaque, vazio, cartao, secao, barra, escala, selo, classeSinal, classeNivel, icone, TIPOS, nomeFila,
+  tile, destaque, vazio, cartao as cartaoSimples, secao, barra, escala, selo, classeSinal, classeNivel, icone, TIPOS, nomeFila,
 } from "./util.js";
 import { B, itensDe, stats, agrupar, calor as carregarCalor, passaPartida, passaMembro } from "./dados.js";
-import { barraFiltros, listaPorDia, tabela, celulaAgente, forma, vereditoSelo, linhaPartida, segmentoTipoRound, lerTipoRound, TIPO_COD } from "./componentes.js";
+import { barraFiltros, listaPorDia, tabela, celulaAgente, forma, vereditoSelo, linhaPartida, segmentoTipoRound, lerTipoRound, TIPO_COD, miniAbas, cartaoMin } from "./componentes.js";
 import { linha, linhaElo, histograma, precisao, moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { calcularRecordes, gradeRecordes } from "./recordes.js";
+import { temCoroa, coroaSobre } from "./coroa.js";
+
+/** Todo cartão do perfil pode ser minimizado (a escolha vale para todos os jogadores, neste aparelho) */
+const chaveCartao = (t) => `j-${t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()}`;
+const cartao = (titulo, corpo, extra = "") => cartaoMin(chaveCartao(titulo), titulo, corpo, extra);
 
 const ultimoElo = (slug) => (B.elo[slug] || []).filter((h) => h.tier != null).at(-1);
 
@@ -20,9 +25,9 @@ export function cabecalhoJogador(e) {
   return `<header class="cabecalho">
     ${banner ? `<div class="cabecalho__banner" style="background-image:url('${esc(banner)}')"></div>` : ""}
     <div class="cabecalho__corpo">
-      ${imagem(imgCard(e.card) || imgAgente(e.agente), e.apelido, "avatar", e.apelido)}
+      <span class="foto-coroa">${imagem(imgCard(e.card) || imgAgente(e.agente), e.apelido, "avatar", e.apelido)}${coroaSobre(e.slug, "coroa--grande")}</span>
       <div class="cabecalho__info">
-        <h1>${esc(e.apelido)}</h1>
+        <h1>${esc(e.apelido)}${temCoroa(e.slug) ? ` <span class="selo selo--ouro titulo-coroa">${icone("coroa")} MVP da semana</span>` : ""}</h1>
         <div class="sub">${e.riot ? `<span>${esc(e.riot)}</span>` : ""}
           ${e.funcao ? `<span>${esc(e.funcao)}${e.agente ? ` · ${esc(e.agente)}` : ""}</span>` : ""}
           ${e.lvl ? `<span>Nível ${num(e.lvl)}</span>` : ""}
@@ -58,22 +63,24 @@ function cartaoAvaliacao(x, todas = [x]) {
   const solo = x.solo && (x.solo.kills || x.solo.mortes) ? `<li>Jogadas solo (a mais de ${B.meta.regras.isolado_m} m do time): ${x.solo.kills} abates, ${x.solo.mortes} mortes, saldo de ${sinal(x.solo.impacto / 100, 1)} round(s).</li>` : "";
   const seletor = todas.length > 1 ? `<label class="seletor-funcao"><span>Função</span><select data-param-sel="fn" data-padrao="${esc(todas[0].funcao)}" aria-label="Escolher a função do índice">
       ${todas.map((o) => `<option value="${esc(o.funcao)}"${o.funcao === x.funcao ? " selected" : ""}>${esc(o.funcao)} · ${o.indice}</option>`).join("")}</select></label>` : "";
-  return cartao(todas.length > 1 ? "Índice NokyLabs" : `Índice NokyLabs · ${x.funcao}`, `<div class="indice">
-      ${todas.length > 1 ? `<p class="suave pequeno" style="margin:-4px 0 4px">Jogou ${todas.length} funções nos últimos ${B.meta.regras.janela_dias} dias. Troque no seletor para ver o índice de cada uma.</p>` : ""}
-      <div class="indice__topo"><div class="indice__valor">${x.indice}<small>/100</small></div>
-        <div><div>${vereditoSelo(x.tipo, x.veredito)}</div>
-        <div class="suave pequeno" style="margin-top:4px">margem ${x.margem[0]}–${x.margem[1]} · ${x.rounds} rounds · ${x.partidas} partida${x.partidas === 1 ? "" : "s"}</div></div></div>
-      ${escala(x.indice, x.margem)}
-      <p class="suave pequeno">50 = média de ${esc(x.funcao.toLowerCase())} nos lobbies de vocês (últimos ${B.meta.regras.janela_dias} dias). Não muda com os filtros.</p>
-      ${x.vs_elo ? `<div class="vs-elo">
+  const pontos = [x.fortes.length ? `<li><strong>Pontos fortes:</strong> ${esc(x.fortes.join(", "))}</li>` : "", x.fracos.length ? `<li><strong>A melhorar:</strong> ${esc(x.fracos.join(", "))}</li>` : ""].join("");
+  const detalhes = [kit, trade, cl, solo].join("");
+  const resumo = `${pontos ? `<ul class="lista-pontos">${pontos}</ul>` : `<p class="suave pequeno">Nenhum ponto muito acima ou abaixo da média da função.</p>`}
+      <p class="suave pequeno" style="margin-top:8px">50 = média de ${esc(x.funcao.toLowerCase())} nos lobbies de vocês (últimos ${B.meta.regras.janela_dias} dias). Não muda com os filtros.</p>`;
+  const elo = x.vs_elo ? `<div class="vs-elo">
         <div class="vs-elo__topo"><span class="vs-elo__rotulo">vs ${esc(x.funcao.toLowerCase())} no ${esc(nomeTier(x.vs_elo.faixa))}</span>
           <strong>${x.vs_elo.indice}<small>/100</small></strong><span class="suave pequeno">margem ${x.vs_elo.margem[0]}–${x.vs_elo.margem[1]}</span></div>
         ${escala(x.vs_elo.indice, x.vs_elo.margem)}
         <p class="suave pequeno">Mesmo cálculo, mas comparando só com quem jogou ${esc(x.funcao.toLowerCase())} no ${esc(nomeTier(x.vs_elo.faixa))} nas partidas salvas (${x.vs_elo.amostras} ${x.vs_elo.amostras === 1 ? "referência" : "referências"}).${x.vs_elo.amostras < 15 ? " <strong>Poucas referências nesse elo:</strong> por enquanto a régua se apoia bastante na média geral, então leia com cautela." : ""}</p>
-      </div>` : ""}
-      <div class="comparacao" style="margin-top:6px">${mets}</div>
-      ${x.fortes.length || x.fracos.length ? `<ul class="lista-pontos">${x.fortes.length ? `<li><strong>Pontos fortes:</strong> ${esc(x.fortes.join(", "))}</li>` : ""}${x.fracos.length ? `<li><strong>A melhorar:</strong> ${esc(x.fracos.join(", "))}</li>` : ""}${kit}${trade}${cl}${solo}</ul>` : `<ul class="lista-pontos">${kit}${trade}${cl}${solo}</ul>`}
-    </div>`, seletor || `<span class="suave pequeno">${x.vs_elo ? "vs lobby · vs elo" : "vs lobby"}</span>`);
+      </div>` : "";
+  const extra = `${seletor}${x.vs_elo ? `<span class="selo selo--destaque indice__elo-mini" title="Índice comparando só com o mesmo elo">vs elo ${x.vs_elo.indice}</span>` : ""}`;
+  return cartaoMin("indice", todas.length > 1 ? "Índice NokyLabs" : `Índice NokyLabs · ${x.funcao}`, `<div class="indice">
+      <div class="indice__topo"><div class="indice__valor">${x.indice}<small>/100</small></div>
+        <div><div>${vereditoSelo(x.tipo, x.veredito)}</div>
+        <div class="suave pequeno" style="margin-top:4px">margem ${x.margem[0]}–${x.margem[1]} · ${x.rounds} rounds · ${x.partidas} partida${x.partidas === 1 ? "" : "s"}</div></div></div>
+      ${escala(x.indice, x.margem)}
+      ${miniAbas("indice", [["resumo", "Resumo", resumo], ["elo", "vs elo", elo], ["metricas", "Métricas", `<div class="comparacao">${mets}</div>`], ["detalhes", "Detalhes", detalhes ? `<ul class="lista-pontos">${detalhes}</ul>` : ""]])}
+    </div>`, extra);
 }
 
 // ---------- Geral ----------
@@ -447,8 +454,8 @@ async function calor(e, itens, q) {
     <div class="cartao">${moldeMapa(mapa)}
       <p class="suave pequeno" style="margin-top:10px">Calor = onde as mortes se repetem; pontos claros = mortes; verdes = de onde saiu o abate. Mortes na própria spike não entram (igual ao placar).</p></div>
     <div class="pilha">
-      ${cartao("Mapa (partidas)", `<div class="chips">${mapas.map((m) => `<button class="chip" style="cursor:pointer;${m === mapa ? "border-color:var(--destaque);color:var(--destaque-texto)" : ""}" type="button" data-param="cm" data-valor="${esc(m)}" aria-pressed="${m === mapa}">${esc(m)} <strong>${partidasPorMapa.get(m).size}</strong></button>`).join("")}</div>`)}
-      ${cartao("Mostrar", `<div class="segmentos">${[["ambos", "Mortes e abates"], ["mortes", "Só mortes"], ["abates", "Só abates"]].map(([k, t]) =>
+      ${cartaoSimples("Mapa (partidas)", `<div class="chips">${mapas.map((m) => `<button class="chip" style="cursor:pointer;${m === mapa ? "border-color:var(--destaque);color:var(--destaque-texto)" : ""}" type="button" data-param="cm" data-valor="${esc(m)}" aria-pressed="${m === mapa}">${esc(m)} <strong>${partidasPorMapa.get(m).size}</strong></button>`).join("")}</div>`)}
+      ${cartaoSimples("Mostrar", `<div class="segmentos">${[["ambos", "Mortes e abates"], ["mortes", "Só mortes"], ["abates", "Só abates"]].map(([k, t]) =>
         `<button type="button" data-param="cv" data-valor="${k}" aria-pressed="${k === ver}">${t}</button>`).join("")}</div>
         <div class="segmentos" style="margin-top:8px">${[["-1", "Os dois lados"], ["0", "Ataque"], ["1", "Defesa"]].map(([k, t]) =>
         `<button type="button" data-param="cl" data-valor="${k}" aria-pressed="${String(lado) === k}">${t}</button>`).join("")}</div>

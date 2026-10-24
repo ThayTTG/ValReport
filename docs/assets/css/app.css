@@ -100,7 +100,7 @@ p { margin: 0; }
 .so-claro { display: none; }
 :root[data-tema="claro"] .so-escuro { display: none; } :root[data-tema="claro"] .so-claro { display: block; }
 @media (prefers-color-scheme: light) { :root:not([data-tema="escuro"]) .so-escuro { display: none; } :root:not([data-tema="escuro"]) .so-claro { display: block; } }
-.topo__jogadores { max-width: var(--largura); margin: 0 auto; padding: 0 var(--gutter) 10px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.topo__jogadores { max-width: var(--largura); margin: 0 auto; padding: 5px var(--gutter) 10px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .topo__jogadores::-webkit-scrollbar { display: none; }
 .pilula-jogador { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid var(--borda); background: var(--superficie); color: var(--texto-2); font-weight: 600; font-size: 13.5px; white-space: nowrap; }
 .pilula-jogador:hover { text-decoration: none; border-color: var(--destaque); }
@@ -718,3 +718,109 @@ main[data-anim="pagina"] .lados__barra i, main[data-anim="aba"] .lados__barra i 
 }
 /* Cartões lado a lado na grade alinham pelo topo (a margem de pilha não vale aqui) */
 .grade-2 > .cartao + .cartao, .grade-2 > .pilha + .cartao, .grade-2 > .cartao + .pilha { margin-top: 0; }
+
+/* ---------- Cartões minimizáveis e abas internas ---------- */
+.cartao__acoes { display: flex; align-items: center; gap: 8px; margin-left: auto; min-width: 0; }
+.minimizar { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; border: 1px solid var(--borda); background: var(--superficie-2); color: var(--texto-2); cursor: pointer; transition: background .2s, color .2s; }
+.minimizar:hover { background: var(--destaque-suave); color: var(--destaque-texto); }
+.minimizar svg { font-size: 14px; transform: rotate(-90deg); transition: transform .25s cubic-bezier(.2, .7, .2, 1.2); }
+.cartao--min.minimizado .minimizar svg { transform: rotate(90deg); }
+.cartao--min .cartao__corpo { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .3s ease, opacity .25s ease; }
+.cartao--min .cartao__corpo > * { min-height: 0; }
+.cartao--min.minimizado .cartao__corpo { grid-template-rows: 0fr; opacity: 0; overflow: hidden; }
+.cartao--min.minimizado .cartao__titulo { margin-bottom: 0; }
+.cartao--min.minimizado { padding-bottom: 12px; padding-top: 12px; }
+.cartao--min .cartao__corpo > :only-child { overflow: hidden; }
+.mini-abas { display: grid; gap: 10px; margin-top: 2px; }
+.mini-abas__lista { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: var(--superficie-2); overflow-x: auto; scrollbar-width: none; }
+.mini-abas__lista button { flex: 1; white-space: nowrap; padding: 6px 10px; border: 0; border-radius: 999px; background: none; color: var(--texto-2); font: 600 12.5px var(--fonte); cursor: pointer; transition: background .2s, color .2s; }
+.mini-abas__lista button[aria-selected="true"] { background: var(--superficie); color: var(--destaque-texto); box-shadow: 0 1px 4px rgba(0, 0, 0, .15); }
+.mini-abas__painel { animation: surgir .25s ease; }
+.indice__elo-mini { font-size: 11.5px; }
+@media (max-width: 420px) { .indice__elo-mini { display: none; } }
+
+/* ---------- Topo minimizável e botão NokyLabs ---------- */
+.topo { position: sticky; }
+.topo__jogadores { max-height: 80px; transition: max-height .3s ease, padding .3s ease, opacity .25s ease; }
+.topo-min .topo__jogadores { max-height: 0; padding-bottom: 0; opacity: 0; overflow: hidden; }
+.topo__puxador { position: absolute; left: 50%; bottom: -12px; translate: -50% 0; z-index: 2; display: grid; place-items: center; width: 44px; height: 22px; border-radius: 0 0 12px 12px; border: 1px solid var(--borda); border-top: 0;
+  background: color-mix(in srgb, var(--fundo) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: var(--suave); cursor: pointer; transition: color .2s, height .2s; }
+.topo__puxador:hover { color: var(--destaque-texto); height: 25px; }
+.topo__puxador svg { font-size: 14px; transform: rotate(-90deg); transition: transform .3s cubic-bezier(.2, .7, .2, 1.2); }
+.topo-min .topo__puxador svg { transform: rotate(90deg); }
+.botao-nokylabs { width: auto; padding: 0 12px; gap: 6px; grid-auto-flow: column; color: var(--texto-2); font-weight: 600; font-size: 13.5px; }
+.botao-nokylabs:hover { text-decoration: none; color: var(--destaque-texto); }
+@media (max-width: 700px) { .botao-nokylabs { width: 40px; padding: 0; } .botao-nokylabs span { display: none; } }
+@media (max-width: 440px) { .marca__texto { display: none; } .topo__linha { gap: 8px; } }
+.rodape__noky { font-weight: 600; }
+
+/* ---------- Coroa do MVP da semana ---------- */
+.foto-coroa { position: relative; display: inline-flex; flex: none; }
+.coroa { position: absolute; top: -12px; left: 50%; translate: -50% 0; z-index: 2; display: grid; place-items: center; width: 26px; height: 22px; color: var(--ouro); font-size: 22px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45)); transform-origin: 50% 100%; animation: coroaBalanca 3.4s ease-in-out infinite; pointer-events: auto; }
+.coroa svg { width: 1em; height: 1em; }
+.coroa--grande { top: -20px; font-size: 34px; width: 40px; height: 32px; }
+.coroa--mini { top: -9px; font-size: 14px; width: 16px; height: 13px; }
+.coroa--mvp { top: -16px; font-size: 26px; }
+.mvp__foto { position: relative; display: inline-flex; flex: none; }
+@keyframes coroaBalanca { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg) translateY(-1px); } }
+.pilula-jogador .foto-coroa img, .pilula-jogador .foto-coroa .avatar-vazio { margin: 0; }
+.titulo-coroa { vertical-align: middle; font-size: 12px; margin-left: 6px; font-family: var(--fonte); letter-spacing: 0; }
+.mvp--coroa { border-color: color-mix(in srgb, var(--ouro) 65%, var(--borda)); }
+.mvp--coroa .mvp__texto small svg { color: var(--ouro); }
+.mvp__seguidas { display: inline-flex; align-items: center; gap: 4px; color: var(--alerta); font-weight: 700; margin-top: 2px; }
+.pilha-mvp { display: grid; gap: 8px; justify-items: stretch; }
+.ver-coroa { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.ver-coroa svg { color: var(--ouro); }
+
+/* ---------- Partículas ---------- */
+.com-particulas { position: relative; display: grid; }
+.com-particulas > .mvp { height: 100%; }
+.com-particulas > .mvp--grande { animation: pulsoBorda 3.2s ease-in-out infinite; }
+@keyframes pulsoBorda { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 22px 2px color-mix(in srgb, var(--ouro) 35%, transparent); } }
+.particulas { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.particulas i { position: absolute; width: var(--t); height: var(--t); border-radius: 50%; opacity: 0; animation: faisca var(--d) ease-out var(--a) infinite; }
+.particulas .p-ouro { background: var(--ouro); box-shadow: 0 0 8px var(--ouro); }
+.particulas .p-tema { background: var(--destaque); box-shadow: 0 0 8px var(--destaque); }
+.particulas .p-claro { background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, .9); }
+@keyframes faisca { 0% { opacity: 0; transform: translate(0, 0) scale(.6); } 15% { opacity: 1; } 70% { opacity: .8; } 100% { opacity: 0; transform: translate(var(--dx), calc(-1 * var(--sobe))) scale(.2); } }
+
+/* ---------- Revelação do MVP da semana ---------- */
+.revela-aberta, .revela-aberta body { overflow: hidden; }
+.revela { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; }
+.revela__fundo { position: absolute; inset: 0; background: rgba(8, 6, 14, .55); backdrop-filter: blur(12px) saturate(1.1); -webkit-backdrop-filter: blur(12px) saturate(1.1); opacity: 0; transition: opacity .35s ease; }
+.revela.visivel .revela__fundo { opacity: 1; }
+.revela__palco { position: relative; width: min(100%, 400px); }
+.revela__cartao { position: relative; overflow: hidden; display: grid; justify-items: center; text-align: center; gap: 6px; padding: 34px 22px 22px; border-radius: 26px; color: var(--texto);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--ouro) 26%, var(--superficie)), var(--superficie) 60%); border: 1.5px solid color-mix(in srgb, var(--ouro) 70%, var(--borda)); box-shadow: 0 30px 80px rgba(0, 0, 0, .5), 0 0 40px color-mix(in srgb, var(--ouro) 30%, transparent);
+  opacity: 0; transform: translateY(30px) scale(.85); }
+.revela.visivel .revela__cartao { animation: revelaEntra .7s cubic-bezier(.2, .8, .25, 1.25) .15s forwards; }
+.revela.saindo .revela__cartao { opacity: 1; transform: none; transition: opacity .3s, transform .3s; opacity: 0; transform: scale(.94); }
+@keyframes revelaEntra { to { opacity: 1; transform: none; } }
+.revela__banner { position: absolute; inset: 0 0 auto; height: 120px; background-size: cover; background-position: center 30%; opacity: .28; mask-image: linear-gradient(180deg, #000, transparent); -webkit-mask-image: linear-gradient(180deg, #000, transparent); }
+.revela__cartao > :not(.revela__banner) { position: relative; }
+.revela__medalha { position: absolute !important; top: 10px; right: 20px; font-size: 44px; color: var(--ouro); filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35)); transform-origin: 50% 0; animation: medalha 2.6s ease-in-out 1s infinite; }
+@keyframes medalha { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+.revela__rotulo { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--texto-2); }
+.revela__foto { position: relative; margin: 22px 0 6px; }
+.revela__foto .avatar { width: 112px; height: 112px; border-radius: 30px; box-shadow: 0 0 0 4px var(--ouro), 0 12px 30px rgba(0, 0, 0, .4); font-size: 30px; }
+.revela__coroa { position: absolute; top: -40px; left: 50%; translate: -50% 0; font-size: 52px; color: var(--ouro); filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .45)); opacity: 0; }
+.revela.visivel .revela__coroa { animation: coroaCai .8s cubic-bezier(.3, 1.4, .5, 1) .75s forwards, coroaBalanca 3.4s ease-in-out 1.6s infinite; }
+@keyframes coroaCai { from { opacity: 0; transform: translateY(-60px) rotate(-25deg) scale(1.3); } to { opacity: 1; transform: none; } }
+.revela h2 { font: 700 34px var(--fonte-titulo); letter-spacing: -.02em; }
+.revela__seguidas { font-weight: 700; color: var(--destaque-texto); font-size: 14px; }
+.revela__nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; margin-top: 8px; }
+.revela__nums div { display: grid; padding: 9px 4px; border-radius: 12px; background: color-mix(in srgb, var(--superficie-2) 85%, transparent); }
+.revela__nums strong { font: 700 18px var(--fonte-titulo); white-space: nowrap; }
+.revela__nums small { font-size: 10.5px; color: var(--suave); font-weight: 600; }
+.revela__equipe { font-size: 13px; color: var(--texto-2); margin-top: 4px; }
+.revela__botoes { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+.revela__ok { padding: 11px 26px; border: 0; border-radius: 999px; background: var(--destaque); color: var(--sobre-destaque); font: 700 15px var(--fonte); cursor: pointer; box-shadow: 0 6px 18px color-mix(in srgb, var(--destaque) 40%, transparent); transition: transform .2s; }
+.revela__ok:hover { transform: translateY(-2px); }
+.revela__link { padding: 11px 18px; border-radius: 999px; border: 1px solid var(--borda); color: var(--texto-2); font-weight: 600; font-size: 14px; }
+.revela__link:hover { text-decoration: none; border-color: var(--destaque); color: var(--destaque-texto); }
+.revela__alvo .particulas { inset: -10px; }
+.revela__confete { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.revela__confete i { position: absolute; top: -20px; width: 8px; height: 13px; border-radius: 2px; opacity: 0; animation: confete var(--d) cubic-bezier(.3, .6, .5, 1) var(--a) forwards; }
+@keyframes confete { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), 105vh) rotate(var(--g)); } }
+@media (max-width: 420px) { .revela h2 { font-size: 28px; } .revela__nums strong { font-size: 15px; } .revela__foto .avatar { width: 92px; height: 92px; } }
+@media (prefers-reduced-motion: reduce) { .particulas, .revela__confete { display: none; } .revela__cartao, .revela__coroa { opacity: 1 !important; transform: none !important; } .revela__fundo { opacity: 1; } }

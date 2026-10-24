@@ -17,7 +17,7 @@ async function json(caminho) {
 
 const NOTAS_VAZIAS = { partidas: {}, mapas: {} };
 export const B = { meta: null, partidas: [], avaliacao: {}, formacoes: { formacoes: [], pares: [] }, porId: new Map(), equipe: [], porSlug: new Map(),
-  semana: null, notas: NOTAS_VAZIAS, elo: {}, editor: false };
+  semana: null, coroa: null, notas: NOTAS_VAZIAS, elo: {}, editor: false };
 
 /** No PC da IGL (editar_notas.bat), o site ganha botões para escrever notas */
 async function detectarEditor() {
@@ -30,17 +30,19 @@ async function detectarEditor() {
 
 export async function carregarBase() {
   const editor = await detectarEditor();
-  const [meta, partidas, avaliacao, formacoes, semana, notas, elo] = await Promise.all([
+  const [meta, partidas, avaliacao, formacoes, semana, notas, elo, fechada] = await Promise.all([
     json("data/meta.json"), json("data/partidas.json"),
     json("data/avaliacao.json").catch(() => ({})), json("data/formacoes.json").catch(() => ({ formacoes: [], pares: [] })),
     json("data/semana.json").catch(() => null), json(editor ? "api/notas" : "data/notas.json").catch(() => NOTAS_VAZIAS),
-    json("data/elo.json").catch(() => ({})),
+    json("data/elo.json").catch(() => ({})), json("data/semana_fechada.json").catch(() => null),
   ]);
   partidas.sort((a, b) => (a.t < b.t ? 1 : -1));  // mais recente primeiro
   Object.assign(B, { meta, partidas, avaliacao, formacoes, semana, notas: { ...NOTAS_VAZIAS, ...notas }, elo, editor,
     porId: new Map(partidas.map((p) => [p.id, p])) });
   B.equipe = meta.equipe;
   B.porSlug = new Map(meta.equipe.map((e) => [e.slug, e]));
+  // Coroa: MVP da última semana fechada (domingo 21h), se ele aparece no site
+  B.coroa = fechada?.mvp && B.porSlug.has(fechada.mvp) ? fechada : null;
   return B;
 }
 export const detalhe = (id) => json(`data/partidas/${id}.json`);

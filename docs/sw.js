@@ -2,11 +2,11 @@
 // Estratégia: o site e os dados vêm sempre da rede primeiro (nunca mostra versão velha quando há internet);
 // sem internet, usa a última cópia guardada. Imagens do valorant-api.com ficam guardadas (não mudam).
 
-const VERSAO = "valreport-v3";
+const VERSAO = "valreport-v4";
 const SITE = `${VERSAO}-site`, IMAGENS = `${VERSAO}-imagens`;
 const ESSENCIAL = ["./", "index.html", "assets/css/app.css", "assets/js/app.js", "assets/js/util.js", "assets/js/dados.js",
   "assets/js/componentes.js", "assets/js/graficos.js", "assets/js/jogador.js", "assets/js/partida.js", "assets/js/equipe.js",
-  "assets/js/sobre.js", "assets/js/recordes.js", "assets/js/animar.js", "assets/js/hoje.js", "assets/fonts/inter-400.woff", "assets/fonts/inter-600.woff",
+  "assets/js/sobre.js", "assets/js/recordes.js", "assets/js/animar.js", "assets/js/hoje.js", "assets/js/coroa.js", "assets/fonts/inter-400.woff", "assets/fonts/inter-600.woff",
   "assets/img/logo.svg", "manifest.webmanifest"];
 const LIMITE_IMAGENS = 400;
 

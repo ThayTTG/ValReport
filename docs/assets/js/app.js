@@ -2,7 +2,8 @@
 
 import { esc, imagem, imgCard, imgAgente, definirMeta, dataHora, vazio, larguraGrafico } from "./util.js";
 import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache } from "./dados.js";
-import { alternarOrdem } from "./componentes.js";
+import { alternarOrdem, trocarMiniAba, alternarMinimizado } from "./componentes.js";
+import { coroaSobre, abrirRevelacao, talvezRevelar } from "./coroa.js";
 import { viewJogador } from "./jogador.js";
 import { viewPartida } from "./partida.js";
 import { viewEquipe } from "./equipe.js";
@@ -136,6 +137,11 @@ main.addEventListener("click", (ev) => {
     document.getElementById(rolar.dataset.rolar)?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
+  const mini = ev.target.closest("[data-mini-aba]");
+  if (mini) { trocarMiniAba(mini); return; }
+  const minimizar = ev.target.closest("[data-minimizar]");
+  if (minimizar) { alternarMinimizado(minimizar); return; }
+  if (ev.target.closest("[data-ver-coroa]")) { abrirRevelacao(); return; }
   const salvar = ev.target.closest("[data-salvar-nota]");
   if (salvar) { gravarNota(salvar); return; }
   const voltar = ev.target.closest("[data-voltar]");
@@ -204,6 +210,22 @@ function ajustarTopo() {
   document.documentElement.style.setProperty("--topo-altura", `${h}px`);
 }
 
+// ---------- Topo minimizável (esconde a fileira de jogadores) ----------
+const botaoTopo = document.getElementById("minimizar-topo");
+function aplicarTopo(min) {
+  document.body.classList.toggle("topo-min", min);
+  botaoTopo.setAttribute("aria-expanded", String(!min));
+  botaoTopo.setAttribute("aria-label", min ? "Mostrar os jogadores no topo" : "Esconder os jogadores do topo");
+  botaoTopo.title = min ? "Mostrar jogadores" : "Esconder jogadores";
+}
+try { aplicarTopo(localStorage.getItem("valreport.topo") === "min"); } catch (e) { aplicarTopo(false); }
+botaoTopo.addEventListener("click", () => {
+  const min = !document.body.classList.contains("topo-min");
+  aplicarTopo(min);
+  try { localStorage.setItem("valreport.topo", min ? "min" : "aberto"); } catch (e) { /* sem armazenamento */ }
+  setTimeout(ajustarTopo, 320);  // depois da transição, as abas grudam no lugar certo
+});
+
 // ---------- Dados novos: o site confere sozinho a cada 20 min (e no botão Atualizar) ----------
 const INTERVALO_MS = 20 * 60 * 1000;
 const botaoAtualizar = document.getElementById("atualizar");
@@ -222,7 +244,7 @@ function avisar(texto, tipo = "") {
 function preencherTopo() {
   definirMeta(B.meta);
   document.getElementById("lista-jogadores").innerHTML = B.equipe.map((e) =>
-    `<a class="pilula-jogador" data-slug="${esc(e.slug)}" href="#/j/${esc(e.slug)}">${imagem(imgCard(e.card) || imgAgente(e.agente), "", "", e.apelido)}${esc(e.apelido)}</a>`).join("");
+    `<a class="pilula-jogador" data-slug="${esc(e.slug)}" href="#/j/${esc(e.slug)}"><span class="foto-coroa">${imagem(imgCard(e.card) || imgAgente(e.agente), "", "", e.apelido)}${coroaSobre(e.slug, "coroa--mini")}</span>${esc(e.apelido)}</a>`).join("");
   document.getElementById("gerado-em").textContent = `Dados atualizados em ${dataHora(B.meta.gerado_em)} · ${B.meta.contagem.partidas} partidas · o site confere se há novidades a cada 20 minutos`;
   ajustarTopo();
 }
@@ -300,6 +322,7 @@ async function iniciar() {
   preencherTopo();
   ultimaConferida = Date.now();
   ligarBrilho(main);
-  renderizar();
+  await renderizar();
+  talvezRevelar();
 }
 iniciar();
