@@ -73,14 +73,16 @@ function cartaoAvaliacao(x, todas = [x]) {
         ${escala(x.vs_elo.indice, x.vs_elo.margem)}
         <p class="suave pequeno">Mesmo cálculo, mas comparando só com quem jogou ${esc(x.funcao.toLowerCase())} no ${esc(nomeTier(x.vs_elo.faixa))} nas partidas salvas (${x.vs_elo.amostras} ${x.vs_elo.amostras === 1 ? "referência" : "referências"}).${x.vs_elo.amostras < 15 ? " <strong>Poucas referências nesse elo:</strong> por enquanto a régua se apoia bastante na média geral, então leia com cautela." : ""}</p>
       </div>` : "";
-  const extra = `${seletor}${x.vs_elo ? `<span class="selo selo--destaque indice__elo-mini" title="Índice comparando só com o mesmo elo">vs elo ${x.vs_elo.indice}</span>` : ""}`;
+  const eloMini = x.vs_elo ? `<span class="selo selo--destaque indice__elo-mini" title="Índice comparando só com o mesmo elo">vs elo ${x.vs_elo.indice}</span>` : "";
+  const barraTopo = seletor || eloMini ? `<div class="indice__barra">${seletor}${eloMini}</div>` : "";
   return cartaoMin("indice", todas.length > 1 ? "Índice NokyLabs" : `Índice NokyLabs · ${x.funcao}`, `<div class="indice">
+      ${barraTopo}
       <div class="indice__topo"><div class="indice__valor">${x.indice}<small>/100</small></div>
         <div><div>${vereditoSelo(x.tipo, x.veredito)}</div>
         <div class="suave pequeno" style="margin-top:4px">margem ${x.margem[0]}–${x.margem[1]} · ${x.rounds} rounds · ${x.partidas} partida${x.partidas === 1 ? "" : "s"}</div></div></div>
       ${escala(x.indice, x.margem)}
       ${miniAbas("indice", [["resumo", "Resumo", resumo], ["elo", "vs elo", elo], ["metricas", "Métricas", `<div class="comparacao">${mets}</div>`], ["detalhes", "Detalhes", detalhes ? `<ul class="lista-pontos">${detalhes}</ul>` : ""]])}
-    </div>`, extra);
+    </div>`);
 }
 
 // ---------- Geral ----------

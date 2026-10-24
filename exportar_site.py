@@ -747,8 +747,9 @@ def exportar(cfg=None, verificar=False):
     return PASTA_DATA
 
 
-def publicar(mensagem=None):
-    """git add docs + commit + push. Só funciona se esta pasta for um clone do repositório (veja PUBLICAR.md)."""
+def publicar(mensagem=None, tudo=False):
+    """git add docs (ou tudo, com tudo=True) + commit + push. Só funciona se esta pasta for um clone do repositório (veja PUBLICAR.md).
+    tudo=True é usado pelo publicar_site.bat: envia também o código e os textos; config.json, dados/ e notas/ ficam de fora pelo .gitignore."""
     def git(*args):
         # CREATE_NO_WINDOW: na coleta rápida (sem janela) o Git não abre um console piscando na tela
         return subprocess.run(["git", *args], cwd=PASTA, capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -760,7 +761,13 @@ def publicar(mensagem=None):
     except FileNotFoundError:
         print("Site: Git não encontrado no PC (instale o Git para Windows). Nada publicado.")
         return False
-    git("add", "docs")
+    if tudo:
+        # Trava de segurança: nunca publica arquivos privados, mesmo se o .gitignore tiver sido apagado
+        ign = (PASTA / ".gitignore").read_text(encoding="utf-8") if (PASTA / ".gitignore").exists() else ""
+        if not all(x in ign for x in ("config.json", "dados/", "notas/")):
+            print("Site: o .gitignore não protege config.json, dados/ e notas/. Publicando só a pasta docs por segurança.")
+            tudo = False
+    git("add", "." if tudo else "docs")
     if git("diff", "--cached", "--quiet").returncode == 0:
         print("Site: nada mudou desde a última publicação.")
         return True
@@ -790,4 +797,4 @@ def exportar_e_publicar(cfg=None):
 if __name__ == "__main__":
     ok = exportar(verificar="--verificar" in sys.argv)
     if ok and "--publicar" in sys.argv:
-        publicar()
+        publicar(tudo="--tudo" in sys.argv)

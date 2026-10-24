@@ -61,7 +61,8 @@ export function viewHoje(q) {
         <p>${ps.length ? `${ps.length} partida${ps.length === 1 ? "" : "s"} ${ehHoje ? "até agora" : "neste dia"}: <strong class="bom">${v}V</strong> · <strong class="ruim">${d}D</strong>` : ehHoje ? "Ainda sem partidas hoje." : "Sem partidas neste dia."}
           <span class="suave"> · dados atualizados ${esc(relativo(B.meta.gerado_em))}</span></p></div>
       ${ps.length ? `<div class="hoje-placar"><strong>${pct(v + d ? v / (v + d) : null)}</strong><small>de vitórias</small></div>` : ""}
-    </header>${navDias(dia)}`;
+    </header>`;
+  const nav = navDias(dia);
 
   if (!ps.length) {
     const ultimo = diasComPartidas().filter((x) => x < dia).at(-1);
@@ -69,7 +70,7 @@ export function viewHoje(q) {
     const rU = psU.map(resultadoEquipe);
     const melhorU = ultimo ? cadaUm(ultimo)[0] : null;
     const S = B.semana;
-    return { titulo: "Início", html: `${topo}
+    return { titulo: "Início", html: `<div class="hoje-cabeca">${topo}</div>${nav}
       <section class="hoje-vazio">
         <span class="hoje-vazio__icone" aria-hidden="true">${icone("alvo")}</span>
         <h2>${ehHoje ? "Sem partidas por ora." : "Ninguém da equipe jogou neste dia."}</h2>
@@ -89,20 +90,17 @@ export function viewHoje(q) {
   const todos = linhas.flatMap((x) => x.itens);
   const t = stats(todos);
   const melhor = linhas.find((x) => x.s.impr != null);
-  const html = `${topo}
+  const html = `<div class="hoje-cabeca${melhor ? " hoje-cabeca--dupla" : ""}">${topo}${melhor ? cartaoDestaqueDia(melhor) : ""}</div>${nav}
     <div class="destaques secao">
       ${destaque("Partidas", num(ps.length), `${num(ps.reduce((a, p) => a + Math.max(...Object.values(p.m).map((m) => m.rt || 0)), 0))} rounds`)}
       ${destaque("Vitórias", pct(v + d ? v / (v + d) : null), `${v}V · ${d}D`, v > d ? "bom" : v < d ? "ruim" : "")}
       ${destaque("Impacto da equipe", sinal(t.impr, 1, "%"), "por round, somando todos", classeSinal(t.impr, 1))}
       ${destaque("K/D da equipe", num(t.kd, 2), `${t.k} abates · ${t.mo} mortes`)}
     </div>
-    <div class="hoje-meio secao">
-      ${melhor ? cartaoDestaqueDia(melhor) : ""}
-      <div class="hoje-jogadores">${linhas.map((x) => `<a class="hoje-jog" href="#/j/${esc(x.e.slug)}/partidas">
+    ${secao(ehHoje ? "Cada um hoje" : "Cada um no dia", `<div class="hoje-jogadores">${linhas.map((x) => `<a class="hoje-jog" href="#/j/${esc(x.e.slug)}/partidas">
           ${imagem(imgCard(x.e.card) || imgAgente(x.e.agente), x.e.apelido, "hoje-jog__foto", x.e.apelido)}
           <span class="hoje-jog__nome"><strong>${esc(x.e.apelido)}</strong><small>${x.s.n} partida${x.s.n === 1 ? "" : "s"} · ${x.s.v}V ${x.s.d}D</small></span>
-          <span class="hoje-jog__num"><strong class="${classeSinal(x.s.impr, 1)}">${sinal(x.s.impr, 1, "%")}</strong><small>K/D ${num(x.s.kd, 2)}</small></span></a>`).join("")}</div>
-    </div>
+          <span class="hoje-jog__num"><strong class="${classeSinal(x.s.impr, 1)}">${sinal(x.s.impr, 1, "%")}</strong><small>K/D ${num(x.s.kd, 2)}</small></span></a>`).join("")}</div>`, `<span class="suave pequeno">por impacto por round</span>`)}
     ${secao(ehHoje ? "Partidas de hoje" : "Partidas do dia", listaEquipe(ps))}
     ${atalhos()}`;
   return { titulo: "Início", html };
