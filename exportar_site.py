@@ -403,6 +403,45 @@ def vs_elo(recs, funcao, faixa, refs_faixa, cfg):
 # Notas da IGL, histórico de elo e prévia de compartilhamento
 # ----------------------------------------------------------------------------
 
+def semana_com_slugs(sem, slug):
+    """Troca Riot IDs por apelidos públicos (slugs) no resumo da semana."""
+    for x in sem["jogadores"]:
+        x["slug"] = slug[x.pop("rid")]
+    for x in sem["destaques"] + sem["rever"]:
+        x["slug"] = slug[x.pop("rid")]
+    sem["mvp"] = slug.get(sem["mvp"]) if sem["mvp"] else None
+    return sem
+
+
+def fim_da_semana_fechada(agora):
+    """A semana fecha no domingo às 21h (junto com o report e o card do Discord)."""
+    domingo = agora - timedelta(days=(agora.weekday() + 1) % 7)
+    fim = domingo.replace(hour=21, minute=0, second=0, microsecond=0)
+    return fim if fim <= agora else fim - timedelta(days=7)
+
+
+def semana_fechada(ctx, cfg, autorizados, slug, agora=None, max_semanas=8):
+    """Última semana fechada (segunda a domingo 21h): o MVP dela fica com a coroa até a próxima fechar.
+    "seguidas" = quantas semanas fechadas seguidas a mesma pessoa foi MVP."""
+    fim = fim_da_semana_fechada(agora or datetime.now(av.FUSO_BR))
+    sem = semana_com_slugs(gr.resumo_semana(ctx, cfg, autorizados, fim), slug)
+    seguidas, anterior = (1 if sem["mvp"] else 0), None
+    for k in range(1, max_semanas):
+        outra = gr.resumo_semana(ctx, cfg, autorizados, fim - timedelta(days=7 * k))
+        mvp = slug.get(outra["mvp"]) if outra["mvp"] else None
+        if k == 1:
+            anterior = mvp
+        if not sem["mvp"] or mvp != sem["mvp"]:
+            break
+        seguidas += 1
+    sem["id"] = fim.date().isoformat()
+    sem["seguidas"] = seguidas
+    sem["mvp_anterior"] = anterior
+    sem["destaques"] = sem["destaques"][:1]  # só o round da semana (a lista completa fica na aba Semana)
+    sem["rever"] = []
+    return sem
+
+
 def notas_json(cfg, partidas_ids):
     site = cfg.get("site") or {}
     vazio = {"partidas": {}, "mapas": {}}
@@ -657,13 +696,9 @@ def exportar(cfg=None, verificar=False):
         tamanho += gravar(PASTA_DATA / "calor" / f"{sl}.json", c)
     faixas = {rid: faixa_de(membros_info[slug[rid]]["tn"]) for rid in autorizados}
     tamanho += gravar(PASTA_DATA / "avaliacao.json", avaliacao_json(ctx14, cfg, autorizados, slug, ctx, faixas))
-    sem = gr.resumo_semana(ctx, cfg, autorizados, datetime.now(av.FUSO_BR))
-    for x in sem["jogadores"]:
-        x["slug"] = slug[x.pop("rid")]
-    for x in sem["destaques"] + sem["rever"]:
-        x["slug"] = slug[x.pop("rid")]
-    sem["mvp"] = slug.get(sem["mvp"]) if sem["mvp"] else None
+    sem = semana_com_slugs(gr.resumo_semana(ctx, cfg, autorizados, datetime.now(av.FUSO_BR)), slug)
     tamanho += gravar(PASTA_DATA / "semana.json", sem)
+    tamanho += gravar(PASTA_DATA / "semana_fechada.json", semana_fechada(ctx, cfg, autorizados, slug))
     tamanho += gravar(PASTA_DATA / "notas.json", notas_json(cfg, {p["id"] for p in indice}))
     tamanho += gravar(PASTA_DATA / "elo.json", elo_json(autorizados, slug))
     atualizar_previa(site)
