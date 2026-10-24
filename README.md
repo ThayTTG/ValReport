@@ -18,9 +18,9 @@ Report diário e site de estatísticas da nossa equipe de VALORANT, com partidas
 
 ### Abas do site
 
-- **Por jogador:** Geral · Partidas · Agentes · Mapas · Armas · Performance · Mapa de calor
-- **Equipe:** Visão geral (com ranking) · Partidas · Formações · Sinergia · Comparar · Mapas
-- **Por partida:** Placar · Rounds (killfeed, economia e leitura de cada round) · Mapa 2D · Leitura da equipe
+- **Por jogador:** Geral · Partidas · Agentes · Mapas · Armas · Performance (com evolução de elo e recordes pessoais) · Mapa de calor (filtra por tipo de round)
+- **Equipe:** Visão geral (com ranking) · Semana (MVP, comparação com a semana anterior, rounds para rever) · Partidas · Formações · Sinergia · Comparar · Mapas (com o plano da IGL) · Recordes
+- **Por partida:** Placar · Rounds (killfeed, economia e leitura de cada round) · Mapa 2D · Leitura da equipe · Notas da IGL
 - **Filtros:** fila, temporada, período, mapa, agente e "com quem" (sem a equipe, com a equipe, com uma pessoa específica)
 
 ### O que é diferente de um tracker comum
@@ -29,6 +29,9 @@ Report diário e site de estatísticas da nossa equipe de VALORANT, com partidas
 - **Índice NokyLabs (0–100) por função:** 50 é a média da mesma função **nos lobbies de vocês**, com margem de confiança e veredito só a partir de 100 rounds.
 - **Trades e posicionamento:** distância até o aliado mais próximo em cada morte, mortes trocadas e jogadas solo.
 - **Formações e sinergia:** sozinho × juntos, quem vinga quem e a taxa de vitória de cada dupla.
+- **Régua “vs elo”:** o mesmo índice comparado só com quem joga a mesma função na mesma faixa de elo.
+- **Notas da IGL:** a IGL escreve o plano de cada mapa e a leitura de partidas e rounds num editor local, e as notas aparecem no site.
+- **App instalável:** o site funciona como app no celular (PWA), com ícone e leitura sem internet, e tem prévia bonita quando o link é compartilhado.
 
 A metodologia completa está na página **Sobre** do site e em [`avaliacao.py`](avaliacao.py).
 
@@ -82,10 +85,12 @@ Para ver o site no próprio PC antes de publicar: `py -m http.server 8000 -d doc
 ├── cards.py, mapa_calor.py  cards em imagem (Pillow)
 ├── discord_envio.py         envio por webhook
 ├── exportar_site.py         JSON do site + publicação (git)
+├── notas_igl.py             editor local das Notas da IGL (abre com editar_notas.bat)
 ├── docs/                    o site (HTML, CSS, JS, fontes) + docs/data (gerado)
 ├── fontes/                  Inter (SIL OFL 1.1) para os cards
 ├── config.exemplo.json      modelo do config.json (o real fica fora do Git)
-└── dados/                   partidas, cache, reports e logs, só no PC (fora do Git)
+├── notas/                   rascunho das notas da IGL, só no PC (fora do Git)
+└── dados/                   partidas, cache, histórico de elo, reports e logs, só no PC (fora do Git)
 ```
 
 ## Créditos

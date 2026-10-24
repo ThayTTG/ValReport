@@ -19,11 +19,12 @@ Uso:
 
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import avaliacao as av
@@ -33,6 +34,10 @@ PASTA = Path(__file__).resolve().parent
 PASTA_SITE = PASTA / "docs"
 PASTA_DATA = PASTA_SITE / "data"
 ARQ_MAPAS = PASTA / "dados" / "cache" / "mapas" / "mapas.json"
+ARQ_NOTAS = PASTA / "notas" / "notas.json"
+PASTA_ELO = PASTA / "dados" / "elo"
+URL_PADRAO = "https://thayttg.github.io/ValReport/"
+CODIGO_TIPO = {"pistol": 0, "eco": 1, "force": 2, "armado": 3, "anti-eco": 4}
 VERSAO_DADOS = 1
 TIERS_UUID = "03621f52-342b-cf4e-4f86-9350a49c6d04"  # tabela de elos atual da valorant-api
 
@@ -308,6 +313,7 @@ def eventos_calor(bruta, a, pu):
     validos = {r.get("id") for r in av.rounds_validos(bruta)}
     j = a["jogadores"].get(pu) or {}
     lado = {r["n"]: (0 if r["lado"] == "ataque" else 1) for r in j.get("rounds") or []}
+    tipo = {r["n"]: CODIGO_TIPO.get(r["tipo"], -1) for r in j.get("rounds") or []}
     out = []
     for k in bruta.get("kills") or []:
         rid = k.get("round")
@@ -315,12 +321,12 @@ def eventos_calor(bruta, a, pu):
             continue
         vit, mat = g(k, "victim", "puuid"), g(k, "killer", "puuid")
         if vit == pu and mat != vit and k.get("location"):  # morte na própria spike não conta (igual ao placar)
-            out.append([0, lado.get(rid + 1, -1), k["location"]["x"], k["location"]["y"], rid + 1])
+            out.append([0, lado.get(rid + 1, -1), k["location"]["x"], k["location"]["y"], rid + 1, tipo.get(rid + 1, -1)])
         elif mat == pu and vit != pu:
             loc = next((pl.get("location") for pl in k.get("player_locations") or []
                         if g(pl, "player", "puuid") == pu), None)
             if loc:
-                out.append([1, lado.get(rid + 1, -1), loc["x"], loc["y"], rid + 1])
+                out.append([1, lado.get(rid + 1, -1), loc["x"], loc["y"], rid + 1, tipo.get(rid + 1, -1)])
     return out
 
 
@@ -328,9 +334,21 @@ def eventos_calor(bruta, a, pu):
 # Avaliação de 14 dias (a mesma do Discord)
 # ----------------------------------------------------------------------------
 
-def avaliacao_json(ctx14, cfg, autorizados, slug):
+def faixa_de(tier_nome):
+    """'Platinum 2' -> 'Platinum' (faixa de elo usada na régua vs elo)."""
+    f = (tier_nome or "").split(" ")[0]
+    return None if f in ("", "Unrated", "Unranked") else f
+
+
+def avaliacao_json(ctx14, cfg, autorizados, slug, ctx_tudo=None, faixas=None):
     avals = gr.avaliacoes_por_jogador(ctx14, cfg)
     out = {}
+    refs_faixa = {}
+    if ctx_tudo and faixas:
+        excluir = set(ctx_tudo["puuid_de"].values())
+        for fx in set(f for f in faixas.values() if f):
+            refs_faixa[fx] = av.calcular_referencias(list(ctx_tudo["analises"].values()), excluir, cfg,
+                                                     filtro=lambda j, fx=fx: faixa_de(j.get("elo")) == fx)
     for rid in autorizados:
         lst = []
         for x in avals.get(rid, []):
@@ -366,9 +384,73 @@ def avaliacao_json(ctx14, cfg, autorizados, slug):
                 "clutch": {"tentados": cl["tentados"], "vencidos": cl["vencidos"], "esperado": cl["esperado"]} if cl else None,
                 "solo": {k: r3(v) for k, v in av.jogadas_solo(recs).items()},
                 "lista": partidas, "amostras_ref": ref.get("_amostras", 0),
+                "vs_elo": vs_elo(recs, f, (faixas or {}).get(rid), refs_faixa, cfg),
             })
         out[slug[rid]] = lst
     return out
+
+
+def vs_elo(recs, funcao, faixa, refs_faixa, cfg):
+    """Mesmo índice, mas comparado com quem joga a mesma função na mesma faixa de elo (todas as partidas salvas)."""
+    if not faixa or faixa not in refs_faixa:
+        return None
+    ref = refs_faixa[faixa][funcao]
+    x = av.avaliar(recs, ref, funcao, cfg)
+    return {"faixa": faixa, "indice": x["indice"], "margem": list(x["margem"]), "amostras": ref.get("_amostras", 0)} if x else None
+
+
+# ----------------------------------------------------------------------------
+# Notas da IGL, histórico de elo e prévia de compartilhamento
+# ----------------------------------------------------------------------------
+
+def notas_json(cfg, partidas_ids):
+    site = cfg.get("site") or {}
+    vazio = {"partidas": {}, "mapas": {}}
+    if site.get("publicar_notas", True) is False:
+        return vazio
+    bruto = gr.ler_json(ARQ_NOTAS, None) or vazio
+    out = {"partidas": {}, "mapas": {}}
+    for mid, n in (bruto.get("partidas") or {}).items():
+        if mid in partidas_ids and isinstance(n, dict):
+            rounds = {str(k): str(v)[:2000] for k, v in (n.get("rounds") or {}).items() if str(v).strip()}
+            texto = str(n.get("texto") or "")[:6000]
+            if texto.strip() or rounds:
+                out["partidas"][mid] = {"texto": texto, "rounds": rounds, "atualizado": n.get("atualizado")}
+    for mapa, n in (bruto.get("mapas") or {}).items():
+        if isinstance(n, dict) and str(n.get("texto") or "").strip():
+            out["mapas"][mapa] = {"texto": str(n["texto"])[:6000], "atualizado": n.get("atualizado")}
+    return out
+
+
+def elo_json(autorizados, slug):
+    try:
+        from coletor_valorant import gerar_nome
+    except Exception:  # noqa: BLE001
+        return {}
+    out = {}
+    for rid in autorizados:
+        lst = gr.ler_json(PASTA_ELO / f"{gerar_nome(rid)}.json", []) or []
+        if lst:
+            out[slug[rid]] = [{k: x.get(k) for k in ("match_id", "t", "tier", "tn", "rr", "delta", "elo", "mapa")}
+                              for x in sorted(lst, key=lambda x: x.get("t") or "")]
+    return out
+
+
+def atualizar_previa(site):
+    """Coloca o endereço público nas tags de prévia (Discord, WhatsApp...) do docs/index.html."""
+    url = (site.get("url_publica") or URL_PADRAO).rstrip("/") + "/"
+    arq = PASTA_SITE / "index.html"
+    try:
+        with open(arq, encoding="utf-8", newline="") as f:  # newline="": mantém as quebras de linha como estão
+            html = f.read()
+    except OSError:
+        return
+    novo = re.sub(r'(<meta property="og:url" content=")[^"]*(")', rf"\g<1>{url}\g<2>", html)
+    novo = re.sub(r'(<meta (?:property|name)="(?:og:image|twitter:image)" content=")[^"]*(")',
+                  rf"\g<1>{url}assets/img/og.png\g<2>", novo)
+    if novo != html:
+        with open(arq, "w", encoding="utf-8", newline="") as f:
+            f.write(novo)
 
 
 # ----------------------------------------------------------------------------
@@ -573,7 +655,18 @@ def exportar(cfg=None, verificar=False):
     tamanho += gravar(PASTA_DATA / "partidas.json", indice)
     for sl, c in calor.items():
         tamanho += gravar(PASTA_DATA / "calor" / f"{sl}.json", c)
-    tamanho += gravar(PASTA_DATA / "avaliacao.json", avaliacao_json(ctx14, cfg, autorizados, slug))
+    faixas = {rid: faixa_de(membros_info[slug[rid]]["tn"]) for rid in autorizados}
+    tamanho += gravar(PASTA_DATA / "avaliacao.json", avaliacao_json(ctx14, cfg, autorizados, slug, ctx, faixas))
+    sem = gr.resumo_semana(ctx, cfg, autorizados, datetime.now(av.FUSO_BR))
+    for x in sem["jogadores"]:
+        x["slug"] = slug[x.pop("rid")]
+    for x in sem["destaques"] + sem["rever"]:
+        x["slug"] = slug[x.pop("rid")]
+    sem["mvp"] = slug.get(sem["mvp"]) if sem["mvp"] else None
+    tamanho += gravar(PASTA_DATA / "semana.json", sem)
+    tamanho += gravar(PASTA_DATA / "notas.json", notas_json(cfg, {p["id"] for p in indice}))
+    tamanho += gravar(PASTA_DATA / "elo.json", elo_json(autorizados, slug))
+    atualizar_previa(site)
     tamanho += gravar(PASTA_DATA / "formacoes.json", formacoes_json(ctx, cfg, autorizados, slug))
 
     equipe = []

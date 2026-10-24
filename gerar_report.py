@@ -814,6 +814,70 @@ def efeito_juntos(mi, mj, minimo):
     return None, None
 
 
+def resumo_semana(ctx, cfg, rids, fim, dias=7):
+    """Semana [fim-7d, fim) comparada com a anterior: números por jogador, rounds de destaque e MVP.
+    Usado pela aba Semana do site e pelo card de domingo no Discord."""
+    ini = fim - timedelta(days=dias)
+    ini_ant = ini - timedelta(days=dias)
+
+    def jogos(a0, a1):
+        out = {}
+        for rid in rids:
+            pu = ctx["puuid_de"].get(rid)
+            out[rid] = sorted([(a, a["jogadores"][pu]) for a in ctx["analises"].values()
+                               if pu and pu in a["jogadores"] and a["inicio"] and a0 <= a["inicio"] < a1],
+                              key=lambda x: x[0]["inicio"])
+        return out
+
+    def numeros(lst):
+        recs = [r for _, j in lst for r in j["rounds"]]
+        if not recs:
+            return None
+        k = sum(j["stats"].get("kills", 0) for _, j in lst)
+        m = sum(j["stats"].get("deaths", 0) for _, j in lst)
+        v = sum(j["resultado"] == "vitória" for _, j in lst)
+        d = sum(j["resultado"] == "derrota" for _, j in lst)
+        return {"partidas": len(lst), "v": v, "d": d, "rounds": len(recs),
+                "impacto": round(100 * sum(r["wpa"] for r in recs) / len(recs), 2),
+                "kd": round(k / m, 2) if m else float(k), "adr": round(sum(r["dano"] for r in recs) / len(recs), 1),
+                "kast": round(100 * sum(r["kast"] for r in recs) / len(recs))}
+
+    sem, ant = jogos(ini, fim), jogos(ini_ant, ini)
+    jogadores = [{"rid": rid, "semana": numeros(sem[rid]), "anterior": numeros(ant[rid])} for rid in rids]
+    partidas = {}
+    for lst in sem.values():
+        for a, j in lst:
+            partidas.setdefault(a["match_id"], (a, j))
+    mapas = defaultdict(lambda: [0, 0])
+    for a, j in partidas.values():
+        if j["resultado"] in ("vitória", "derrota"):
+            mapas[a["mapa"]][0 if j["resultado"] == "vitória" else 1] += 1
+    rounds = []
+    for rid in rids:
+        for a, j in sem[rid]:
+            for r in j["rounds"]:
+                rounds.append((r["wpa"], rid, a, j, r))
+    rounds.sort(key=lambda x: -x[0])
+
+    def item(x):
+        wpa, rid, a, j, r = x
+        resumo, dica, _, ip = descrever_round(r, j["agente"], a["mapa"])
+        return {"rid": rid, "match_id": a["match_id"], "n": r["n"], "imp": round(ip, 1), "mapa": a["mapa"],
+                "agente": j["agente"], "inicio": a["inicio"].isoformat() if a["inicio"] else None,
+                "resumo": resumo, "dica": texto_puro(dica), "tipo": r["tipo"]}
+
+    cands = [x for x in jogadores if x["semana"] and x["semana"]["rounds"] >= 20]
+    mvp = max(cands, key=lambda x: x["semana"]["impacto"], default=None)
+    return {
+        "ini": ini.isoformat(), "fim": fim.isoformat(),
+        "partidas": len(partidas), "v": sum(j["resultado"] == "vitória" for _, j in partidas.values()),
+        "d": sum(j["resultado"] == "derrota" for _, j in partidas.values()),
+        "mapas": dict(mapas), "jogadores": jogadores, "mvp": mvp["rid"] if mvp else None,
+        "destaques": [item(x) for x in rounds[:8] if x[0] * 100 >= 15],
+        "rever": [item(x) for x in rounds[::-1][:5] if x[0] * 100 <= -15],
+    }
+
+
 def md_grupos(ctx, mids_hoje, cfg):
     dia = ctx["dia"]
     dias = cfg["janela_dias"]

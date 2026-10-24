@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import armazem
@@ -41,6 +41,8 @@ ARQ_HISTORICO = DADOS / "historico.csv"
 ARQ_LOG = DADOS / "coletor.log"
 
 URL_PARTIDAS = "https://api.henrikdev.xyz/valorant/v4/matches/{regiao}/{plataforma}/{nome}/{tag}"
+URL_ELO_V2 = "https://api.henrikdev.xyz/valorant/v2/mmr-history/{regiao}/{plataforma}/{nome}/{tag}"
+URL_ELO_V1 = "https://api.henrikdev.xyz/valorant/v1/mmr-history/{regiao}/{nome}/{tag}"
 VERSAO_ESTADO = 3
 g = av.g
 
@@ -132,6 +134,73 @@ def buscar_pagina(chave, regiao, plataforma, nome, tag, start, size=10):
             else:
                 raise RuntimeError(f"Sem conexão com a API: {e.reason}")
     raise RuntimeError("Não foi possível buscar as partidas após 3 tentativas.")
+
+
+# ----------------------------------------------------------------------------
+# Histórico de elo (RR)
+# ----------------------------------------------------------------------------
+
+def _get_json(url, chave):
+    req = urllib.request.Request(url, headers={"Authorization": chave, "Accept": "application/json",
+                                               "User-Agent": "NokyLabs-ValorantReport/2.0"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def normalizar_elo(e):
+    """Uma entrada do histórico de elo, venha da v2 (tier{id,name}, rr, last_change, date) ou da v1
+    (currenttier, ranking_in_tier, mmr_change_to_last_game, date_raw)."""
+    tier = g(e, "tier", "id") if isinstance(e.get("tier"), dict) else e.get("currenttier")
+    tn = g(e, "tier", "name") if isinstance(e.get("tier"), dict) else e.get("currenttierpatched")
+    data = e.get("date")
+    if e.get("date_raw") and (not data or not str(data)[:4].isdigit()):
+        data = datetime.fromtimestamp(int(e["date_raw"]), timezone.utc).isoformat()
+    rr = e.get("rr", e.get("ranking_in_tier"))
+    delta = e.get("last_change", e.get("mmr_change_to_last_game"))
+    if not e.get("match_id") or tier is None or rr is None:
+        return None
+    return {"match_id": e["match_id"], "t": data, "tier": tier, "tn": tn, "rr": rr, "delta": delta,
+            "elo": e.get("elo"), "mapa": g(e, "map", "name") if isinstance(e.get("map"), dict) else e.get("map")}
+
+
+def coletar_elo(chave, cfg, riot_id):
+    """Guarda em dados/elo/ as últimas mudanças de RR do jogador (a API devolve ~20 partidas)."""
+    nome, _, tag = riot_id.partition("#")
+    q = dict(regiao=cfg.get("regiao", "br"), plataforma=cfg.get("plataforma", "pc"),
+             nome=urllib.parse.quote(nome, safe=""), tag=urllib.parse.quote(tag, safe=""))
+    entradas = None
+    for url in (URL_ELO_V2.format(**q), URL_ELO_V1.format(**q)):
+        try:
+            corpo = _get_json(url, chave)
+            dados = corpo.get("data")
+            entradas = dados.get("history") if isinstance(dados, dict) else dados
+            if entradas is not None:
+                break
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                time.sleep(int(e.headers.get("Retry-After") or 60))
+            continue
+        except Exception:  # noqa: BLE001
+            continue
+    if not entradas:
+        return 0
+    arq = PASTA / "dados" / "elo" / f"{gerar_nome(riot_id)}.json"
+    atual = {x["match_id"]: x for x in ler_json(arq, [])}
+    novos = 0
+    for e in entradas:
+        x = normalizar_elo(e or {})
+        if x:
+            novos += x["match_id"] not in atual
+            atual[x["match_id"]] = x
+    salvar_json(arq, sorted(atual.values(), key=lambda x: x["t"] or ""))
+    return novos
+
+
+def gerar_nome(riot_id):
+    import re
+    import unicodedata
+    t = unicodedata.normalize("NFKD", riot_id).encode("ascii", "ignore").decode()
+    return re.sub(r"[^A-Za-z0-9_-]+", "", t.replace(" ", "-").replace("#", "_")) or "jogador"
 
 
 # ----------------------------------------------------------------------------
@@ -327,6 +396,16 @@ def main():
 
         resumo["jogadores"][riot_id] = bloco
         time.sleep(2)
+
+    # Histórico de elo (para o gráfico do site). Nunca derruba a coleta.
+    if cfg.get("coletar_elo", True):
+        for riot_id in cfg.get("jogadores", []):
+            try:
+                n = coletar_elo(chave, cfg, riot_id)
+                log(f"Elo de {riot_id}: {n} mudança(s) nova(s) de RR.")
+            except Exception as e:  # noqa: BLE001
+                log(f"  Elo de {riot_id} não lido ({e}).")
+            time.sleep(2)
 
     # Se já houve uma execução hoje (ex.: manual às 15h e agendada às 21h), soma em vez de substituir
     arq_resumo = PASTA_RESUMOS / f"{hoje.isoformat()}.json"

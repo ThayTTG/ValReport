@@ -54,6 +54,7 @@ Em 1–2 minutos o link aparece no topo dessa página (algo como `https://thaytt
 
 - **Manual:** dois cliques em `publicar_site.bat` (exporta e faz `git push`).
 - **Automático:** no `config.json`, troque `"publicar_automatico": false` para `true`. O report das 21h passa a publicar sozinho.
+- **Notas da IGL:** depois de escrever no `editar_notas.bat`, publique (manual ou automático) para elas irem ao site.
 
 ## Dicas
 

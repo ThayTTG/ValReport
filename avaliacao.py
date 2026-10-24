@@ -656,14 +656,15 @@ def metricas(recs):
     }
 
 
-def calcular_referencias(analises, puuids_equipe, cfg=None):
-    """Média e desvio de cada métrica, por função, entre os OUTROS jogadores dos seus lobbies."""
+def calcular_referencias(analises, puuids_equipe, cfg=None, filtro=None):
+    """Média e desvio de cada métrica, por função, entre os OUTROS jogadores dos seus lobbies.
+    filtro(jogador) opcional: só entram os jogadores para os quais ele devolve True (ex.: mesma faixa de elo)."""
     cfg = cfg or {}
     k_ref = cfg.get("referencia_peso_padrao", 8)
     amostras = defaultdict(list)
     for a in analises:
         for pu, j in a["jogadores"].items():
-            if pu in puuids_equipe or len(j["rounds"]) < 8:
+            if pu in puuids_equipe or len(j["rounds"]) < 8 or (filtro and not filtro(j)):
                 continue
             m = metricas(j["rounds"])
             amostras[j["funcao"]].append(m)

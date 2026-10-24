@@ -182,3 +182,7 @@ Depois do report e do Discord, o `exportar_site.py` gera os dados do site em `do
 - **Ver no PC:** `py -m http.server 8000 -d docs` e abra http://localhost:8000.
 - **Publicar:** siga o `PUBLICAR.md` uma vez. Depois disso, `publicar_site.bat` publica com dois cliques, ou ponha `"publicar_automatico": true` para publicar sozinho às 21h.
 - **Créditos e transparência:** `CREDITOS.md` e a página Sobre do site.
+- **Notas da IGL:** dois cliques em `editar_notas.bat`. Abre o site no seu PC com campos para escrever: na partida (aba *Notas da IGL* e no *Placar*), em cada round (aba *Rounds*) e no plano de cada mapa (*Equipe → Mapas*). Salve com o botão ou Ctrl+Enter. As notas vão para o site na próxima publicação. O site é público, então não cite pelo nome quem não autorizou aparecer. Para não publicar notas: `"site": {"publicar_notas": false}`.
+- **Elo:** o coletor guarda o histórico de RR de cada jogador em `dados\elo\` (gráfico na aba *Performance*). Para desligar: `"coletar_elo": false`.
+- **Resumo da semana:** aos domingos, o card `semana.png` (MVP, cada um contra a semana anterior e rounds para rever) vai junto da mensagem da equipe no Discord. No site, fica na aba *Equipe → Semana*.
+- **Prévia do link e app:** ao compartilhar o link, aparece a imagem `docs\assets\img\og.png`. Se o endereço do site mudar, ponha `"url_publica"` em `"site"`. No celular, o site pode ser instalado como app.

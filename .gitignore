@@ -3,6 +3,9 @@
 # Dados locais: partidas brutas, reports, cache de imagens, modelo, logs e estado
 dados/
 
+# Rascunho das notas da IGL (a versão publicada, já filtrada, vai em docs/data/notas.json)
+notas/
+
 # Configuração real (tem os Riot IDs da equipe). O modelo público é o config.exemplo.json
 config.json
 

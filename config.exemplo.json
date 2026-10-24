@@ -56,6 +56,9 @@
     ],
     "mostrar_riot_id": false,
     "publicar_automatico": false,
-    "repositorio": "https://github.com/ThayTTG/ValReport"
-  }
+    "repositorio": "https://github.com/ThayTTG/ValReport",
+    "publicar_notas": true,
+    "url_publica": "https://thayttg.github.io/ValReport/"
+  },
+  "coletar_elo": true
 }

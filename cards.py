@@ -1007,6 +1007,97 @@ def card_formacao(df, cfg, ctx, dia):
 
 
 # ----------------------------------------------------------------------------
+# Card: Semana (domingo)
+# ----------------------------------------------------------------------------
+
+def card_semana(cfg, ctx, dia):
+    from datetime import timedelta
+    fim = datetime.fromisoformat(dia).replace(tzinfo=av.FUSO_BR) + timedelta(days=1)
+    s = gr.resumo_semana(ctx, cfg, ctx["equipe"], fim)
+    img = Image.new("RGB", (W, H), FUNDO)
+    d = ImageDraw.Draw(img)
+    ini = datetime.fromisoformat(s["ini"])
+    faixa_marca(d, "Semana", f"{ini:%d/%m} a {datetime.fromisoformat(dia):%d/%m}")
+    d.text((M - 3, 112), "Semana", font=fonte("display", 68), fill=TEXTO, anchor="la")
+    d.text((M, 196), f"{s['partidas']} partida{'s' if s['partidas'] != 1 else ''} · {s['v']}V {s['d']}D · últimos 7 dias",
+           font=fonte("medio", 22), fill=SUAVE, anchor="la")
+
+    # MVP da semana
+    y0 = 248
+    painel(d, M, y0, W - M, y0 + 176)
+    d.rounded_rectangle((M, y0, M + 10, y0 + 176), radius=5, fill=ROXO)
+    rotulo(d, M + 32, y0 + 24, "MVP da semana")
+    mvp = next((x for x in s["jogadores"] if x["rid"] == s["mvp"]), None)
+    if mvp:
+        lista = [(a, j) for a in ctx["analises"].values() for j in [a["jogadores"].get(ctx["puuid_de"].get(mvp["rid"]))] if j]
+        agente, _ = agente_principal(lista[-6:], None) if lista else ("?", [])
+        selo_agente(img, d, M + 32, y0 + 58, 96, agente)
+        d.text((M + 148, y0 + 62), gr.apelido(mvp["rid"], cfg), font=fonte("display", 46), fill=TEXTO, anchor="la")
+        sm = mvp["semana"]
+        d.text((M + 150, y0 + 122), f"{sm['partidas']} partidas · K/D {sm['kd']:.2f} · ADR {sm['adr']:.0f}",
+               font=fonte("regular", 21), fill=SUAVE, anchor="la")
+        d.text((W - M - 28, y0 + 60), f"{sm['impacto']:+.1f}%", font=fonte("display", 60), fill=cor_pp(sm["impacto"], 0.5), anchor="ra")
+        d.text((W - M - 28, y0 + 132), "impacto por round", font=fonte("regular", 18), fill=SUAVE, anchor="ra")
+    else:
+        d.text((M + 32, y0 + 80), "Precisa de 20+ rounds na semana", font=fonte("semi", 26), fill=SUAVE, anchor="la")
+
+    # Jogadores (com a comparação com a semana anterior)
+    y1 = y0 + 176 + 20
+    ativos = [x for x in s["jogadores"] if x["semana"]]
+    alt = 70 + 62 * max(1, len(ativos))
+    painel(d, M, y1, W - M, y1 + alt)
+    rotulo(d, M + 28, y1 + 24, "Cada um na semana")
+    d.text((W - M - 28, y1 + 24), "vs semana anterior", font=fonte("medio", 17), fill=SUAVE, anchor="ra")
+    for i, x in enumerate(ativos):
+        yy = y1 + 66 + i * 62
+        sm, an = x["semana"], x["anterior"]
+        d.text((M + 28, yy + 4), gr.apelido(x["rid"], cfg), font=fonte("semi", 25), fill=TEXTO, anchor="la")
+        d.text((M + 230, yy + 8), f"{sm['partidas']}p · {sm['v']}V {sm['d']}D · K/D {sm['kd']:.2f}", font=fonte("regular", 20),
+               fill=SUAVE, anchor="la")
+        d.text((M + 700, yy + 2), f"{sm['impacto']:+.1f}%", font=fonte("negrito", 27), fill=cor_pp(sm["impacto"], 0.5), anchor="ra")
+        if an:
+            dif = sm["impacto"] - an["impacto"]
+            seta = "▲" if dif > 0.5 else "▼" if dif < -0.5 else "="
+            chip(d, W - M - 24, yy, f"{seta} {dif:+.1f}", VERDE_CLARO if dif > 0.5 else VERMELHO_CLARO if dif < -0.5 else CINZA_CLARO,
+                 VERDE if dif > 0.5 else VERMELHO if dif < -0.5 else SUAVE, fonte("semi", 18), alt=36, pad=14, direita=True)
+        else:
+            chip(d, W - M - 24, yy, "sem semana anterior", CINZA_CLARO, SUAVE, fonte("semi", 16), alt=36, pad=12, direita=True)
+    if not ativos:
+        d.text((M + 28, y1 + 74), "Ninguém jogou nesta semana.", font=fonte("semi", 24), fill=SUAVE, anchor="la")
+
+    # Destaques
+    y2 = y1 + alt + 20
+    painel(d, M, y2, W - M, H - 74, raio=18)
+    rotulo(d, M + 28, y2 + 22, "Rounds da semana")
+    yy = y2 + 60
+    for x in s["destaques"][:3]:
+        if yy + 100 > H - 80:
+            break
+        d.text((M + 28, yy), f"{x['imp']:+.0f}%", font=fonte("display", 34), fill=VERDE, anchor="la")
+        d.text((M + 150, yy + 2), f"{gr.apelido(x['rid'], cfg)} · {x['mapa']} R{x['n']} · {x['agente']}", font=fonte("semi", 22),
+               fill=TEXTO, anchor="la")
+        for li, linha in enumerate(quebrar(d, x["resumo"], fonte("regular", 19), W - 2 * M - 180, 2)):
+            d.text((M + 150, yy + 34 + li * 25), linha, font=fonte("regular", 19), fill=SUAVE, anchor="la")
+        yy += 100
+    if not s["destaques"]:
+        d.text((M + 28, y2 + 70), "Nenhum round acima de +15% nesta semana.", font=fonte("regular", 21), fill=SUAVE, anchor="la")
+    piores = [x for x in s["rever"] if yy + 150 < H - 80][:max(0, (H - 80 - yy - 50) // 100)]
+    if piores:
+        d.line((M + 28, yy + 4, W - M - 28, yy + 4), fill=BORDA, width=2)
+        rotulo(d, M + 28, yy + 22, "Para rever no VOD", VERMELHO)
+        yy += 60
+        for x in piores:
+            d.text((M + 28, yy), f"{x['imp']:+.0f}%", font=fonte("display", 34), fill=VERMELHO, anchor="la")
+            d.text((M + 150, yy + 2), f"{gr.apelido(x['rid'], cfg)} · {x['mapa']} R{x['n']} · {x['agente']}", font=fonte("semi", 22),
+                   fill=TEXTO, anchor="la")
+            for li, linha in enumerate(quebrar(d, x["resumo"], fonte("regular", 19), W - 2 * M - 180, 2)):
+                d.text((M + 150, yy + 34 + li * 25), linha, font=fonte("regular", 19), fill=SUAVE, anchor="la")
+            yy += 100
+    rodape(d, "Impacto = quanto as ações mudaram a chance do time vencer o round. Comparação com os 7 dias anteriores.")
+    return img
+
+
+# ----------------------------------------------------------------------------
 # Execução
 # ----------------------------------------------------------------------------
 
@@ -1050,6 +1141,9 @@ def gerar_cards(dia, cfg=None, base=None):
     if any(hoje.values()):
         salvar(card_economia(cfg, ctx, hoje, avals, jogos, dia), cards_equipe, "economia.png")
     salvar(card_mapas(cfg, ctx, hoje, avals, jogos, dia), cards_equipe, "mapas.png")
+    # Domingo: card da semana (ou sempre, com "card_semanal_todo_dia": true no config, para testar)
+    if datetime.fromisoformat(dia).weekday() == 6 or cfg.get("card_semanal_todo_dia"):
+        salvar(card_semana(cfg, ctx, dia), cards_equipe, "semana.png")
     for rid in ctx["equipe"]:
         if not hoje.get(rid):
             continue

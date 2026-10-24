@@ -142,7 +142,7 @@ def enviar(dia, cfg=None, base=None, forcar=False):
             feitos.append((canal, ok))
 
     ce = base / gr.PASTA_EQUIPE / "cards"
-    mandar("equipe", f"📊 **Report diário da equipe — {data}**", [ce / "equipe.png", ce / "economia.png", ce / "mapas.png", ce / "calor_equipe.png"])
+    mandar("equipe", f"📊 **Report diário da equipe — {data}**", [ce / "equipe.png", ce / "economia.png", ce / "mapas.png", ce / "calor_equipe.png", ce / "semana.png"])
 
     resumo = gr.ler_json(gr.PASTA_RESUMOS / f"{dia}.json") or {"jogadores": {}}
     for rid in resumo.get("jogadores", {}):
