@@ -60,5 +60,6 @@
     "publicar_notas": true,
     "url_publica": "https://thayttg.github.io/ValReport/"
   },
-  "coletar_elo": true
+  "coletar_elo": true,
+  "coleta_rapida": true
 }

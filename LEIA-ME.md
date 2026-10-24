@@ -13,7 +13,8 @@ com análise tática por partida, avaliação justa por função e análise de d
 | `gerar_report.py` | Escreve os reports (`py gerar_report.py 2026-10-23` refaz um dia) |
 | `config.json` | Jogadores, apelidos, filas e ajustes finos |
 | `rodar_report.bat` | Roda tudo com dois cliques |
-| `instalar_agendamento.ps1` | Agenda a execução diária às 21h |
+| `instalar_agendamento.ps1` | Agenda o report diário às 21h e a atualização do site a cada 20 min |
+| `atualizar_agora.bat` | Procura partidas novas agora e atualiza o site (sem report nem Discord) |
 
 ## Atualizando da versão 1
 
@@ -180,7 +181,8 @@ Depois do report e do Discord, o `exportar_site.py` gera os dados do site em `do
 
 - **Quem aparece:** só quem estiver em `"site" → "jogadores_autorizados"` no `config.json`. Sem essa parte, só a primeira pessoa da lista de jogadores aparece. Todo o resto vira "Aliado/Adversário", sem nome.
 - **Ver no PC:** `py -m http.server 8000 -d docs` e abra http://localhost:8000.
-- **Publicar:** siga o `PUBLICAR.md` uma vez. Depois disso, `publicar_site.bat` publica com dois cliques, ou ponha `"publicar_automatico": true` para publicar sozinho às 21h.
+- **Publicar:** siga o `PUBLICAR.md` uma vez. Depois disso, `publicar_site.bat` publica com dois cliques, ou ponha `"publicar_automatico": true` para publicar sozinho.
+- **Atualização a cada 20 min:** o `instalar_agendamento.ps1` cria também a tarefa "NokyLabs - Atualizar site VALORANT", que roda escondida e só publica quando acha partida nova. O que ela achar fica em `dados/pendentes.json` e entra no report das 21h normalmente. Para pausar, use `"coleta_rapida": false` no `config.json`. O site também confere sozinho a cada 20 min e tem o botão de atualizar no topo.
 - **Créditos e transparência:** `CREDITOS.md` e a página Sobre do site.
 - **Notas da IGL:** dois cliques em `editar_notas.bat`. Abre o site no seu PC com campos para escrever: na partida (aba *Notas da IGL* e no *Placar*), em cada round (aba *Rounds*) e no plano de cada mapa (*Equipe → Mapas*). Salve com o botão ou Ctrl+Enter. As notas vão para o site na próxima publicação. O site é público, então não cite pelo nome quem não autorizou aparecer. Para não publicar notas: `"site": {"publicar_notas": false}`.
 - **Elo:** o coletor guarda o histórico de RR de cada jogador em `dados\elo\` (gráfico na aba *Performance*). Para desligar: `"coletar_elo": false`.

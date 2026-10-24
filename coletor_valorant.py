@@ -14,6 +14,11 @@ O que ele faz:
        - dados/coletor.log                 -> registro de execuções e erros
   5. Chama o gerar_report.py para escrever os reports .md
 
+Coleta rápida (py coletor_valorant.py --rapido, a cada 20 min pelo Agendador):
+  só procura partidas novas; se achar, guarda, atualiza o site e publica (se "publicar_automatico").
+  Não gera report nem manda nada ao Discord: o que ela achar entra no próximo report das 21h
+  (fica guardado em dados/pendentes.json até lá).
+
 A chave da API é lida da variável de ambiente HENRIKDEV_API_KEY (nunca fica no código).
 Só usa a biblioteca padrão do Python, então não precisa instalar nada.
 """
@@ -39,6 +44,8 @@ PASTA_RESUMOS = DADOS / "resumos"
 ARQ_ESTADO = DADOS / "estado.json"
 ARQ_HISTORICO = DADOS / "historico.csv"
 ARQ_LOG = DADOS / "coletor.log"
+ARQ_PENDENTES = DADOS / "pendentes.json"
+ARQ_TRAVA = DADOS / "coleta.trava"
 
 URL_PARTIDAS = "https://api.henrikdev.xyz/valorant/v4/matches/{regiao}/{plataforma}/{nome}/{tag}"
 URL_ELO_V2 = "https://api.henrikdev.xyz/valorant/v2/mmr-history/{regiao}/{plataforma}/{nome}/{tag}"
@@ -55,12 +62,47 @@ def agora_br():
     return datetime.now(av.FUSO_BR)
 
 
+_BUFFER_LOG = None  # na coleta rápida, o log só vai para o arquivo se houver novidade ou erro
+
+
 def log(msg):
     linha = f"[{agora_br():%Y-%m-%d %H:%M:%S}] {msg}"
     print(linha)
+    if _BUFFER_LOG is not None:
+        _BUFFER_LOG.append(linha)
+        return
     DADOS.mkdir(parents=True, exist_ok=True)
     with open(ARQ_LOG, "a", encoding="utf-8") as f:
         f.write(linha + "\n")
+
+
+def travar(esperar_s):
+    """Evita duas coletas ao mesmo tempo (ex.: a rápida das 21h00 e a do report). Trava velha (>40 min) é ignorada."""
+    DADOS.mkdir(parents=True, exist_ok=True)
+    limite = time.time() + esperar_s
+    while True:
+        try:
+            fd = os.open(ARQ_TRAVA, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+            return True
+        except FileExistsError:
+            try:
+                if time.time() - ARQ_TRAVA.stat().st_mtime > 40 * 60:
+                    ARQ_TRAVA.unlink()
+                    continue
+            except FileNotFoundError:
+                continue
+            if time.time() >= limite:
+                return False
+            time.sleep(5)
+
+
+def destravar():
+    try:
+        ARQ_TRAVA.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def ler_json(caminho, padrao):
@@ -309,6 +351,59 @@ def coletar_jogador(chave, cfg, riot_id, ja_lidas, ja_ignoradas, incluidas, prim
     return novas
 
 
+def processar_jogador(chave, cfg, estado, riot_id, incluidas):
+    """Busca, filtra e guarda as partidas novas de um jogador. Atualiza estado["lidas"/"ignoradas"]."""
+    lidas = list(estado["lidas"].get(riot_id, []))
+    ignoradas = list(estado["ignoradas"].get(riot_id, []))
+    bloco = {"status": "ok", "partidas": [], "ignoradas": 0, "filas_ignoradas": {}}
+    try:
+        novas = coletar_jogador(chave, cfg, riot_id, set(lidas), set(ignoradas), incluidas,
+                                primeira_vez=not lidas and not ignoradas)
+        for partida in sorted(novas, key=lambda p: g(p, "metadata", "started_at") or ""):
+            mid = g(partida, "metadata", "match_id")
+            qid = g(partida, "metadata", "queue", "id") or "sem id"
+            nome_fila = g(partida, "metadata", "queue", "name") or qid
+
+            motivo = None
+            if not fila_incluida(partida, incluidas):
+                motivo = f"{nome_fila} [{qid}]"
+            elif not partida.get("rounds"):
+                motivo = f"{nome_fila} [{qid}, sem dados de rounds]"
+            elif not av.partida_valida(partida):
+                motivo = f"{nome_fila} [{av.motivo_invalida(partida)}]"
+            if motivo:
+                bloco["ignoradas"] += 1
+                bloco["filas_ignoradas"][motivo] = bloco["filas_ignoradas"].get(motivo, 0) + 1
+                if mid not in ignoradas:
+                    ignoradas.append(mid)
+                continue
+
+            armazem.salvar_partida(partida)
+            lidas.append(mid)
+            if mid in ignoradas:
+                ignoradas.remove(mid)
+
+            a = av.analisar_partida_completa(partida, None, cfg)
+            j = av.localizar(a, riot_id)
+            if j and j["rounds"]:
+                r = av.resumo_basico(a, j)
+                bloco["partidas"].append(r)
+                anexar_historico(riot_id, r)
+
+        ign = ", ".join(f"{n} ({q})" for n, q in bloco["filas_ignoradas"].items())
+        log(f"  {len(bloco['partidas'])} partida(s) nova(s) analisada(s), {bloco['ignoradas']} ignorada(s)"
+            + (f": {ign}" if ign else "") + ".")
+        # Guarda só os últimos IDs para o arquivo não crescer sem fim
+        estado["lidas"][riot_id] = lidas[-1000:]
+        estado["ignoradas"][riot_id] = ignoradas[-1000:]
+    except Exception as e:  # noqa: BLE001 — queremos registrar qualquer falha e seguir
+        bloco["status"] = "erro"
+        bloco["erro"] = str(e)
+        log(f"  ERRO: {e}")
+
+    return bloco
+
+
 def main():
     log("=" * 60)
     log("Iniciando coleta")
@@ -324,6 +419,33 @@ def main():
         sys.exit(1)
     incluidas = [f.lower() for f in cfg.get("filas_incluidas", ["competitive", "premier", "custom"])]
 
+    if not travar(esperar_s=10 * 60):
+        log("Outra coleta ficou travada por muito tempo; seguindo mesmo assim.")
+    try:
+        _main_travado(chave, cfg, incluidas)
+    finally:
+        destravar()
+
+
+def juntar_pendentes(resumo):
+    """Partidas que a coleta rápida achou desde o último report entram neste report."""
+    pend = ler_json(ARQ_PENDENTES, None)
+    if not pend:
+        return 0
+    total = 0
+    for riot_id, velho in (pend.get("jogadores") or {}).items():
+        novo = resumo["jogadores"].setdefault(riot_id, {"status": "ok", "partidas": [], "ignoradas": 0, "filas_ignoradas": {}})
+        ids = {p["match_id"] for p in novo["partidas"]}
+        extra = [p for p in velho.get("partidas", []) if p["match_id"] not in ids]
+        novo["partidas"] = extra + novo["partidas"]
+        total += len(extra)
+        novo["ignoradas"] += velho.get("ignoradas", 0)
+        for k, v in (velho.get("filas_ignoradas") or {}).items():
+            novo["filas_ignoradas"][k] = novo["filas_ignoradas"].get(k, 0) + v
+    return total
+
+
+def _main_travado(chave, cfg, incluidas):
     estado = ler_json(ARQ_ESTADO, {"ultima_execucao": None, "lidas": {}})
     estado.setdefault("lidas", {})
     estado.setdefault("ignoradas", {})
@@ -346,54 +468,7 @@ def main():
 
     for riot_id in cfg.get("jogadores", []):
         log(f"Buscando partidas de {riot_id}...")
-        lidas = list(estado["lidas"].get(riot_id, []))
-        ignoradas = list(estado["ignoradas"].get(riot_id, []))
-        bloco = {"status": "ok", "partidas": [], "ignoradas": 0, "filas_ignoradas": {}}
-        try:
-            novas = coletar_jogador(chave, cfg, riot_id, set(lidas), set(ignoradas), incluidas,
-                                    primeira_vez=not lidas and not ignoradas)
-            for partida in sorted(novas, key=lambda p: g(p, "metadata", "started_at") or ""):
-                mid = g(partida, "metadata", "match_id")
-                qid = g(partida, "metadata", "queue", "id") or "sem id"
-                nome_fila = g(partida, "metadata", "queue", "name") or qid
-
-                motivo = None
-                if not fila_incluida(partida, incluidas):
-                    motivo = f"{nome_fila} [{qid}]"
-                elif not partida.get("rounds"):
-                    motivo = f"{nome_fila} [{qid}, sem dados de rounds]"
-                elif not av.partida_valida(partida):
-                    motivo = f"{nome_fila} [{av.motivo_invalida(partida)}]"
-                if motivo:
-                    bloco["ignoradas"] += 1
-                    bloco["filas_ignoradas"][motivo] = bloco["filas_ignoradas"].get(motivo, 0) + 1
-                    if mid not in ignoradas:
-                        ignoradas.append(mid)
-                    continue
-
-                armazem.salvar_partida(partida)
-                lidas.append(mid)
-                if mid in ignoradas:
-                    ignoradas.remove(mid)
-
-                a = av.analisar_partida_completa(partida, None, cfg)
-                j = av.localizar(a, riot_id)
-                if j and j["rounds"]:
-                    r = av.resumo_basico(a, j)
-                    bloco["partidas"].append(r)
-                    anexar_historico(riot_id, r)
-
-            ign = ", ".join(f"{n} ({q})" for n, q in bloco["filas_ignoradas"].items())
-            log(f"  {len(bloco['partidas'])} partida(s) nova(s) analisada(s), {bloco['ignoradas']} ignorada(s)"
-                + (f": {ign}" if ign else "") + ".")
-            # Guarda só os últimos IDs para o arquivo não crescer sem fim
-            estado["lidas"][riot_id] = lidas[-1000:]
-            estado["ignoradas"][riot_id] = ignoradas[-1000:]
-        except Exception as e:  # noqa: BLE001 — queremos registrar qualquer falha e seguir
-            bloco["status"] = "erro"
-            bloco["erro"] = str(e)
-            log(f"  ERRO: {e}")
-
+        bloco = processar_jogador(chave, cfg, estado, riot_id, incluidas)
         resumo["jogadores"][riot_id] = bloco
         time.sleep(2)
 
@@ -406,6 +481,10 @@ def main():
             except Exception as e:  # noqa: BLE001
                 log(f"  Elo de {riot_id} não lido ({e}).")
             time.sleep(2)
+
+    n_pend = juntar_pendentes(resumo)
+    if n_pend:
+        log(f"{n_pend} partida(s) achada(s) pela coleta rápida entram neste report.")
 
     # Se já houve uma execução hoje (ex.: manual às 15h e agendada às 21h), soma em vez de substituir
     arq_resumo = PASTA_RESUMOS / f"{hoje.isoformat()}.json"
@@ -424,6 +503,8 @@ def main():
     salvar_json(arq_resumo, resumo)
     estado["ultima_execucao"] = hoje.isoformat()
     salvar_json(ARQ_ESTADO, estado)
+    if ARQ_PENDENTES.exists():
+        ARQ_PENDENTES.unlink()
     log(f"Resumo salvo em dados/resumos/{hoje.isoformat()}.json")
 
     try:
@@ -437,5 +518,97 @@ def main():
         log(traceback.format_exc())
 
 
+# ----------------------------------------------------------------------------
+# Coleta rápida (a cada 20 min): só partidas novas -> site
+# ----------------------------------------------------------------------------
+
+def rapido():
+    global _BUFFER_LOG
+    _BUFFER_LOG = []
+    houve_algo = False
+    try:
+        chave = os.environ.get("HENRIKDEV_API_KEY", "").strip()
+        cfg = ler_json(ARQ_CONFIG, None)
+        if not chave or not cfg:
+            log("Coleta rápida: falta a HENRIKDEV_API_KEY ou o config.json.")
+            houve_algo = True
+            return
+        if cfg.get("coleta_rapida", True) is False:
+            print("Coleta rápida desligada no config.json (\"coleta_rapida\": false).")
+            return
+        if not travar(esperar_s=0):
+            print("Outra coleta está rodando agora; fica para a próxima.")
+            return
+        try:
+            houve_algo = _rapido_travado(chave, cfg)
+        finally:
+            destravar()
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        log(f"Coleta rápida: ERRO {e}")
+        log(traceback.format_exc())
+        houve_algo = True
+    finally:
+        buffer, _BUFFER_LOG = _BUFFER_LOG, None
+        if houve_algo and buffer:
+            DADOS.mkdir(parents=True, exist_ok=True)
+            with open(ARQ_LOG, "a", encoding="utf-8") as f:
+                f.write("\n".join(buffer) + "\n")
+        salvar_json(DADOS / "ultima_coleta_rapida.json", {"em": agora_br().isoformat(timespec="seconds"), "novidade": houve_algo})
+
+
+def _rapido_travado(chave, cfg):
+    estado = ler_json(ARQ_ESTADO, None)
+    if not estado or estado.get("versao", 1) < VERSAO_ESTADO or not estado.get("ultima_execucao"):
+        print("A primeira coleta (e qualquer atualização de dados) fica com o report completo das 21h.")
+        return False
+    estado.setdefault("lidas", {})
+    estado.setdefault("ignoradas", {})
+    incluidas = [f.lower() for f in cfg.get("filas_incluidas", ["competitive", "premier", "custom"])]
+    log("Coleta rápida: procurando partidas novas...")
+    pend = ler_json(ARQ_PENDENTES, {"jogadores": {}})
+    novas_total, erros, com_novas = 0, 0, []
+    for riot_id in cfg.get("jogadores", []):
+        bloco = processar_jogador(chave, cfg, estado, riot_id, incluidas)
+        if bloco["status"] != "ok":
+            erros += 1
+            continue
+        if bloco["partidas"] or bloco["ignoradas"]:
+            alvo = pend["jogadores"].setdefault(riot_id, {"partidas": [], "ignoradas": 0, "filas_ignoradas": {}})
+            alvo["partidas"] += bloco["partidas"]
+            alvo["ignoradas"] += bloco["ignoradas"]
+            for k, v in bloco["filas_ignoradas"].items():
+                alvo["filas_ignoradas"][k] = alvo["filas_ignoradas"].get(k, 0) + v
+        if bloco["partidas"]:
+            novas_total += len(bloco["partidas"])
+            com_novas.append(riot_id)
+        time.sleep(1)
+    salvar_json(ARQ_ESTADO, estado)
+    if pend["jogadores"]:
+        salvar_json(ARQ_PENDENTES, pend)
+    if not novas_total:
+        print("Nenhuma partida nova. Até daqui a pouco!")
+        return erros > 0
+    if cfg.get("coletar_elo", True):
+        for riot_id in com_novas:
+            try:
+                coletar_elo(chave, cfg, riot_id)
+            except Exception as e:  # noqa: BLE001
+                log(f"  Elo de {riot_id} não lido ({e}).")
+            time.sleep(1)
+    import exportar_site
+    site = cfg.get("site") or {}
+    if site.get("ativo", True) is not False and exportar_site.exportar(cfg):
+        if site.get("publicar_automatico", False):
+            exportar_site.publicar(f"Novas partidas ({agora_br():%d/%m %Hh%M})")
+        else:
+            log("Site exportado (publicação automática desligada: rode o publicar_site.bat).")
+    log(f"Coleta rápida: {novas_total} partida(s) nova(s); entram também no report das 21h.")
+    return True
+
+
 if __name__ == "__main__":
-    main()
+    if "--rapido" in sys.argv:
+        rapido()
+    else:
+        main()

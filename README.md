@@ -69,7 +69,7 @@ O site **não chama nenhuma API**. Ele só lê os JSON gerados no PC, por isso n
 2. **Chave da HenrikDev API:** gere no [dashboard](https://api.henrikdev.xyz/dashboard/) e guarde com `setx HENRIKDEV_API_KEY "sua-chave"`.
 3. Copie `config.exemplo.json` para `config.json` e preencha os jogadores.
 4. Rode `rodar_report.bat` uma vez para testar. Ele instala o Pillow sozinho se faltar.
-5. Para agendar às 21h, rode `instalar_agendamento.ps1` no PowerShell.
+5. Para agendar o report das 21h e a atualização do site a cada 20 min, rode `instalar_agendamento.ps1` no PowerShell.
 6. **Discord (opcional):** crie webhooks e guarde nas variáveis `DISCORD_WEBHOOK_EQUIPE`, `..._JOGADORES`, `..._FORMACOES` e `..._DICAS` (veja o [LEIA-ME.md](LEIA-ME.md)).
 7. **Site:** siga o [PUBLICAR.md](PUBLICAR.md).
 

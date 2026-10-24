@@ -715,7 +715,9 @@ def exportar(cfg=None, verificar=False):
 def publicar(mensagem=None):
     """git add docs + commit + push. Só funciona se esta pasta for um clone do repositório (veja PUBLICAR.md)."""
     def git(*args):
-        return subprocess.run(["git", *args], cwd=PASTA, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        # CREATE_NO_WINDOW: na coleta rápida (sem janela) o Git não abre um console piscando na tela
+        return subprocess.run(["git", *args], cwd=PASTA, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     try:
         if git("rev-parse", "--is-inside-work-tree").returncode != 0:
             print("Site: esta pasta ainda não é um repositório Git (veja PUBLICAR.md). Nada publicado.")

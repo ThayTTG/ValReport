@@ -53,7 +53,7 @@ Em 1–2 minutos o link aparece no topo dessa página (algo como `https://thaytt
 ## 5. Atualizar todo dia
 
 - **Manual:** dois cliques em `publicar_site.bat` (exporta e faz `git push`).
-- **Automático:** no `config.json`, troque `"publicar_automatico": false` para `true`. O report das 21h passa a publicar sozinho.
+- **Automático:** no `config.json`, troque `"publicar_automatico": false` para `true`. O report das 21h e a atualização de 20 em 20 minutos passam a publicar sozinhos (a de 20 min só publica quando acha partida nova).
 - **Notas da IGL:** depois de escrever no `editar_notas.bat`, publique (manual ou automático) para elas irem ao site.
 
 ## Dicas
