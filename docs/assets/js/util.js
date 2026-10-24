@@ -44,6 +44,11 @@ export const TIPOS = { pistol: "Pistol", eco: "Eco", force: "Force", armado: "Ar
 export const FUNCOES_ICONE = { Duelista: "⚔", Iniciador: "◎", Controlador: "◐", Sentinela: "▣" };
 const TIERS = { Iron: "Ferro", Bronze: "Bronze", Silver: "Prata", Gold: "Ouro", Platinum: "Platina", Diamond: "Diamante", Ascendant: "Ascendente", Immortal: "Imortal", Radiant: "Radiante", Unrated: "Sem rank", Unranked: "Sem rank" };
 export const nomeTier = (tn) => { if (!tn) return "Sem rank"; const [a, b] = tn.split(" "); return (TIERS[a] || a) + (b ? ` ${b}` : ""); };
+const ORDEM_TIERS = ["Iron", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Ascendant", "Immortal"];
+/** Nome do elo pelo número do tier (3 = Ferro 1 ... 27 = Radiante) */
+export const nomeTierId = (id) => (id >= 27 ? "Radiante" : id >= 3 ? `${TIERS[ORDEM_TIERS[Math.floor((id - 3) / 3)]]} ${((id - 3) % 3) + 1}` : "Sem rank");
+/** Gráficos em SVG ficam mais estreitos no celular para o texto não ficar minúsculo */
+export const larguraGrafico = () => (innerWidth <= 600 ? 380 : innerWidth >= 1000 ? 900 : 640);
 export const FIM_ROUND = { Elimination: "Eliminação", Detonate: "Spike detonada", Defuse: "Spike desarmada", "": "Tempo esgotado" };
 export const CERIMONIAS = { Ace: "Ace", TeamAce: "Ace da equipe", Clutch: "Clutch", Flawless: "Perfeito", Thrifty: "Econômico", Closer: "Fechou" };
 
@@ -87,6 +92,22 @@ document.addEventListener("error", (ev) => {
     el.replaceWith(s);
   }
 }, true);
+
+/** Markdown simples e seguro para as notas: **negrito**, *itálico*, listas com "- " e parágrafos */
+export function md(texto) {
+  const linhas = esc(texto || "").split(/\r?\n/);
+  const out = [];
+  let lista = false;
+  const inline = (t) => t.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*])\*(?!\s)(.+?)\*/g, "$1<em>$2</em>");
+  for (const l of linhas) {
+    const item = l.match(/^\s*[-•]\s+(.*)$/);
+    if (item) { if (!lista) { out.push("<ul>"); lista = true; } out.push(`<li>${inline(item[1])}</li>`); continue; }
+    if (lista) { out.push("</ul>"); lista = false; }
+    out.push(l.trim() ? `<p>${inline(l)}</p>` : "");
+  }
+  if (lista) out.push("</ul>");
+  return out.join("");
+}
 
 export const icone = (id, classe = "") => `<svg class="${classe}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 

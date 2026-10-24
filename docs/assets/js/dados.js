@@ -13,20 +13,47 @@ async function json(caminho) {
   return cache.get(caminho);
 }
 
-export const B = { meta: null, partidas: [], avaliacao: {}, formacoes: { formacoes: [], pares: [] }, porId: new Map(), equipe: [], porSlug: new Map() };
+const NOTAS_VAZIAS = { partidas: {}, mapas: {} };
+export const B = { meta: null, partidas: [], avaliacao: {}, formacoes: { formacoes: [], pares: [] }, porId: new Map(), equipe: [], porSlug: new Map(),
+  semana: null, notas: NOTAS_VAZIAS, elo: {}, editor: false };
+
+/** No PC da IGL (editar_notas.bat), o site ganha botões para escrever notas */
+async function detectarEditor() {
+  if (!["127.0.0.1", "localhost"].includes(location.hostname)) return false;
+  try {
+    const r = await fetch("api/ping", { cache: "no-store" });
+    return r.ok && (await r.json()).editor === true;
+  } catch (e) { return false; }
+}
 
 export async function carregarBase() {
-  const [meta, partidas, avaliacao, formacoes] = await Promise.all([
+  const editor = await detectarEditor();
+  const [meta, partidas, avaliacao, formacoes, semana, notas, elo] = await Promise.all([
     json("data/meta.json"), json("data/partidas.json"),
     json("data/avaliacao.json").catch(() => ({})), json("data/formacoes.json").catch(() => ({ formacoes: [], pares: [] })),
+    json("data/semana.json").catch(() => null), json(editor ? "api/notas" : "data/notas.json").catch(() => NOTAS_VAZIAS),
+    json("data/elo.json").catch(() => ({})),
   ]);
   partidas.sort((a, b) => (a.t < b.t ? 1 : -1));  // mais recente primeiro
-  Object.assign(B, { meta, partidas, avaliacao, formacoes, porId: new Map(partidas.map((p) => [p.id, p])) });
+  Object.assign(B, { meta, partidas, avaliacao, formacoes, semana, notas: { ...NOTAS_VAZIAS, ...notas }, elo, editor,
+    porId: new Map(partidas.map((p) => [p.id, p])) });
   B.equipe = meta.equipe;
   B.porSlug = new Map(meta.equipe.map((e) => [e.slug, e]));
   return B;
 }
 export const detalhe = (id) => json(`data/partidas/${id}.json`);
+
+/** Salva uma nota pelo editor local (só funciona com o editar_notas.bat aberto) */
+export async function salvarNota(pedido) {
+  const r = await fetch("api/notas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pedido) });
+  const resp = await r.json().catch(() => ({}));
+  if (!r.ok || !resp.ok) throw new Error(resp.erro || `erro ${r.status}`);
+  B.notas = { ...NOTAS_VAZIAS, ...resp.notas };
+  return B.notas;
+}
+export const notaPartida = (id) => B.notas.partidas?.[id];
+export const notaRound = (id, n) => B.notas.partidas?.[id]?.rounds?.[String(n)];
+export const notaMapa = (mapa) => B.notas.mapas?.[mapa];
 export const calor = (slug) => json(`data/calor/${slug}.json`).catch(() => ({ partidas: [], e: [] }));
 
 // ---------- Filtros ----------

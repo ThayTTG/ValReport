@@ -1,12 +1,12 @@
 // Detalhe de uma partida: Placar, Rounds (killfeed + economia + leitura), Mapa 2D e Leitura da equipe
 
-import { esc, num, sinal, imagem, imgAgente, imgRank, imgMapaSplash, imgArmaKill, nomeFila, nomeTier, dataHora, duracao, vazio, cartao, secao, selo, icone, classeSinal, TIPOS, FIM_ROUND, CERIMONIAS } from "./util.js";
-import { B, detalhe } from "./dados.js";
-import { tabela } from "./componentes.js";
+import { md, esc, num, sinal, imagem, imgAgente, imgRank, imgMapaSplash, imgArmaKill, nomeFila, nomeTier, dataHora, duracao, vazio, cartao, secao, selo, icone, classeSinal, TIPOS, FIM_ROUND, CERIMONIAS } from "./util.js";
+import { B, detalhe, notaPartida, notaRound } from "./dados.js";
+import { tabela, blocoNota } from "./componentes.js";
 import { moldeMapa, svgRound } from "./graficos.js";
 import { abas } from "./jogador.js";
 
-const ABAS = [["placar", "Placar"], ["rounds", "Rounds"], ["mapa", "Mapa 2D"], ["leitura", "Leitura da equipe"]];
+const ABAS = [["placar", "Placar"], ["rounds", "Rounds"], ["mapa", "Mapa 2D"], ["leitura", "Leitura da equipe"], ["notas", "Notas da IGL"]];
 const ICONE_FIM = { Elimination: "caveira", Detonate: "spike", Defuse: "escudo", "": "relogio" };
 
 function cabecalho(d, p) {
@@ -48,9 +48,9 @@ function placar(d) {
 }
 
 function linhaRounds(d, rSel, rota) {
-  return `<div class="linha-rounds" role="group" aria-label="Rounds">${d.rounds.map((r) => {
+  return `<div class="linha-rounds" role="group" aria-label="Rounds">${d.rounds.map((r, i) => {
     const nosso = r.venc === d.nosso;
-    return `<a class="round-cel ${nosso ? "nosso" : "deles"} ${r.n === 13 || (r.n > 24 && r.n % 2 === 1) ? "meio-tempo" : ""}" href="${rota}?r=${r.n}" aria-pressed="${r.n === rSel}" title="Round ${r.n}: ${nosso ? "vitória" : "derrota"} · ${esc(FIM_ROUND[r.fim] || r.fim)}">${icone(ICONE_FIM[r.fim] || "caveira")}<span>${r.n}</span></a>`;
+    return `<a class="round-cel ${nosso ? "nosso" : "deles"} ${notaRound(d.id, r.n) ? "tem-nota" : ""} ${r.n === 13 || (r.n > 24 && r.n % 2 === 1) ? "meio-tempo" : ""}" style="--i:${i}" data-n="${r.n}" href="${rota}?r=${r.n}" aria-pressed="${r.n === rSel}" title="Round ${r.n}: ${nosso ? "vitória" : "derrota"} · ${esc(FIM_ROUND[r.fim] || r.fim)}">${icone(ICONE_FIM[r.fim] || "caveira")}<span>${r.n}</span></a>`;
   }).join("")}</div>
   <p class="suave pequeno">Verde = round da equipe · vermelho = do adversário · a linha separa os tempos.</p>`;
 }
@@ -87,7 +87,8 @@ function detalheRound(d, r) {
       <div class="chips" style="margin-top:10px">${spike(r.plant, "Spike plantada")}${spike(r.defuse, "Spike desarmada")}</div>
       ${membros.length ? `<div class="leitura" style="margin-top:12px">${membros.map(([slug, [imp, resumo, dica]]) => `<div class="leitura__item">
           <span class="imp ${classeSinal(imp, 1)}">${sinal(imp, 0, "%")}</span>
-          <div><p><strong>${esc(B.porSlug.get(slug)?.apelido || slug)}:</strong> ${esc(resumo)}</p><p>${esc(dica)}</p></div></div>`).join("")}</div>` : ""}`)}
+          <div><p><strong>${esc(B.porSlug.get(slug)?.apelido || slug)}:</strong> ${esc(resumo)}</p><p>${esc(dica)}</p></div></div>`).join("")}</div>` : ""}
+      ${blocoNota("round", d.id, notaRound(d.id, r.n), { n: r.n, titulo: `Nota da IGL · round ${r.n}` })}`)}
     ${cartao("Abates", killfeed(d, r))}
   </div>`;
 }
@@ -104,7 +105,7 @@ function leituraEquipe(d) {
     const piores = [...rs].sort((a, b) => a.imp - b.imp).slice(0, 3).filter((r) => r.imp <= -10);
     const item = (r) => `<div class="leitura__item"><span class="imp ${classeSinal(r.imp, 1)}">${sinal(r.imp, 0, "%")}</span><div><p><strong>R${r.n}</strong> · ${esc(r.resumo)}</p><p>${esc(r.dica)}</p></div></div>`;
     return secao(nome, `<div class="cartao">
-      <div class="barra-imp" role="img" aria-label="Impacto de ${esc(nome)} round a round">${rs.map((r) => `<div title="R${r.n}: ${sinal(r.imp, 0, "%")}">
+      <div class="barra-imp" role="img" aria-label="Impacto de ${esc(nome)} round a round">${rs.map((r, i) => `<div style="--i:${i}" title="R${r.n}: ${sinal(r.imp, 0, "%")}">
         <span style="height:${Math.max(0, r.imp) / maior * 50}%;background:var(--vitoria);margin-top:auto"></span>
         <span style="height:${Math.max(0, -r.imp) / maior * 50}%;background:var(--derrota);margin-bottom:auto"></span></div>`).join("")}</div>
       <p class="suave pequeno">Cada barra é um round (verde ajudou, vermelho atrapalhou). Total: <strong class="${classeSinal(total / 100, 0.3)}">${sinal(total / 100, 1)} round(s)</strong> gerados para o time.</p>
@@ -122,11 +123,23 @@ export async function viewPartida(id, aba, q) {
   const rSel = Math.min(d.rounds.length, Math.max(1, Number(q.get("r") || 1)));
   const r = d.rounds.find((x) => x.n === rSel) || d.rounds[0];
   let corpo = "";
-  if (aba === "placar") corpo = placar(d);
+  const nota = notaPartida(id);
+  if (aba === "placar") corpo = (nota?.texto || B.editor ? `<div class="secao">${blocoNota("partida", id, nota?.texto)}</div>` : "") + placar(d);
+  else if (aba === "notas") {
+    const rs = Object.entries(nota?.rounds || {}).sort((a, b) => Number(a[0]) - Number(b[0]));
+    corpo = blocoNota("partida", id, nota?.texto, { vazio: vazio("Sem nota da IGL nesta partida", "<p>A IGL escreve as notas no editor do PC; elas aparecem aqui depois da publicação.</p>") })
+      + (rs.length ? secao("Notas por round", `<div class="leitura">${rs.map(([n, t]) => `<a class="leitura__item" style="color:inherit" href="#/p/${esc(id)}/rounds?r=${esc(n)}"><span class="imp">R${esc(n)}</span><div class="nota__texto">${md(t)}</div></a>`).join("")}</div>`) : "")
+      + (B.editor ? `<p class="suave pequeno" style="margin-top:12px">Para anotar um round, abra a aba Rounds e escolha o round.</p>` : "");
+  }
   else if (aba === "rounds") corpo = secao("Linha do tempo", `<div class="cartao">${linhaRounds(d, rSel, rota)}</div>`) + (r ? detalheRound(d, r) : "");
   else if (aba === "mapa") corpo = secao("Abates no mapa", `<div class="cartao">${linhaRounds(d, rSel, rota)}</div>`)
     + `<div class="grade-mapa secao"><div class="cartao">${moldeMapa(d.mapa, svgRound(d.mapa, r, d.jogadores, d.nosso))}</div><div class="pilha">${cartao(`Round ${r.n}`, `<div class="chips"><span class="chip"><span style="width:10px;height:10px;border-radius:50%;background:var(--nosso);display:inline-block"></span>Equipe</span><span class="chip"><span style="width:10px;height:10px;border-radius:50%;background:var(--deles);display:inline-block"></span>Adversário</span></div>
         <p class="suave pequeno" style="margin-top:10px">Círculo = onde estava quem matou · X = onde a pessoa morreu · losango = spike. Passe o dedo/mouse para ver quem foi.</p>`)}${cartao("Abates", killfeed(d, r))}</div></div>`;
   else corpo = leituraEquipe(d);
-  return { titulo: `${d.mapa} · ${dataHora(d.t)}`, html: `${cabecalho(d, p)}${abas(`#/p/${id}`, aba, ABAS)}<div class="secao">${corpo}</div>` };
+  // Deixa o round escolhido à vista na linha do tempo (no celular ela rola de lado)
+  const depois = (el) => {
+    const linha = el.querySelector(".linha-rounds"), cel = linha?.querySelector('[aria-pressed="true"]');
+    if (cel && linha.scrollWidth > linha.clientWidth) linha.scrollLeft += cel.getBoundingClientRect().left - linha.getBoundingClientRect().left - (linha.clientWidth - cel.offsetWidth) / 2;
+  };
+  return { titulo: `${d.mapa} · ${dataHora(d.t)}`, html: `${cabecalho(d, p)}${abas(`#/p/${id}`, aba, ABAS)}<div class="secao">${corpo}</div>`, depois };
 }

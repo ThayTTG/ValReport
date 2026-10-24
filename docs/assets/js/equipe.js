@@ -1,13 +1,15 @@
 // Abas da equipe: Visão geral, Partidas, Formações, Sinergia, Comparar e Mapas
 
 import { esc, num, pct, sinal, div, imagem, imgAgente, imgCard, imgRank, imgMapaFaixa, nomeTier, nomeFila, hora, diaLongo, chaveDia, relativo, dataHora,
-  tile, destaque, vazio, cartao, secao, barra, selo, classeSinal, classeNivel, icone } from "./util.js";
-import { B, itensDe, stats, partidasDaEquipe, passaPartida, passaMembro, resultadoEquipe, placarEquipe, calor as carregarCalor, agrupar } from "./dados.js";
-import { barraFiltros, tabela, forma, celulaAgente } from "./componentes.js";
+  tile, destaque, vazio, cartao, secao, barra, selo, classeSinal, classeNivel, icone, dataCurta, TIPOS } from "./util.js";
+import { B, itensDe, stats, partidasDaEquipe, passaPartida, passaMembro, resultadoEquipe, placarEquipe, calor as carregarCalor, agrupar, notaMapa } from "./dados.js";
+import { barraFiltros, tabela, forma, celulaAgente, blocoNota, segmentoTipoRound, lerTipoRound, TIPO_COD, delta } from "./componentes.js";
+import { calcularRecordes, gradeRecordes } from "./recordes.js";
 import { moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { abas, filtrosQuery } from "./jogador.js";
 
-export const ABAS_EQUIPE = [["visao", "Visão geral"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"], ["comparar", "Comparar"], ["mapas", "Mapas"]];
+export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
+  ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Recordes"]];
 const membrosCom = () => B.equipe.filter((e) => e.partidas > 0);
 
 function cabecalhoEquipe(f) {
@@ -220,6 +222,55 @@ function comparar(f, q) {
     ${juntos.length ? secao(`Partidas com ${sel.map((s) => B.porSlug.get(s).apelido).join(" & ")} no mesmo time`, `<div class="partidas">${juntos.slice(0, 10).map(linhaEquipe).join("")}</div>`) : ""}`;
 }
 
+// ---------- Semana ----------
+function itemRound(x, { nome = true } = {}) {
+  const e = B.porSlug.get(x.slug);
+  return `<a class="leitura__item leitura__item--link" href="#/p/${esc(x.match_id)}/rounds?r=${x.n}">
+    <span class="imp ${classeSinal(x.imp, 1)}">${sinal(x.imp, 0, "%")}</span>
+    <div><p><strong>${nome && e ? `${esc(e.apelido)} · ` : ""}R${x.n}</strong> <span class="suave">· ${esc(x.mapa)} (${esc(x.agente)})${x.tipo ? ` · ${esc(TIPOS[x.tipo] || x.tipo)}` : ""} · ${dataCurta(x.inicio)}</span></p>
+      <p>${esc(x.resumo)}</p>${x.dica ? `<p class="suave">${esc(x.dica)}</p>` : ""}</div></a>`;
+}
+function semana() {
+  const S = B.semana;
+  if (!S || !S.partidas) return vazio("Ninguém da equipe jogou nos últimos 7 dias", "<p>O resumo da semana aparece aqui quando houver partidas. Aos domingos ele também vai para o Discord.</p>");
+  const mvp = B.porSlug.get(S.mvp);
+  const mv = S.jogadores.find((j) => j.slug === S.mvp)?.semana;
+  const linhas = S.jogadores.filter((j) => j.semana && B.porSlug.get(j.slug));
+  const parados = S.jogadores.filter((j) => !j.semana && B.porSlug.get(j.slug));
+  const mapas = Object.entries(S.mapas || {}).sort((a, b) => b[1][0] + b[1][1] - a[1][0] - a[1][1]);
+  const tab = tabela("semana", linhas, [
+    { k: "nome", t: "Jogador", v: (j) => B.porSlug.get(j.slug).apelido, f: (j) => { const e = B.porSlug.get(j.slug); return `<a class="celula-ag" href="#/j/${esc(e.slug)}?periodo=7" style="color:inherit">${imagem(imgCard(e.card), e.apelido, "", e.apelido)}<div><strong>${esc(e.apelido)}${j.slug === S.mvp ? ` <span class="selo selo--destaque">${icone("trofeu")} MVP</span>` : ""}</strong><small>${j.semana.partidas} partida${j.semana.partidas === 1 ? "" : "s"} · ${j.semana.v}V ${j.semana.d}D</small></div></a>`; } },
+    { k: "imp", t: "Impacto/round", v: (j) => j.semana.impacto, f: (j) => `<strong class="${classeSinal(j.semana.impacto, 1)}">${sinal(j.semana.impacto, 1, "%")}</strong> ${delta(j.semana.impacto, j.anterior?.impacto, 1)}` },
+    { k: "kd", t: "K/D", v: (j) => j.semana.kd, f: (j) => `${num(j.semana.kd, 2)} ${delta(j.semana.kd, j.anterior?.kd, 2)}` },
+    { k: "adr", t: "ADR", v: (j) => j.semana.adr, f: (j) => `${num(j.semana.adr)} ${delta(j.semana.adr, j.anterior?.adr, 0)}` },
+    { k: "kast", t: "KAST", v: (j) => j.semana.kast, f: (j) => `${num(j.semana.kast)}% ${delta(j.semana.kast, j.anterior?.kast, 0, "%")}` },
+    { k: "r", t: "Rounds", v: (j) => j.semana.rounds },
+  ], { padrao: "imp" });
+  return `<div class="semana-topo">
+      <div><span class="selo selo--destaque">${icone("relogio")} ${dataCurta(S.ini)} a ${dataCurta(S.fim)}</span>
+        <h2 style="margin-top:8px">Resumo da semana</h2>
+        <p class="suave pequeno">${S.partidas} partida${S.partidas === 1 ? "" : "s"} com alguém da equipe · <strong class="bom">${S.v}V</strong> · <strong class="ruim">${S.d}D</strong> · calculado em ${esc(dataHora(B.meta.gerado_em))} (não muda com os filtros)</p></div>
+      ${mvp && mv ? `<a class="mvp" href="#/j/${esc(mvp.slug)}?periodo=7">
+        <span class="mvp__brilho" aria-hidden="true"></span>
+        ${imagem(imgCard(mvp.card) || imgAgente(mvp.agente), mvp.apelido, "avatar", mvp.apelido)}
+        <span class="mvp__texto"><small>${icone("trofeu")} MVP da semana</small><strong>${esc(mvp.apelido)}</strong>
+          <span class="pequeno">${sinal(mv.impacto, 1, "%")} por round · K/D ${num(mv.kd, 2)} · ADR ${num(mv.adr)}</span></span></a>` : ""}
+    </div>
+    ${secao("Cada um na semana", `<div class="cartao">${tab}${parados.length ? `<p class="suave pequeno" style="margin-top:10px">Não jogou nesta semana: ${esc(parados.map((j) => B.porSlug.get(j.slug).apelido).join(", "))}.</p>` : ""}</div>`, `<span class="suave pequeno">▲▼ = comparado com a semana anterior</span>`)}
+    ${mapas.length ? secao("Mapas da semana", `<div class="chips">${mapas.map(([m, [v, d]]) => `<span class="chip">${esc(m)} <strong class="${v >= d ? "bom" : "ruim"}">${v}V ${d}D</strong></span>`).join("")}</div>`) : ""}
+    <div class="grade-2 secao">
+      ${cartao("Rounds da semana", S.destaques?.length ? `<div class="leitura">${S.destaques.map((x) => itemRound(x)).join("")}</div>` : `<p class="suave pequeno">Nenhum round passou de +15% de impacto.</p>`)}
+      ${cartao("Para rever no VOD", S.rever?.length ? `<div class="leitura">${S.rever.map((x) => itemRound(x)).join("")}</div>` : `<p class="suave pequeno">Nenhum round abaixo de −15%. Semana limpa!</p>`)}
+    </div>`;
+}
+
+// ---------- Recordes ----------
+function recordesEquipe(f) {
+  const itens = membrosCom().flatMap((e) => itensDe(e.slug, f));
+  const recs = calcularRecordes(itens);
+  return `<p class="suave pequeno" style="margin-bottom:12px">O melhor número de cada estatística entre as partidas da equipe (segue os filtros). Médias por round só contam partidas com 10+ rounds. Toque num recorde para abrir a partida.</p>${gradeRecordes(recs)}`;
+}
+
 // ---------- Mapas da equipe ----------
 async function mapasEquipe(f, q) {
   const ps = partidasDaEquipe(f);
@@ -239,6 +290,7 @@ async function mapasEquipe(f, q) {
     return `<article class="mapa-cartao">
       <div class="mapa-cartao__banner" style="${imgMapaFaixa(mapa) ? `background-image:url('${esc(imgMapaFaixa(mapa))}')` : ""}"><strong>${esc(mapa)}</strong>${selo(`${v}V · ${d}D`, v >= d ? "vitoria" : "derrota")}</div>
       <div class="mapa-cartao__corpo">
+        ${notaMapa(mapa)?.texto ? `<a class="selo selo--destaque" style="justify-self:start" href="#/equipe/mapas${filtrosQuery(f)}${filtrosQuery(f) ? "&" : "?"}cm=${encodeURIComponent(mapa)}">${icone("nota")} plano da IGL</a>` : ""}
         <div class="lado-barra"><span>Vitórias</span>${barra(div(v, v + d), v >= d ? "vitoria" : "derrota")}<span>${pct(div(v, v + d))}</span></div>
         <div class="lado-barra"><span>Ataque</span>${barra(div(rva, ra))}<span>${pct(div(rva, ra))} <small class="suave">${ra}r</small></span></div>
         <div class="lado-barra"><span>Defesa</span>${barra(div(rvd, rd))}<span>${pct(div(rvd, rd))} <small class="suave">${rd}r</small></span></div>
@@ -251,8 +303,9 @@ async function mapasEquipe(f, q) {
   const mapa = mapas.includes(q.get("cm")) ? q.get("cm") : mapas[0];
   const ids = new Set(porMapa.get(mapa).map((p) => p.id));
   const todos = await Promise.all(membrosCom().map(async (e) => ({ e, c: await carregarCalor(e.slug) })));
+  const tr = lerTipoRound(q);
   const evs = [];
-  for (const { e, c } of todos) c.e.forEach(([mi, tipo, lado, x, y]) => { if (ids.has(c.partidas[mi])) evs.push({ tipo, lado, x, y, quem: e.apelido }); });
+  for (const { e, c } of todos) c.e.forEach(([mi, tipo, lado, x, y, , tp]) => { if (ids.has(c.partidas[mi]) && (tr === "todos" || tp === TIPO_COD[tr])) evs.push({ tipo, lado, x, y, quem: e.apelido }); });
   const regioes = new Map();
   for (const ev of evs.filter((x) => x.tipo === 0)) {
     const r = calloutMaisProximo(mapa, ev.x, ev.y); if (!r) continue;
@@ -261,7 +314,9 @@ async function mapasEquipe(f, q) {
   const top = [...regioes].sort((a, b) => b[1].n - a[1].n).slice(0, 6);
   const html = `<div class="grade-mapas">${cartoes}</div>
     ${secao(`Mapa de calor da equipe · ${mapa}`, `<div class="grade-mapa"><div class="cartao">${moldeMapa(mapa)}</div><div class="pilha">
-      ${cartao("Mapa", `<div class="chips">${mapas.map((m) => `<button class="chip" style="cursor:pointer;${m === mapa ? "border-color:var(--destaque);color:var(--destaque-texto)" : ""}" type="button" data-param="cm" data-valor="${esc(m)}">${esc(m)}</button>`).join("")}</div>`)}
+      ${blocoNota("mapa", mapa, notaMapa(mapa)?.texto, { titulo: `Plano da IGL · ${mapa}` })}
+      ${cartao("Mapa", `<div class="chips">${mapas.map((m) => `<button class="chip" style="cursor:pointer;${m === mapa ? "border-color:var(--destaque);color:var(--destaque-texto)" : ""}" type="button" data-param="cm" data-valor="${esc(m)}" aria-pressed="${m === mapa}">${esc(m)}</button>`).join("")}</div>
+        ${segmentoTipoRound(tr)}<p class="suave pequeno" style="margin-top:8px">${evs.filter((x) => x.tipo === 0).length} mortes e ${evs.filter((x) => x.tipo === 1).length} abates${tr === "todos" ? "" : ` em rounds de ${esc(TIPOS[tr].toLowerCase())}`}.</p>`)}
       ${cartao("Onde a equipe mais morre", top.length ? top.map(([r, x]) => { const [quem, k] = [...x.quem].sort((a, b) => b[1] - a[1])[0]; return `<div style="padding:5px 0"><div style="display:flex;justify-content:space-between;font-size:13.5px"><strong>${esc(r)}</strong><span>${x.n}× <span class="suave">(mais: ${esc(quem)} ${k})</span></span></div>${barra(x.n / top[0][1].n, "derrota")}</div>`; }).join("") : `<p class="suave pequeno">Sem nomes de regiões para este mapa ainda.</p>`)}
     </div></div>`)}`;
   return { html, depois: (el) => desenharCalor(el, mapa, evs, { mostrar: "ambos" }) };
@@ -271,11 +326,13 @@ export async function viewEquipe(aba, f, q) {
   aba = ABAS_EQUIPE.some(([a]) => a === aba) ? aba : "visao";
   const qs = filtrosQuery(f);
   let corpo = "", depois = null;
-  const semFiltros = ["formacoes"].includes(aba);
+  const semFiltros = ["formacoes", "semana"].includes(aba);
   if (!B.partidas.length) corpo = vazio("Ainda não há partidas exportadas", "<p>Rode o report no PC para gerar os dados do site.</p>");
   else if (aba === "visao") corpo = visao(f);
   else if (aba === "partidas") { const ps = partidasDaEquipe(f); corpo = listaEquipe(ps.slice(0, Number(q.get("n") || 40))) || vazio("Nenhuma partida com estes filtros"); if (ps.length > Number(q.get("n") || 40)) corpo += `<p style="text-align:center;margin-top:14px"><button class="limpar" type="button" data-param="n" data-valor="${Number(q.get("n") || 40) + 40}">Mostrar mais</button></p>`; }
   else if (aba === "formacoes") corpo = formacoes();
+  else if (aba === "semana") corpo = semana();
+  else if (aba === "recordes") corpo = recordesEquipe(f);
   else if (aba === "sinergia") corpo = sinergia(f);
   else if (aba === "comparar") corpo = comparar(f, q);
   else if (aba === "mapas") ({ html: corpo, depois } = await mapasEquipe(f, q));

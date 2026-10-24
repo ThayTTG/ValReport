@@ -1,12 +1,12 @@
 // Gráficos em SVG/canvas feitos à mão (sem bibliotecas): linhas, histograma, corpo (precisão), mapa de calor e mapa 2D
 
-import { esc, num, imgMinimapa } from "./util.js";
+import { esc, num, imgMinimapa, nomeTier, nomeTierId, dataCurta, larguraGrafico } from "./util.js";
 import { B } from "./dados.js";
 
 /** Linha com pontos por partida + média móvel. pontos: [{y, rotulo, classe}] */
 export function linha(pontos, { referencia = null, casas = 1, sufixo = "", janela = 5, altura = 200 } = {}) {
   if (pontos.length < 2) return `<p class="suave pequeno">Jogue pelo menos 2 partidas com estes filtros para ver a evolução.</p>`;
-  const W = 640, H = altura, pe = 34, pd = 10, pt = 12, pb = 26;
+  const W = larguraGrafico(), H = W < 640 ? Math.round(altura * 0.85) : altura, pe = 40, pd = 10, pt = 12, pb = 26;
   const ys = pontos.map((p) => p.y);
   if (referencia != null) ys.push(referencia);
   let lo = Math.min(...ys), hi = Math.max(...ys);
@@ -20,16 +20,44 @@ export function linha(pontos, { referencia = null, casas = 1, sufixo = "", janel
     return fatia.reduce((a, p) => a + p.y, 0) / fatia.length;
   });
   const marcas = [0, 0.5, 1].map((f) => lo + (hi - lo) * f);
-  const passo = Math.max(1, Math.ceil(pontos.length / 8));
+  const passo = Math.max(1, Math.ceil(pontos.length / (W < 640 ? 5 : 8)));
   return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução partida a partida">
     ${marcas.map((v) => `<line class="grade-linha" x1="${pe}" x2="${W - pd}" y1="${y(v)}" y2="${y(v)}"/><text x="${pe - 6}" y="${y(v) + 4}" text-anchor="end">${num(v, casas)}${sufixo}</text>`).join("")}
     ${referencia != null ? `<line class="linha-ref" x1="${pe}" x2="${W - pd}" y1="${y(referencia)}" y2="${y(referencia)}"/>` : ""}
-    <polyline class="serie" points="${pontos.map((p, i) => `${x(i)},${y(p.y)}`).join(" ")}"/>
+    <polyline class="serie" pathLength="1" points="${pontos.map((p, i) => `${x(i)},${y(p.y)}`).join(" ")}"/>
     <polyline class="serie-media" points="${media.map((v, i) => `${x(i)},${y(v)}`).join(" ")}"/>
-    ${pontos.map((p, i) => `<circle class="ponto ${esc(p.classe || "")}" cx="${x(i)}" cy="${y(p.y)}" r="4"><title>${esc(p.rotulo)}: ${num(p.y, casas)}${sufixo}</title></circle>`).join("")}
+    ${pontos.map((p, i) => `<circle class="ponto ${esc(p.classe || "")}" style="--i:${i}" cx="${x(i)}" cy="${y(p.y)}" r="4"><title>${esc(p.rotulo)}: ${num(p.y, casas)}${sufixo}</title></circle>`).join("")}
     ${pontos.map((p, i) => (i % passo === 0 || i === pontos.length - 1 ? `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${esc(p.curto || "")}</text>` : "")).join("")}
   </svg>
   <div class="legenda"><span><i></i>por partida</span><span><i class="media"></i>média das últimas ${janela}</span>${referencia != null ? `<span>tracejado fino = referência</span>` : ""}</div>`;
+}
+
+/** Evolução de elo: cada ponto é uma partida ranqueada (tier × 100 + RR). hist: [{t, tier, tn, rr, delta, mapa}] */
+export function linhaElo(hist) {
+  const pts = hist.filter((h) => h.tier != null && h.rr != null).map((h) => ({ ...h, y: h.tier * 100 + h.rr }));
+  if (pts.length < 2) return `<p class="suave pequeno">O gráfico aparece depois de 2 partidas ranqueadas registradas pelo report.</p>`;
+  const W = larguraGrafico(), H = W < 640 ? 200 : 220, pe = W < 640 ? 74 : 92, pd = 12, pt = 14, pb = 26;
+  let lo = Math.min(...pts.map((p) => p.y)), hi = Math.max(...pts.map((p) => p.y));
+  lo = Math.floor((lo - 15) / 100) * 100; hi = Math.ceil((hi + 15) / 100) * 100;
+  if (hi - lo < 100) hi = lo + 100;
+  const x = (i) => pe + (i * (W - pe - pd)) / (pts.length - 1);
+  const y = (v) => pt + ((hi - v) * (H - pt - pb)) / (hi - lo);
+  const faixas = [];
+  for (let v = lo; v < hi; v += 100) faixas.push(v);
+  const nomeDe = (v) => nomeTierId(v / 100);
+  const area = `M${x(0)},${y(pts[0].y)} ${pts.map((p, i) => `L${x(i)},${y(p.y)}`).join(" ")} L${x(pts.length - 1)},${H - pb} L${x(0)},${H - pb}Z`;
+  const passo = Math.max(1, Math.ceil(pts.length / (W < 640 ? 5 : 8)));
+  return `<svg class="grafico grafico--elo" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução do elo partida a partida">
+    <defs><linearGradient id="grad-elo" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--destaque)" stop-opacity=".32"/><stop offset="1" stop-color="var(--destaque)" stop-opacity="0"/></linearGradient></defs>
+    ${faixas.map((v, i) => `<rect x="${pe}" y="${y(v + 100)}" width="${W - pe - pd}" height="${y(v) - y(v + 100)}" fill="var(--superficie-2)" opacity="${i % 2 ? 0.55 : 0}"/>
+      <line class="grade-linha" x1="${pe}" x2="${W - pd}" y1="${y(v)}" y2="${y(v)}"/>
+      <text x="${pe - 8}" y="${(y(v) + y(v + 100)) / 2 + 4}" text-anchor="end">${esc(nomeDe(v))}</text>`).join("")}
+    <path class="area" d="${area}" fill="url(#grad-elo)"/>
+    <polyline class="serie" pathLength="1" points="${pts.map((p, i) => `${x(i)},${y(p.y)}`).join(" ")}"/>
+    ${pts.map((p, i) => `<circle class="ponto ${p.delta > 0 ? "V" : p.delta < 0 ? "D" : ""}" style="--i:${i}" cx="${x(i)}" cy="${y(p.y)}" r="4"><title>${dataCurta(p.t)}${p.mapa ? ` · ${esc(p.mapa)}` : ""}: ${esc(nomeTier(p.tn))} · ${p.rr} RR${p.delta != null ? ` (${p.delta > 0 ? "+" : ""}${p.delta})` : ""}</title></circle>`).join("")}
+    ${pts.map((p, i) => (i % passo === 0 || i === pts.length - 1 ? `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${dataCurta(p.t)}</text>` : "")).join("")}
+  </svg>
+  <div class="legenda"><span><i style="background:var(--vitoria)"></i>ganhou RR</span><span><i style="background:var(--derrota)"></i>perdeu RR</span><span>faixas = divisões de elo</span></div>`;
 }
 
 /** Histograma das distâncias até o aliado mais próximo na morte (metros) */
@@ -41,7 +69,7 @@ export function histograma(dists, trade = 15, isolado = 30) {
   return `<div class="histograma" role="img" aria-label="Distribuição da distância até o aliado mais próximo quando morreu">
     ${faixas.map((n, i) => {
       const ini = i * passo, cls = ini >= isolado ? "longe" : ini >= trade ? "medio" : "";
-      return `<div class="${cls}" style="height:${(100 * n) / maior}%" title="${ini}${i === faixas.length - 1 ? "+" : `–${ini + passo}`} m: ${n} morte(s)"></div>`;
+      return `<div class="${cls}" style="height:${(100 * n) / maior}%;--i:${i}" title="${ini}${i === faixas.length - 1 ? "+" : `–${ini + passo}`} m: ${n} morte(s)"></div>`;
     }).join("")}
   </div><div class="eixo-hist"><span>0 m</span><span>${trade} m</span><span>${isolado} m</span><span>${max}+ m</span></div>
   <div class="legenda"><span><i></i>até ${trade} m (dá para trocar)</span><span><i style="background:var(--alerta)"></i>${trade}–${isolado} m</span><span><i style="background:var(--derrota)"></i>+${isolado} m (isolada)</span></div>`;

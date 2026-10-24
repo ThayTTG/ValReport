@@ -9,6 +9,28 @@
   <meta name="theme-color" content="#faf6f1" media="(prefers-color-scheme: light)">
   <meta name="color-scheme" content="dark light">
   <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/img/icone-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ValReport">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Prévia ao compartilhar o link (Discord, WhatsApp, X...). O exportar_site.py ajusta o endereço. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ValReport · NokyLabs">
+  <meta property="og:title" content="ValReport · estatísticas da equipe">
+  <meta property="og:description" content="Partidas, agentes, mapas, formações e sinergia da equipe, com a leitura tática de cada round. Projeto de fã da NokyLabs.">
+  <meta property="og:url" content="https://thayttg.github.io/ValReport/">
+  <meta property="og:image" content="https://thayttg.github.io/ValReport/assets/img/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ValReport by NokyLabs: estatísticas e análise tática da equipe">
+  <meta property="og:locale" content="pt_BR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ValReport · estatísticas da equipe">
+  <meta name="twitter:description" content="Partidas, agentes, mapas, formações e sinergia da equipe. Projeto de fã da NokyLabs.">
+  <meta name="twitter:image" content="https://thayttg.github.io/ValReport/assets/img/og.png">
   <link rel="preload" href="assets/fonts/inter-400.woff" as="font" type="font/woff" crossorigin>
   <link rel="preload" href="assets/fonts/inter-600.woff" as="font" type="font/woff" crossorigin>
   <link rel="stylesheet" href="assets/css/app.css">
@@ -37,6 +59,11 @@
       <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6l-7-3Z" fill="currentColor"/><path d="m8.8 12.2 2.2 2.2 4.4-4.6" fill="none" stroke="var(--fundo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-relogio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
       <symbol id="i-alvo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-nota" viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12h6M9 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-instalar" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-raio" viewBox="0 0 24 24"><path d="M13 2 5 13.5h6L10 22l9-12h-6.5L13 2Z" fill="currentColor"/></symbol>
+      <symbol id="i-estrela" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor"/></symbol>
+      <symbol id="i-fogo" viewBox="0 0 24 24"><path d="M12 2.5c.6 3.4-1.2 5-2.6 6.6C8 10.6 6.5 12.4 6.5 15a5.5 5.5 0 0 0 11 0c0-2.2-1-3.9-2.2-5.1-.2 1.4-.9 2.4-2 2.9.6-3.6-.2-7.4-1.3-10.3Z" fill="currentColor"/></symbol>
       <symbol id="i-filtro" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
     </defs>
   </svg>
@@ -52,6 +79,9 @@
         <a href="#/" data-nav="equipe"><svg aria-hidden="true"><use href="#i-equipe"/></svg><span>Equipe</span></a>
         <a href="#/sobre" data-nav="sobre"><svg aria-hidden="true"><use href="#i-info"/></svg><span>Sobre</span></a>
       </nav>
+      <button class="botao-icone" id="instalar" type="button" aria-label="Instalar o ValReport no aparelho" title="Instalar no aparelho" hidden>
+        <svg aria-hidden="true"><use href="#i-instalar"/></svg>
+      </button>
       <button class="botao-icone" id="alternar-tema" type="button" aria-label="Alternar tema claro ou escuro">
         <svg class="so-escuro" aria-hidden="true"><use href="#i-sol"/></svg>
         <svg class="so-claro" aria-hidden="true"><use href="#i-lua"/></svg>

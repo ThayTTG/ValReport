@@ -1,6 +1,6 @@
 // Componentes compartilhados: barra de filtros, linha de partida, tabela ordenável, agrupamento por dia
 
-import { esc, num, pct, sinal, imagem, imgAgente, imgMapaFaixa, imgCard, nomeFila, hora, diaLongo, classeSinal, icone, selo } from "./util.js";
+import { esc, num, pct, sinal, imagem, imgAgente, imgMapaFaixa, imgCard, nomeFila, hora, diaLongo, classeSinal, icone, selo, md } from "./util.js";
 import { B, PERIODOS, FILTROS_PADRAO, opcoes, porDia, stats } from "./dados.js";
 
 // ---------- Filtros ----------
@@ -28,6 +28,39 @@ export function barraFiltros(f, slug, { mostrar = ["fila", "temporada", "periodo
   </div>`;
 }
 
+// ---------- Notas da IGL ----------
+/** Mostra a nota; no editor local (editar_notas.bat) vira um campo para escrever */
+export function blocoNota(tipo, id, texto, { n = null, titulo = "Nota da IGL", vazio = "" } = {}) {
+  const chave = [tipo, id, n ?? ""].join("|");
+  if (B.editor) {
+    return `<div class="nota nota--editor" data-nota="${esc(chave)}">
+      <div class="nota__topo">${icone("nota")}<strong>${esc(titulo)}</strong><span class="suave pequeno">vai para o site público</span></div>
+      <textarea rows="${tipo === "round" ? 3 : 6}" placeholder="Escreva aqui. Dá para usar **negrito**, *itálico* e listas começando com - ">${esc(texto || "")}</textarea>
+      <div class="nota__acoes"><button class="botao" type="button" data-salvar-nota="${esc(chave)}">Salvar</button><span class="nota__status pequeno" aria-live="polite"></span></div>
+    </div>`;
+  }
+  if (!texto) return vazio;
+  return `<div class="nota"><div class="nota__topo">${icone("nota")}<strong>${esc(titulo)}</strong></div><div class="nota__texto">${md(texto)}</div></div>`;
+}
+// ---------- Tipo de round (economia) no mapa de calor ----------
+export const TIPO_COD = { pistol: 0, eco: 1, force: 2, armado: 3, "anti-eco": 4 };
+export function segmentoTipoRound(sel) {
+  return `<div class="segmentos segmentos--rolar" role="group" aria-label="Tipo de round" style="margin-top:8px">${[["todos", "Todos os rounds"], ["pistol", "Pistol"], ["eco", "Eco"], ["force", "Force"], ["armado", "Armado"], ["anti-eco", "Anti-eco"]].map(([k, t]) =>
+    `<button type="button" data-param="tr" data-valor="${k}" aria-pressed="${k === sel}">${t}</button>`).join("")}</div>`;
+}
+export const lerTipoRound = (q) => (q.get("tr") in TIPO_COD ? q.get("tr") : "todos");
+
+/** ▲/▼ comparado com a semana anterior */
+export function delta(atual, anterior, casas = 1, sufixo = "", { inverso = false } = {}) {
+  if (atual == null || anterior == null) return "";
+  const d = atual - anterior;
+  if (Math.abs(d) < 10 ** -casas / 2) return `<small class="delta">=</small>`;
+  const bom = inverso ? d < 0 : d > 0;
+  return `<small class="delta ${bom ? "bom" : "ruim"}" title="Semana anterior: ${num(anterior, casas)}${sufixo}">${d > 0 ? "▲" : "▼"} ${num(Math.abs(d), casas)}${sufixo}</small>`;
+}
+
+export const temNota = (id) => Boolean(B.notas.partidas?.[id]?.texto || Object.keys(B.notas.partidas?.[id]?.rounds || {}).length);
+
 // ---------- Partidas ----------
 export function linhaPartida({ p, m, slug }, { mostrarNome = false } = {}) {
   const [a, b] = m.placar.split("-");
@@ -43,7 +76,7 @@ export function linhaPartida({ p, m, slug }, { mostrarNome = false } = {}) {
     <div class="partida__meio">
       <div class="partida__titulo">${mostrarNome && membro ? `<span>${esc(membro.apelido)}</span><span class="suave">·</span>` : ""}<span>${esc(p.mapa)}</span>
         <span class="placar ${m.res === "V" ? "bom" : m.res === "D" ? "ruim" : ""}">${esc(a)}–${esc(b)}</span></div>
-      <div class="partida__sub"><span>${esc(m.ag)}</span><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span>${m.eq > 1 ? `<span>com ${m.eq - 1} da equipe</span>` : ""}${posicao}</div>
+      <div class="partida__sub"><span>${esc(m.ag)}</span><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span>${m.eq > 1 ? `<span>com ${m.eq - 1} da equipe</span>` : ""}${temNota(p.id) ? `<span class="selo selo--destaque" title="Tem nota da IGL">${icone("nota")} nota</span>` : ""}${posicao}</div>
       ${com.length ? `<div class="com" title="Jogou com ${esc(com.map((c) => c.apelido).join(", "))}">${com.map((c) => imagem(imgCard(c.card), c.apelido, "", c.apelido)).join("")}</div>` : ""}
     </div>
     <div class="partida__nums">

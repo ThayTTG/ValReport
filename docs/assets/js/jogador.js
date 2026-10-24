@@ -5,8 +5,11 @@ import {
   tile, destaque, vazio, cartao, secao, barra, escala, selo, classeSinal, classeNivel, icone, TIPOS, nomeFila,
 } from "./util.js";
 import { B, itensDe, stats, agrupar, calor as carregarCalor, passaPartida, passaMembro } from "./dados.js";
-import { barraFiltros, listaPorDia, tabela, celulaAgente, forma, vereditoSelo, linhaPartida } from "./componentes.js";
-import { linha, histograma, precisao, moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
+import { barraFiltros, listaPorDia, tabela, celulaAgente, forma, vereditoSelo, linhaPartida, segmentoTipoRound, lerTipoRound, TIPO_COD } from "./componentes.js";
+import { linha, linhaElo, histograma, precisao, moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
+import { calcularRecordes, gradeRecordes } from "./recordes.js";
+
+const ultimoElo = (slug) => (B.elo[slug] || []).filter((h) => h.tier != null).at(-1);
 
 export const ABAS_JOGADOR = [["geral", "Geral"], ["partidas", "Partidas"], ["agentes", "Agentes"], ["mapas", "Mapas"],
   ["armas", "Armas"], ["performance", "Performance"], ["calor", "Mapa de calor"]];
@@ -27,7 +30,8 @@ export function cabecalhoJogador(e) {
           ${e.ultima ? `<span>última ${esc(relativo(e.ultima, new Date(B.meta.gerado_em)))}</span>` : ""}</div>
       </div>
       <div class="cabecalho__lado">
-        <div class="rank">${imagem(imgRank(e.tier), nomeTier(e.tn), "", nomeTier(e.tn))}<div><small>Elo</small><strong>${esc(nomeTier(e.tn))}</strong></div></div>
+        ${(() => { const el = ultimoElo(e.slug); const tier = el?.tier ?? e.tier, tn = el?.tn ?? e.tn;
+          return `<div class="rank">${imagem(imgRank(tier), nomeTier(tn), "", nomeTier(tn))}<div><small>Elo</small><strong>${esc(nomeTier(tn))}</strong>${el?.rr != null ? `<small class="rank__rr">${el.rr} RR${el.delta ? ` <span class="${el.delta > 0 ? "bom" : "ruim"}">${el.delta > 0 ? "+" : ""}${el.delta}</span>` : ""}</small>` : ""}</div></div>`; })()}
         ${av ? `<div class="rank" title="Índice NokyLabs dos últimos ${B.meta.regras.janela_dias} dias"><div style="padding:0 6px 0 8px;font:700 26px var(--fonte-titulo);color:var(--destaque-texto)">${av.indice}</div><div><small>Índice</small><strong>${esc(av.funcao)}</strong></div></div>` : ""}
       </div>
     </div></header>`;
@@ -58,9 +62,15 @@ function cartaoAvaliacao(x) {
         <div class="suave pequeno" style="margin-top:4px">margem ${x.margem[0]}–${x.margem[1]} · ${x.rounds} rounds · ${x.partidas} partida${x.partidas === 1 ? "" : "s"}</div></div></div>
       ${escala(x.indice, x.margem)}
       <p class="suave pequeno">50 = média de ${esc(x.funcao.toLowerCase())} nos lobbies de vocês (últimos ${B.meta.regras.janela_dias} dias). Não muda com os filtros.</p>
+      ${x.vs_elo ? `<div class="vs-elo">
+        <div class="vs-elo__topo"><span class="vs-elo__rotulo">vs ${esc(x.funcao.toLowerCase())} no ${esc(nomeTier(x.vs_elo.faixa))}</span>
+          <strong>${x.vs_elo.indice}<small>/100</small></strong><span class="suave pequeno">margem ${x.vs_elo.margem[0]}–${x.vs_elo.margem[1]}</span></div>
+        ${escala(x.vs_elo.indice, x.vs_elo.margem)}
+        <p class="suave pequeno">Mesmo cálculo, mas comparando só com quem jogou ${esc(x.funcao.toLowerCase())} no ${esc(nomeTier(x.vs_elo.faixa))} nas partidas salvas (${x.vs_elo.amostras} ${x.vs_elo.amostras === 1 ? "referência" : "referências"}).${x.vs_elo.amostras < 15 ? " <strong>Poucas referências nesse elo:</strong> por enquanto a régua se apoia bastante na média geral, então leia com cautela." : ""}</p>
+      </div>` : ""}
       <div class="comparacao" style="margin-top:6px">${mets}</div>
       ${x.fortes.length || x.fracos.length ? `<ul class="lista-pontos">${x.fortes.length ? `<li><strong>Pontos fortes:</strong> ${esc(x.fortes.join(", "))}</li>` : ""}${x.fracos.length ? `<li><strong>A melhorar:</strong> ${esc(x.fracos.join(", "))}</li>` : ""}${kit}${trade}${cl}${solo}</ul>` : `<ul class="lista-pontos">${kit}${trade}${cl}${solo}</ul>`}
-    </div>`, `<span class="suave pequeno">vs lobby</span>`);
+    </div>`, `<span class="suave pequeno">${x.vs_elo ? "vs lobby · vs elo" : "vs lobby"}</span>`);
 }
 
 // ---------- Geral ----------
@@ -191,7 +201,19 @@ function performance(e, itens, s, q) {
   const lado = (l) => ({ r: l[0], v: l[1], k: l[2], d: l[3], imp: l[4], dano: l[5], fk: l[6], fd: l[7] });
   const A = lado(s.lados.a), D = lado(s.lados.d);
   const avKit = (B.avaliacao[e.slug] || [])[0]?.kit;
+  const hist = (B.elo[e.slug] || []).filter((h) => h.tier != null);
+  const el = hist.at(-1);
+  const pico = hist.reduce((m, h) => (!m || h.tier * 100 + h.rr > m.tier * 100 + m.rr ? h : m), null);
+  const saldo = hist.reduce((a, h) => a + (h.delta || 0), 0);
+  const blocoElo = hist.length ? secao("Evolução de elo", `<div class="cartao">
+      <div class="grade-stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+        ${tile("Agora", `${esc(nomeTier(el.tn))}`, `${el.rr} RR`)}
+        ${tile("Pico", `${esc(nomeTier(pico.tn))}`, `${pico.rr} RR · ${dataCurta(pico.t)}`)}
+        ${tile("Saldo de RR", sinal(saldo, 0), `em ${hist.length} partida${hist.length === 1 ? "" : "s"} ranqueada${hist.length === 1 ? "" : "s"}`, classeSinal(saldo, 1))}
+      </div>${linhaElo(hist)}
+      <p class="suave pequeno" style="margin-top:8px">Histórico de RR da HenrikDev, guardado pelo report a cada coleta. Não muda com os filtros.</p></div>`) : "";
   return `
+    ${blocoElo}
     ${secao("Evolução", `<div class="cartao"><div class="segmentos" role="group" aria-label="Métrica">${METRICAS_GRAF.map(([k, t]) =>
       `<button type="button" data-param="metrica" data-valor="${k}" aria-pressed="${k === met[0]}">${t}</button>`).join("")}</div>
       <div style="margin-top:12px">${linha(pontos, { referencia: met[5], casas: met[3], sufixo: met[4] })}</div></div>`)}
@@ -234,14 +256,17 @@ function performance(e, itens, s, q) {
           <p class="suave pequeno" style="margin-top:8px">A API informa só o total de habilidades da partida (não quando nem onde). Médias da função: últimos ${B.meta.regras.janela_dias} dias.</p>`)}
       ${cartao("Multi-kills", `<div class="grade-stats" style="grid-template-columns:repeat(4,1fr)">
           ${tile("2K", num(s.mk[0]))}${tile("3K", num(s.mk[1]))}${tile("4K", num(s.mk[2]))}${tile("Ace", num(s.mk[3]), "", s.mk[3] ? "bom" : "")}</div>`)}
-    </div>`;
+    </div>
+    ${secao("Recordes pessoais", gradeRecordes(calcularRecordes(itens), { mostrarNome: false }), `<span class="suave pequeno">seguem os filtros · toque para abrir a partida</span>`)}`;
 }
 
 // ---------- Mapa de calor ----------
 async function calor(e, itens, q) {
   const dados = await carregarCalor(e.slug);
   const ok = new Map(itens.map((it) => [it.p.id, it]));
-  const evs = dados.e.map(([mi, tipo, lado, x, y, n]) => ({ id: dados.partidas[mi], tipo, lado, x, y, n })).filter((ev) => ok.has(ev.id));
+  const tr = lerTipoRound(q);
+  const evs = dados.e.map(([mi, tipo, lado, x, y, n, tp]) => ({ id: dados.partidas[mi], tipo, lado, x, y, n, tp }))
+    .filter((ev) => ok.has(ev.id) && (tr === "todos" || ev.tp === TIPO_COD[tr]));
   const porMapa = new Map(), partidasPorMapa = new Map();
   for (const ev of evs) {
     const m = ok.get(ev.id).p.mapa;
@@ -249,7 +274,7 @@ async function calor(e, itens, q) {
     if (!partidasPorMapa.has(m)) partidasPorMapa.set(m, new Set());
     partidasPorMapa.get(m).add(ev.id);
   }
-  if (!porMapa.size) return { html: vazio("Sem posições registradas com estes filtros") };
+  if (!porMapa.size) return { html: tr !== "todos" ? `${segmentoTipoRound(tr)}${vazio(`Sem posições em rounds de ${TIPOS[tr].toLowerCase()} com estes filtros`)}` : vazio("Sem posições registradas com estes filtros") };
   const mapas = [...porMapa].sort((a, b) => b[1] - a[1]).map(([m]) => m);
   const mapa = mapas.includes(q.get("cm")) ? q.get("cm") : mapas[0];
   const ver = ["mortes", "abates", "ambos"].includes(q.get("cv")) ? q.get("cv") : "ambos";
@@ -274,6 +299,7 @@ async function calor(e, itens, q) {
         `<button type="button" data-param="cv" data-valor="${k}" aria-pressed="${k === ver}">${t}</button>`).join("")}</div>
         <div class="segmentos" style="margin-top:8px">${[["-1", "Os dois lados"], ["0", "Ataque"], ["1", "Defesa"]].map(([k, t]) =>
         `<button type="button" data-param="cl" data-valor="${k}" aria-pressed="${String(lado) === k}">${t}</button>`).join("")}</div>
+        ${segmentoTipoRound(tr)}
         <div class="chips" style="margin-top:12px"><span class="chip chip--ponto">${mortes.length} mortes</span><span class="chip chip--ponto chip--kill">${kills.length} abates</span><span class="chip">${partidasMapa} partida${partidasMapa === 1 ? "" : "s"}</span></div>`)}
       ${cartao("Onde mais morre", top.length ? `<div class="pilha" style="display:grid;gap:8px">${top.map(([r, x]) => `<div>
           <div style="display:flex;justify-content:space-between;font-size:13.5px"><strong>${esc(r)}</strong><span>${x.n}× <span class="suave">(${x.a} atq · ${x.d} def)</span></span></div>
