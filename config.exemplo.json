@@ -1,0 +1,61 @@
+{
+  "regiao": "br",
+  "plataforma": "pc",
+  "jogadores": [
+    "Jogador1#TAG1",
+    "Jogador2#TAG2",
+    "Jogador3#TAG3",
+    "Jogador4#TAG4",
+    "Jogador5#TAG5"
+  ],
+  "apelidos": {
+    "Jogador1#TAG1": "J1",
+    "Jogador2#TAG2": "J2",
+    "Jogador3#TAG3": "J3",
+    "Jogador4#TAG4": "J4",
+    "Jogador5#TAG5": "J5"
+  },
+  "filas_incluidas": [
+    "competitive",
+    "premier",
+    "custom"
+  ],
+  "max_paginas_por_jogador": 3,
+  "janela_dias": 14,
+  "janela_referencia_dias": 60,
+  "amostra_minima_rounds": 100,
+  "min_partidas_grupo": 3,
+  "destaque_impacto_pct": 35,
+  "observar_impacto_pct": -20,
+  "max_rounds_no_resumo": 5,
+  "distancia_trade": 1500,
+  "distancia_isolado": 3000,
+  "janela_trade_ms": 5000,
+  "peso_morte_trocada": 0.5,
+  "peso_assistencia": 0.25,
+  "limites_economia": {
+    "eco_abaixo_de": 2000,
+    "armado_a_partir_de": 3900
+  },
+  "funcoes_extras": {},
+  "validacao_por_jogador": 3,
+  "videos": {
+    "canal_youtube": "",
+    "wiki_busca": "",
+    "nome_da_fonte": "",
+    "links_fixos": []
+  },
+  "discord": {
+    "ativo": true,
+    "nome": "NokyLabs",
+    "avatar_url": ""
+  },
+  "site": {
+    "jogadores_autorizados": [
+      "Jogador1#TAG1"
+    ],
+    "mostrar_riot_id": false,
+    "publicar_automatico": false,
+    "repositorio": "https://github.com/ThayTTG/ValReport"
+  }
+}

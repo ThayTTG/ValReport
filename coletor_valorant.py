@@ -1,0 +1,362 @@
+#!/usr/bin/env python3
+"""
+Coletor diário de partidas de VALORANT (HenrikDev API) — NokyLabs
+
+O que ele faz:
+  1. Lê a lista de jogadores do config.json
+  2. Busca as partidas novas de cada um (desde a última execução)
+  3. Guarda só as filas que importam (Competitivo, Premier e Personalizada, por padrão)
+  4. Salva tudo em dados/ :
+       - dados/partidas/<match_id>.json.gz -> partida completa, compactada (base de todas as análises)
+       - dados/resumos/AAAA-MM-DD.json     -> lista do dia (o gerador de reports lê este)
+       - dados/historico.csv               -> uma linha por partida, para ver evolução no Excel
+       - dados/estado.json                 -> controle interno (o que já foi lido)
+       - dados/coletor.log                 -> registro de execuções e erros
+  5. Chama o gerar_report.py para escrever os reports .md
+
+A chave da API é lida da variável de ambiente HENRIKDEV_API_KEY (nunca fica no código).
+Só usa a biblioteca padrão do Python, então não precisa instalar nada.
+"""
+
+import csv
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+
+import armazem
+import avaliacao as av
+
+PASTA = Path(__file__).resolve().parent
+ARQ_CONFIG = PASTA / "config.json"
+DADOS = PASTA / "dados"
+PASTA_RESUMOS = DADOS / "resumos"
+ARQ_ESTADO = DADOS / "estado.json"
+ARQ_HISTORICO = DADOS / "historico.csv"
+ARQ_LOG = DADOS / "coletor.log"
+
+URL_PARTIDAS = "https://api.henrikdev.xyz/valorant/v4/matches/{regiao}/{plataforma}/{nome}/{tag}"
+VERSAO_ESTADO = 3
+g = av.g
+
+
+# ----------------------------------------------------------------------------
+# Utilidades
+# ----------------------------------------------------------------------------
+
+def agora_br():
+    return datetime.now(av.FUSO_BR)
+
+
+def log(msg):
+    linha = f"[{agora_br():%Y-%m-%d %H:%M:%S}] {msg}"
+    print(linha)
+    DADOS.mkdir(parents=True, exist_ok=True)
+    with open(ARQ_LOG, "a", encoding="utf-8") as f:
+        f.write(linha + "\n")
+
+
+def ler_json(caminho, padrao):
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return padrao
+
+
+def salvar_json(caminho, dados):
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    temp = caminho.with_suffix(caminho.suffix + ".tmp")
+    with open(temp, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=2, default=str)
+    os.replace(temp, caminho)
+
+
+def fila_incluida(partida, incluidas):
+    """Compara pelo id E pelo nome da fila. 'custom' cobre Custom Game / Personalizada."""
+    qid = (g(partida, "metadata", "queue", "id") or "").lower()
+    nome = (g(partida, "metadata", "queue", "name") or "").lower()
+    if qid in incluidas or nome in incluidas:
+        return True
+    if "custom" in incluidas and ("custom" in qid or "custom" in nome or "personaliz" in nome):
+        return True
+    return False
+
+
+# ----------------------------------------------------------------------------
+# Acesso à API
+# ----------------------------------------------------------------------------
+
+def buscar_pagina(chave, regiao, plataforma, nome, tag, start, size=10):
+    url = URL_PARTIDAS.format(
+        regiao=regiao,
+        plataforma=plataforma,
+        nome=urllib.parse.quote(nome, safe=""),
+        tag=urllib.parse.quote(tag, safe=""),
+    ) + "?" + urllib.parse.urlencode({"size": size, "start": start})
+
+    req = urllib.request.Request(url, headers={
+        "Authorization": chave,
+        "Accept": "application/json",
+        "User-Agent": "NokyLabs-ValorantReport/2.0",
+    })
+
+    for tentativa in range(1, 4):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                corpo = json.loads(resp.read().decode("utf-8"))
+                return corpo.get("data") or []
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                espera = int(e.headers.get("Retry-After") or 60)
+                log(f"  Limite de requisições atingido, esperando {espera}s...")
+                time.sleep(espera)
+            elif e.code >= 500 and tentativa < 3:
+                log(f"  Erro {e.code} no servidor, tentando de novo em 15s...")
+                time.sleep(15)
+            elif e.code in (401, 403):
+                raise RuntimeError("Chave da API recusada (verifique a variável HENRIKDEV_API_KEY).")
+            elif e.code == 404:
+                raise RuntimeError("Conta não encontrada (confira nome, tag e região).")
+            else:
+                raise RuntimeError(f"Erro HTTP {e.code} ao buscar partidas.")
+        except urllib.error.URLError as e:
+            if tentativa < 3:
+                log(f"  Sem conexão ({e.reason}), tentando de novo em 15s...")
+                time.sleep(15)
+            else:
+                raise RuntimeError(f"Sem conexão com a API: {e.reason}")
+    raise RuntimeError("Não foi possível buscar as partidas após 3 tentativas.")
+
+
+# ----------------------------------------------------------------------------
+# Histórico CSV
+# ----------------------------------------------------------------------------
+
+CAMPOS_CSV = ["data", "jogador", "match_id", "mapa", "fila", "agente", "funcao", "resultado", "placar",
+              "rounds", "rounds_afk", "kills", "mortes", "assistencias", "kd", "acs", "adr", "hs_pct",
+              "kast_pct", "first_kills", "first_deaths", "trades_feitos", "loadout_medio", "arma_principal"]
+
+
+def anexar_historico(jogador, r):
+    novo = not ARQ_HISTORICO.exists()
+    with open(ARQ_HISTORICO, "a", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=CAMPOS_CSV, delimiter=";")
+        if novo:
+            w.writeheader()
+        linha = {c: r.get(c) for c in CAMPOS_CSV}
+        dt = av.hora_br(r.get("inicio"))
+        linha["data"] = f"{dt:%Y-%m-%d}" if dt else ""
+        linha["jogador"] = jogador
+        linha["arma_principal"] = next(iter(r.get("armas_kills") or {}), "")
+        w.writerow(linha)
+
+
+# ----------------------------------------------------------------------------
+# Migração da versão anterior
+# ----------------------------------------------------------------------------
+
+def refazer_historico(cfg):
+    if ARQ_HISTORICO.exists():
+        backup = DADOS / "historico_backup.csv"
+        if backup.exists():
+            backup.unlink()
+        ARQ_HISTORICO.rename(backup)
+    idx = armazem.indice()
+    for mid in sorted(idx, key=lambda m: idx[m] or ""):
+        p = armazem.ler_partida(mid)
+        if not p or not av.partida_valida(p):
+            continue
+        a = av.analisar_partida_completa(p, None, cfg)
+        for rid in cfg.get("jogadores", []):
+            j = av.localizar(a, rid)
+            if j and j["rounds"]:
+                anexar_historico(rid, av.resumo_basico(a, j))
+
+
+def migrar(estado, cfg):
+    """Versão 1 -> 2: compacta as partidas, refaz o histórico com as correções e libera para nova
+    leitura as partidas que tinham sido ignoradas (ex.: as personalizadas, que não entravam por engano).
+    Versão 2 -> 3: tira do histórico as personalizadas fora do 5v5 padrão (Skirmish, Swift Play, DM)."""
+    versao = estado.get("versao", 1)
+    if versao >= VERSAO_ESTADO:
+        return estado
+    if versao >= 2:
+        refazer_historico(cfg)
+        log("Histórico refeito só com partidas 5v5 no modo padrão (o anterior ficou em historico_backup.csv).")
+        estado["versao"] = VERSAO_ESTADO
+        return estado
+    log("Atualizando os dados para a versão 3 (só acontece uma vez)...")
+
+    pasta = armazem.PASTA_PARTIDAS
+    antigos = list(pasta.glob("*.json")) if pasta.exists() else []
+    for arq in antigos:
+        p = ler_json(arq, None)
+        if p:
+            armazem.salvar_partida(p)
+    log(f"  {len(antigos)} partida(s) compactada(s).")
+
+    estado["lidas"] = {rid: [m for m in mids if armazem.partida_existe(m)]
+                       for rid, mids in (estado.get("lidas") or {}).items()}
+
+    refazer_historico(cfg)
+    log("  historico.csv refeito com as correções (o antigo ficou em historico_backup.csv).")
+
+    estado["versao"] = VERSAO_ESTADO
+    return estado
+
+
+# ----------------------------------------------------------------------------
+# Execução principal
+# ----------------------------------------------------------------------------
+
+def coletar_jogador(chave, cfg, riot_id, ja_lidas, ja_ignoradas, incluidas, primeira_vez):
+    nome, _, tag = riot_id.partition("#")
+    novas = []
+    max_pag = 1 if primeira_vez else cfg.get("max_paginas_por_jogador", 3)
+
+    for pagina in range(max_pag):
+        dados = buscar_pagina(chave, cfg["regiao"], cfg["plataforma"], nome, tag, start=pagina * 10)
+        if not dados:
+            break
+        achou_conhecida = False
+        for partida in dados:
+            mid = g(partida, "metadata", "match_id")
+            if not mid:
+                continue
+            # Já lida, ou ignorada e a fila continua fora do config -> conhecida
+            if mid in ja_lidas or (mid in ja_ignoradas and not fila_incluida(partida, incluidas)):
+                achou_conhecida = True
+                continue
+            novas.append(partida)
+        if achou_conhecida or len(dados) < 10:
+            break
+        time.sleep(2)  # gentileza com o limite da API
+    return novas
+
+
+def main():
+    log("=" * 60)
+    log("Iniciando coleta")
+
+    chave = os.environ.get("HENRIKDEV_API_KEY", "").strip()
+    if not chave:
+        log("ERRO: variável de ambiente HENRIKDEV_API_KEY não encontrada.")
+        sys.exit(1)
+
+    cfg = ler_json(ARQ_CONFIG, None)
+    if not cfg:
+        log("ERRO: config.json não encontrado ao lado do script.")
+        sys.exit(1)
+    incluidas = [f.lower() for f in cfg.get("filas_incluidas", ["competitive", "premier", "custom"])]
+
+    estado = ler_json(ARQ_ESTADO, {"ultima_execucao": None, "lidas": {}})
+    estado.setdefault("lidas", {})
+    estado.setdefault("ignoradas", {})
+    estado = migrar(estado, cfg)
+    hoje = agora_br().date()
+
+    dias_sem_leitura = 0
+    if estado.get("ultima_execucao"):
+        anterior = datetime.fromisoformat(estado["ultima_execucao"]).date()
+        dias_sem_leitura = max((hoje - anterior).days - 1, 0)
+
+    resumo = {
+        "gerado_em": agora_br().isoformat(timespec="seconds"),
+        "data_do_report": hoje.isoformat(),
+        "ultima_leitura_anterior": estado.get("ultima_execucao"),
+        "dias_sem_leitura_antes_deste": dias_sem_leitura,
+        "carga_inicial": not estado.get("ultima_execucao"),
+        "jogadores": {},
+    }
+
+    for riot_id in cfg.get("jogadores", []):
+        log(f"Buscando partidas de {riot_id}...")
+        lidas = list(estado["lidas"].get(riot_id, []))
+        ignoradas = list(estado["ignoradas"].get(riot_id, []))
+        bloco = {"status": "ok", "partidas": [], "ignoradas": 0, "filas_ignoradas": {}}
+        try:
+            novas = coletar_jogador(chave, cfg, riot_id, set(lidas), set(ignoradas), incluidas,
+                                    primeira_vez=not lidas and not ignoradas)
+            for partida in sorted(novas, key=lambda p: g(p, "metadata", "started_at") or ""):
+                mid = g(partida, "metadata", "match_id")
+                qid = g(partida, "metadata", "queue", "id") or "sem id"
+                nome_fila = g(partida, "metadata", "queue", "name") or qid
+
+                motivo = None
+                if not fila_incluida(partida, incluidas):
+                    motivo = f"{nome_fila} [{qid}]"
+                elif not partida.get("rounds"):
+                    motivo = f"{nome_fila} [{qid}, sem dados de rounds]"
+                elif not av.partida_valida(partida):
+                    motivo = f"{nome_fila} [{av.motivo_invalida(partida)}]"
+                if motivo:
+                    bloco["ignoradas"] += 1
+                    bloco["filas_ignoradas"][motivo] = bloco["filas_ignoradas"].get(motivo, 0) + 1
+                    if mid not in ignoradas:
+                        ignoradas.append(mid)
+                    continue
+
+                armazem.salvar_partida(partida)
+                lidas.append(mid)
+                if mid in ignoradas:
+                    ignoradas.remove(mid)
+
+                a = av.analisar_partida_completa(partida, None, cfg)
+                j = av.localizar(a, riot_id)
+                if j and j["rounds"]:
+                    r = av.resumo_basico(a, j)
+                    bloco["partidas"].append(r)
+                    anexar_historico(riot_id, r)
+
+            ign = ", ".join(f"{n} ({q})" for n, q in bloco["filas_ignoradas"].items())
+            log(f"  {len(bloco['partidas'])} partida(s) nova(s) analisada(s), {bloco['ignoradas']} ignorada(s)"
+                + (f": {ign}" if ign else "") + ".")
+            # Guarda só os últimos IDs para o arquivo não crescer sem fim
+            estado["lidas"][riot_id] = lidas[-1000:]
+            estado["ignoradas"][riot_id] = ignoradas[-1000:]
+        except Exception as e:  # noqa: BLE001 — queremos registrar qualquer falha e seguir
+            bloco["status"] = "erro"
+            bloco["erro"] = str(e)
+            log(f"  ERRO: {e}")
+
+        resumo["jogadores"][riot_id] = bloco
+        time.sleep(2)
+
+    # Se já houve uma execução hoje (ex.: manual às 15h e agendada às 21h), soma em vez de substituir
+    arq_resumo = PASTA_RESUMOS / f"{hoje.isoformat()}.json"
+    anterior = ler_json(arq_resumo, None)
+    if anterior and anterior.get("data_do_report") == hoje.isoformat():
+        for chave in ("ultima_leitura_anterior", "dias_sem_leitura_antes_deste", "carga_inicial"):
+            resumo[chave] = anterior.get(chave, resumo[chave])
+        for riot_id, velho in (anterior.get("jogadores") or {}).items():
+            novo = resumo["jogadores"].setdefault(riot_id, {"status": "ok", "partidas": [], "ignoradas": 0,
+                                                            "filas_ignoradas": {}})
+            ids_novos = {p["match_id"] for p in novo["partidas"]}
+            novo["partidas"] = [p for p in velho.get("partidas", []) if p["match_id"] not in ids_novos] + novo["partidas"]
+            novo["ignoradas"] += velho.get("ignoradas", 0)
+            for k, v in (velho.get("filas_ignoradas") or {}).items():
+                novo["filas_ignoradas"][k] = novo["filas_ignoradas"].get(k, 0) + v
+    salvar_json(arq_resumo, resumo)
+    estado["ultima_execucao"] = hoje.isoformat()
+    salvar_json(ARQ_ESTADO, estado)
+    log(f"Resumo salvo em dados/resumos/{hoje.isoformat()}.json")
+
+    try:
+        import gerar_report
+        destino = gerar_report.gerar(hoje.isoformat(), cfg)
+        if destino:
+            log(f"Reports .md salvos em {destino.relative_to(PASTA)}")
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        log(f"ERRO ao gerar o report .md: {e}")
+        log(traceback.format_exc())
+
+
+if __name__ == "__main__":
+    main()

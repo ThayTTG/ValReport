@@ -1,0 +1,19 @@
+# ValReport — o que NUNCA vai para o GitHub
+
+# Dados locais: partidas brutas, reports, cache de imagens, modelo, logs e estado
+dados/
+
+# Configuração real (tem os Riot IDs da equipe). O modelo público é o config.exemplo.json
+config.json
+
+# Segredos (a chave da API e os webhooks ficam em variáveis de ambiente, mas por garantia)
+.env
+*.key
+
+# Python e sistema
+__pycache__/
+*.pyc
+*.log
+Thumbs.db
+desktop.ini
+.DS_Store

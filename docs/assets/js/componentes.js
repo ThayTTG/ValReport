@@ -1,0 +1,106 @@
+// Componentes compartilhados: barra de filtros, linha de partida, tabela ordenável, agrupamento por dia
+
+import { esc, num, pct, sinal, imagem, imgAgente, imgMapaFaixa, imgCard, nomeFila, hora, diaLongo, classeSinal, icone, selo } from "./util.js";
+import { B, PERIODOS, FILTROS_PADRAO, opcoes, porDia, stats } from "./dados.js";
+
+// ---------- Filtros ----------
+export function barraFiltros(f, slug, { mostrar = ["fila", "temporada", "periodo", "mapa", "agente", "com"] } = {}) {
+  const op = opcoes(slug);
+  const sel = (nome, rotulo, itens) => {
+    if (!mostrar.includes(nome)) return "";
+    const ligado = f[nome] !== FILTROS_PADRAO[nome];
+    return `<label class="filtro"><span class="sr">${esc(rotulo)}</span>
+      <select data-filtro="${nome}" class="${ligado ? "ligado" : ""}">
+        ${itens.map(([v, t]) => `<option value="${esc(v)}" ${String(f[nome]) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}
+      </select></label>`;
+  };
+  const membros = B.equipe.filter((e) => e.slug !== slug && op.com.includes(e.slug));
+  const algumLigado = Object.keys(FILTROS_PADRAO).some((k) => mostrar.includes(k) && f[k] !== FILTROS_PADRAO[k]);
+  return `<div class="filtros" role="group" aria-label="Filtros">
+    ${icone("filtro", "filtros__icone")}
+    ${sel("fila", "Fila", [["todas", "Todas as filas"], ...op.filas.map((x) => [x, nomeFila(x)])])}
+    ${Object.keys(B.meta.temporadas || {}).length > 1 ? sel("temporada", "Temporada", [["todas", "Todas as temporadas"], ...Object.keys(B.meta.temporadas).sort().reverse().map((t) => [t, `Temporada ${t.toUpperCase()}`])]) : ""}
+    ${sel("periodo", "Período", Object.entries(PERIODOS).map(([v, t]) => [v, t]))}
+    ${sel("mapa", "Mapa", [["todos", "Todos os mapas"], ...op.mapas.map((x) => [x, x])])}
+    ${sel("agente", "Agente", [["todos", "Todos os agentes"], ...op.agentes.map((x) => [x, x])])}
+    ${slug ? sel("com", "Com quem", [["todos", "Com qualquer um"], ["sozinho", "Sem a equipe"], ["equipe", "Com a equipe"], ...membros.map((e) => [e.slug, `Com ${e.apelido}`])]) : ""}
+    ${algumLigado ? `<button class="limpar" type="button" data-limpar-filtros>Limpar</button>` : ""}
+  </div>`;
+}
+
+// ---------- Partidas ----------
+export function linhaPartida({ p, m, slug }, { mostrarNome = false } = {}) {
+  const [a, b] = m.placar.split("-");
+  const imp = m.r ? (100 * m.imp) / m.r : null;
+  const tiros = m.hs + m.bs + m.ls;
+  const posicao = m.mvp === 1 ? `<span class="selo selo--destaque">${icone("trofeu")} MVP</span>`
+    : m.mvp === 2 ? `<span class="selo">${icone("trofeu")} MVP do time</span>` : m.pos ? `<span class="selo">#${m.pos} no time</span>` : "";
+  const com = m.com.map((c) => B.porSlug.get(c)).filter(Boolean);
+  const membro = B.porSlug.get(slug);
+  return `<a class="partida ${m.res}" href="#/p/${esc(p.id)}" aria-label="${esc(p.mapa)}, ${m.res === "V" ? "vitória" : m.res === "D" ? "derrota" : "empate"} ${esc(m.placar)}">
+    <span class="partida__fundo" style="${imgMapaFaixa(p.mapa) ? `background-image:url('${esc(imgMapaFaixa(p.mapa))}')` : ""}"></span>
+    ${imagem(imgAgente(m.ag), m.ag, "partida__ag")}
+    <div class="partida__meio">
+      <div class="partida__titulo">${mostrarNome && membro ? `<span>${esc(membro.apelido)}</span><span class="suave">·</span>` : ""}<span>${esc(p.mapa)}</span>
+        <span class="placar ${m.res === "V" ? "bom" : m.res === "D" ? "ruim" : ""}">${esc(a)}–${esc(b)}</span></div>
+      <div class="partida__sub"><span>${esc(m.ag)}</span><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span>${m.eq > 1 ? `<span>com ${m.eq - 1} da equipe</span>` : ""}${posicao}</div>
+      ${com.length ? `<div class="com" title="Jogou com ${esc(com.map((c) => c.apelido).join(", "))}">${com.map((c) => imagem(imgCard(c.card), c.apelido, "", c.apelido)).join("")}</div>` : ""}
+    </div>
+    <div class="partida__nums">
+      <div><small>K/D/A</small><strong>${m.k}/${m.d}/${m.a}</strong></div>
+      <div><small>K/D</small><strong>${num(m.d ? m.k / m.d : m.k, 2)}</strong></div>
+      <div class="partida__extra"><small>HS%</small><strong>${tiros ? num((100 * m.hs) / tiros) : "—"}%</strong></div>
+      <div><small>ADR</small><strong>${num(m.dd / m.rt)}</strong></div>
+      <div class="partida__extra"><small>ACS</small><strong>${num(m.sc / m.rt)}</strong></div>
+      <div><small>Impacto</small><strong class="${classeSinal(imp, 1)}">${sinal(imp, 1, "%")}</strong></div>
+    </div></a>`;
+}
+
+export function listaPorDia(itens, opcoesLinha = {}) {
+  if (!itens.length) return "";
+  return porDia(itens).map(({ itens: lst, s }) => `<div class="dia">
+      <div class="dia__topo"><h3>${esc(diaLongo(lst[0].p.t))}</h3>
+        <div class="dia__resumo"><span><strong class="bom">${s.v}V</strong> · <strong class="ruim">${s.d}D</strong></span>
+          <span>K/D ${num(s.kd, 2)}</span><span>ADR ${num(s.adr)}</span><span>HS ${pct(s.hsp)}</span>
+          <span class="${classeSinal(s.impr, 1)}">Impacto ${sinal(s.impr, 1, "%")}</span></div></div>
+      <div class="partidas">${lst.map((it) => linhaPartida(it, opcoesLinha)).join("")}</div></div>`).join("");
+}
+
+// ---------- Tabela ordenável ----------
+const ordem = new Map();
+/** colunas: [{k, t, v: (linha)=>valor numérico/texto, f: (linha)=>html, cls?}] — a primeira coluna é o rótulo */
+export function tabela(id, linhas, colunas, { padrao = null, classeLinha = null } = {}) {
+  const est = ordem.get(id) || { k: padrao || colunas[1]?.k, asc: false };
+  const col = colunas.find((c) => c.k === est.k) || colunas[1];
+  const ord = [...linhas].sort((a, b) => {
+    const va = col.v(a), vb = col.v(b);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    const r = typeof va === "string" ? va.localeCompare(vb, "pt-BR") : va - vb;
+    return est.asc ? r : -r;
+  });
+  return `<div class="rolagem"><table class="tabela" data-tabela="${esc(id)}">
+    <thead><tr>${colunas.map((c) => `<th scope="col" data-ordenar="${esc(c.k)}" class="${c.k === col.k ? `ordenado ${est.asc ? "asc" : ""}` : ""}" ${c.k === col.k ? `aria-sort="${est.asc ? "ascending" : "descending"}"` : ""}>${esc(c.t)}</th>`).join("")}</tr></thead>
+    <tbody>${ord.map((l) => `<tr class="${classeLinha ? classeLinha(l) : ""}">${colunas.map((c) => `<td class="${c.cls ? c.cls(l) : ""}">${c.f ? c.f(l) : esc(c.v(l))}</td>`).join("")}</tr>`).join("")}</tbody>
+  </table></div>`;
+}
+export function alternarOrdem(id, k) {
+  const est = ordem.get(id);
+  ordem.set(id, est && est.k === k ? { k, asc: !est.asc } : { k, asc: false });
+}
+
+export const celulaAgente = (nome, sub = "") =>
+  `<div class="celula-ag">${imagem(imgAgente(nome), nome)}<div><strong>${esc(nome)}</strong>${sub ? `<small>${sub}</small>` : ""}</div></div>`;
+
+export function forma(itens, n = 10) {
+  const ult = itens.slice(0, n).reverse();
+  const s = stats(itens.slice(0, n));
+  return `<div class="forma" aria-label="Últimas ${ult.length} partidas">${ult.map(({ m }) => `<span class="${m.res}" title="${m.res === "V" ? "Vitória" : m.res === "D" ? "Derrota" : "Empate"} ${esc(m.placar)}"></span>`).join("")}
+    <small>${ult.length ? `${s.v}V ${s.d}D nas últimas ${ult.length}` : "sem partidas"}</small></div>`;
+}
+
+export const vereditoSelo = (tipo, texto) => ({
+  acima: selo("Acima da média da função", "vitoria"), abaixo: selo("Abaixo da média da função", "derrota"),
+  media: selo("Na média da função", "destaque"), insuf: selo(esc(texto.replace("dados insuficientes", "Amostra pequena")), ""),
+}[tipo] || "");

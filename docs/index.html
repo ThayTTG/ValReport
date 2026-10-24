@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cut">
+  <title>ValReport · NokyLabs</title>
+  <meta name="description" content="Estatísticas e análise tática da equipe: partidas, agentes, mapas, armas, formações e sinergia. Projeto de fã, sem vínculo com a Riot Games.">
+  <meta name="theme-color" content="#110e1a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#faf6f1" media="(prefers-color-scheme: light)">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/inter-400.woff" as="font" type="font/woff" crossorigin>
+  <link rel="preload" href="assets/fonts/inter-600.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script>
+    // Aplica o tema salvo antes de desenhar a página (evita piscar)
+    try {
+      var t = localStorage.getItem("valreport.tema");
+      if (t === "claro" || t === "escuro") document.documentElement.dataset.tema = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-lua" viewBox="0 0 24 24"><path d="M20 14.6A8.3 8.3 0 0 1 9.4 4a8.4 8.4 0 1 0 10.6 10.6Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+      <symbol id="i-equipe" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.8 20c.6-3.6 3.1-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M15.5 4.9a3.4 3.4 0 0 1 0 6.4M18 14.7c1.8.8 2.9 2.6 3.2 5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6M12 7.4v.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+      <symbol id="i-seta" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-voltar" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-externo" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 2.9.8.1-.6.4-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.5 9.5 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2Z"/></symbol>
+      <symbol id="i-trofeu" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0V4ZM8 6H4.5v1.2A3.3 3.3 0 0 0 8 10.5M16 6h3.5v1.2a3.3 3.3 0 0 1-3.5 3.3M12 13v4M8.5 20h7M10 17h4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-caveira" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3a8 8 0 0 0-8 8c0 2.6 1.3 4.6 3 5.8V20a1 1 0 0 0 1 1h1.5v-2h1v2h3v-2h1v2H16a1 1 0 0 0 1-1v-3.2c1.7-1.2 3-3.2 3-5.8a8 8 0 0 0-8-8Zm-3.2 7.2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm6.4 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></symbol>
+      <symbol id="i-spike" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 6 8v8l6 6 6-6V8l-6-6Zm0 5.2 2.8 2.8v4L12 16.8 9.2 14v-4L12 7.2Z"/></symbol>
+      <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6l-7-3Z" fill="currentColor"/><path d="m8.8 12.2 2.2 2.2 4.4-4.6" fill="none" stroke="var(--fundo)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-relogio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+      <symbol id="i-alvo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-filtro" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    </defs>
+  </svg>
+
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+  <header class="topo">
+    <div class="topo__linha">
+      <a class="marca" href="#/" aria-label="ValReport, página inicial">
+        <svg class="marca__logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16"/><path d="M22 46V22m0 9c0-5.5 4.5-10 10-10s10 4.5 10 10v15" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="marca__texto"><strong>ValReport</strong><small>by NokyLabs</small></span>
+      </a>
+      <nav class="topo__nav" aria-label="Principal">
+        <a href="#/" data-nav="equipe"><svg aria-hidden="true"><use href="#i-equipe"/></svg><span>Equipe</span></a>
+        <a href="#/sobre" data-nav="sobre"><svg aria-hidden="true"><use href="#i-info"/></svg><span>Sobre</span></a>
+      </nav>
+      <button class="botao-icone" id="alternar-tema" type="button" aria-label="Alternar tema claro ou escuro">
+        <svg class="so-escuro" aria-hidden="true"><use href="#i-sol"/></svg>
+        <svg class="so-claro" aria-hidden="true"><use href="#i-lua"/></svg>
+      </button>
+    </div>
+    <div class="topo__jogadores" id="lista-jogadores" aria-label="Jogadores"></div>
+  </header>
+
+  <main id="conteudo" tabindex="-1">
+    <div class="carregando" role="status"><span class="girando"></span> Carregando estatísticas…</div>
+  </main>
+
+  <footer class="rodape">
+    <p><strong>ValReport</strong> é um projeto de fã da NokyLabs, sem fins lucrativos.
+      ValReport was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games.
+      Riot Games does not endorse or sponsor this project.</p>
+    <p>Dados: <a href="https://github.com/Henrik-3/unofficial-valorant-api" rel="noopener" target="_blank">HenrikDev API (não oficial)</a> ·
+      Imagens: <a href="https://valorant-api.com" rel="noopener" target="_blank">valorant-api.com</a> ·
+      <a href="#/sobre">Créditos, privacidade e metodologia</a></p>
+    <p class="rodape__gerado" id="gerado-em"></p>
+  </footer>
+
+  <noscript><p class="aviso-noscript">O ValReport precisa de JavaScript para mostrar as estatísticas.</p></noscript>
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
