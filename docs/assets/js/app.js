@@ -7,6 +7,7 @@ import { viewJogador } from "./jogador.js";
 import { viewPartida } from "./partida.js";
 import { viewEquipe } from "./equipe.js";
 import { viewSobre } from "./sobre.js";
+import { viewHoje } from "./hoje.js";
 import { animar, trocarTema, ligarBrilho } from "./animar.js";
 
 const main = document.getElementById("conteudo");
@@ -44,7 +45,8 @@ function irPara(q, caminho = lerRota().caminho) {
 
 /** [página, aba] da rota, para saber quanto animar */
 function chaveRota(partes) {
-  if (!partes.length || partes[0] === "equipe") return ["equipe", partes[1] || "visao"];
+  if (!partes.length) return ["inicio", ""];
+  if (partes[0] === "equipe") return ["equipe", partes[1] || "visao"];
   if (partes[0] === "j" || partes[0] === "p") return [`${partes[0]}/${partes[1]}`, partes[2] || ""];
   return [partes.join("/"), ""];
 }
@@ -59,11 +61,12 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
   const rolagem = window.scrollY;
   let v;
   try {
-    if (!partes.length || partes[0] === "equipe") v = await viewEquipe(partes[1] || "visao", f, q);
+    if (!partes.length) v = viewHoje(q);
+    else if (partes[0] === "equipe") v = await viewEquipe(partes[1] || "visao", f, q);
     else if (partes[0] === "j") v = await viewJogador(decodeURIComponent(partes[1] || ""), partes[2] || "geral", f, q);
     else if (partes[0] === "p") v = await viewPartida(decodeURIComponent(partes[1] || ""), partes[2] || "placar", q);
     else if (partes[0] === "sobre") v = viewSobre();
-    else v = { html: vazio("Página não encontrada", `<p><a href="#/">Voltar para a equipe</a></p>`) };
+    else v = { html: vazio("Página não encontrada", `<p><a href="#/">Voltar para o início</a></p>`) };
   } catch (erro) {
     console.error(erro);
     v = { html: vazio("Algo deu errado ao montar esta página", `<p class="pequeno">${esc(erro.message)}</p>`) };
@@ -81,7 +84,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
 }
 
 function marcarNavegacao(partes) {
-  const sec = partes[0] === "sobre" ? "sobre" : partes[0] === "j" || partes[0] === "p" ? "" : "equipe";
+  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : partes[0] === "equipe" ? "equipe" : "";
   document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("ativo", a.dataset.nav === sec));
   const slug = partes[0] === "j" ? partes[1] : null;
   document.querySelectorAll(".pilula-jogador").forEach((a) => {
@@ -93,6 +96,13 @@ function marcarNavegacao(partes) {
 
 // ---------- Eventos ----------
 main.addEventListener("change", (ev) => {
+  const escolha = ev.target.closest("select[data-param-sel]");
+  if (escolha) {  // seletores simples (ex.: função do Índice NokyLabs)
+    const { q } = lerRota();
+    if (escolha.value === escolha.dataset.padrao) q.delete(escolha.dataset.paramSel); else q.set(escolha.dataset.paramSel, escolha.value);
+    irPara(q);
+    return;
+  }
   const sel = ev.target.closest("select[data-filtro]");
   if (!sel) return;
   const { q } = lerRota();

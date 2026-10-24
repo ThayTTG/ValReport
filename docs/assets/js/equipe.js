@@ -56,7 +56,7 @@ function linhaEquipe(p) {
       <div class="partida__sub"><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span><span>${(() => { const eq = Math.max(...ms.map(([, m]) => m.eq || 1)); return eq > 1 ? `${eq} da equipe no time` : "sem a equipe"; })()}</span></div></div>
     <div class="partida__nums">${ms.map(([slug, m]) => `<div title="${esc(B.porSlug.get(slug)?.apelido)} de ${esc(m.ag)}"><small>${esc(B.porSlug.get(slug)?.apelido || slug)}</small><strong>${m.k}/${m.d}/${m.a}</strong></div>`).join("")}</div></a>`;
 }
-function listaEquipe(ps) {
+export function listaEquipe(ps) {
   const dias = new Map();
   for (const p of ps) { const k = chaveDia(p.t); if (!dias.has(k)) dias.set(k, []); dias.get(k).push(p); }
   return [...dias.values()].map((lst) => {
