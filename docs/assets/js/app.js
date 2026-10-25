@@ -312,7 +312,7 @@ async function iniciar() {
   try {
     await carregarBase();
   } catch (erro) {
-    main.innerHTML = vazio("Ainda não há dados para mostrar", `<p>Os arquivos em <code>docs/data/</code> não foram encontrados. Rode <code>py exportar_site.py</code> no PC da equipe e publique de novo.</p><p class="pequeno suave">${esc(erro.message)}</p>`);
+    main.innerHTML = vazio("Ainda não há dados para mostrar", `<p>Os arquivos em <code>docs/data/</code> não foram encontrados. Rode <code>py ferramentas\\exportar_site.py</code> no PC da equipe e publique de novo.</p><p class="pequeno suave">${esc(erro.message)}</p>`);
     return;
   }
   if (B.editor) {
