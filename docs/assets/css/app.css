@@ -1071,3 +1071,28 @@ body[data-modo="publico"] .botao-buscar, body[data-modo="cadastro"] .botao-busca
   .membro__acoes { width: 100%; }
 }
 .membros + p, .vagas + .membros + p { margin-top: 10px; }
+
+/* ---------- Revisão de 26/10 ---------- */
+/* Pílulas dos jogadores não encolhem (com o card carregado, o nome ficava cortado no celular) */
+.pilula-jogador { flex: none; }
+.pilula-jogador img { max-width: none; }
+/* Seta do cartão da equipe aponta para a direita */
+.equipe-cartao > svg { transform: rotate(90deg); }
+.convite .lp-selo { justify-self: start; }
+/* Celulares (até 430px): o topo cabe sem rolar para o lado */
+@media (max-width: 430px) {
+  .topo__linha { gap: 6px; padding-left: 12px; padding-right: 12px; }
+  .topo__linha .botao-icone, .conta-chip { width: 34px; height: 34px; }
+  .topo__nav { gap: 0; }
+  .topo__nav a { padding: 7px; }
+  .marca__logo { width: 34px; height: 34px; }
+}
+.conta-chip, .topo__linha .botao-icone { flex: none; }
+@media (max-width: 430px) { .topo__linha .botao-nokylabs { display: none; } }  /* o link da NokyLabs continua no rodapé */
+/* Troca de equipe: no celular, numa linha própria abaixo do topo */
+.topo__equipe { display: none; }
+@media (max-width: 700px) {
+  .topo__linha .troca-equipe { display: none; }
+  .topo__equipe { display: block; max-width: var(--largura); margin: 0 auto; padding: 0 var(--gutter) 6px; }
+  .topo__equipe .troca-equipe { width: 100%; max-width: none; font-size: 14px; min-height: 36px; }
+}

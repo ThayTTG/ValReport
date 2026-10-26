@@ -34,13 +34,7 @@
   <link rel="preload" href="assets/fonts/inter-400.woff" as="font" type="font/woff" crossorigin>
   <link rel="preload" href="assets/fonts/inter-600.woff" as="font" type="font/woff" crossorigin>
   <link rel="stylesheet" href="assets/css/app.css">
-  <script>
-    // Aplica o tema salvo antes de desenhar a página (evita piscar)
-    try {
-      var t = localStorage.getItem("valreport.tema");
-      if (t === "claro" || t === "escuro") document.documentElement.dataset.tema = t;
-    } catch (e) {}
-  </script>
+  <script src="assets/js/tema.js"></script>
 </head>
 <body data-modo="carregando">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">

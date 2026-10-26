@@ -345,17 +345,25 @@ async function mostrarPendencias() {
 function trocaDeEquipe() {
   const lista = B.conta?.equipes || [];
   if (lista.length < 2) return;
-  const sel = document.createElement("select");
-  sel.className = "troca-equipe";
-  sel.id = "troca-equipe";
-  sel.setAttribute("aria-label", "Equipe");
-  sel.innerHTML = lista.map((e) => `<option value="${esc(e.slug)}"${e.slug === B.equipeAtual?.slug ? " selected" : ""}>${esc(e.nome)}</option>`).join("");
-  document.querySelector(".marca")?.after(sel);
-  sel.addEventListener("change", () => {
-    try { localStorage.setItem("valreport.equipe", sel.value); } catch (e) { /* sem armazenamento */ }
-    location.hash = "#/";
-    location.reload();
-  });
+  // Um seletor no topo (computador) e outro numa linha própria (celular, onde o topo não tem espaço)
+  const criar = (id) => {
+    const sel = document.createElement("select");
+    sel.className = "troca-equipe";
+    sel.id = id;
+    sel.setAttribute("aria-label", "Equipe");
+    sel.innerHTML = lista.map((e) => `<option value="${esc(e.slug)}"${e.slug === B.equipeAtual?.slug ? " selected" : ""}>${esc(e.nome)}</option>`).join("");
+    sel.addEventListener("change", () => {
+      try { localStorage.setItem("valreport.equipe", sel.value); } catch (e) { /* sem armazenamento */ }
+      location.hash = "#/";
+      location.reload();
+    });
+    return sel;
+  };
+  document.querySelector(".marca")?.after(criar("troca-equipe"));
+  const linha = document.createElement("div");
+  linha.className = "topo__equipe";
+  linha.append(criar("troca-equipe-celular"));
+  document.querySelector(".topo__linha")?.after(linha);
 }
 
 /** Botão redondo da conta: o card verificado, ou a inicial do apelido */

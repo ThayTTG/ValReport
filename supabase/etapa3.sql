@@ -84,6 +84,36 @@ create trigger validar_membro before insert or update of cargo on public.membros
   for each row execute function public.validar_membro();
 revoke execute on function public.validar_membro() from public, anon, authenticated;
 
+-- Se a liderança sair da equipe por qualquer caminho (conta apagada, removida pela administradora),
+-- a liderança passa sozinha para a próxima pessoa: co-líder, depois jogador, treinador e convidado (quem entrou antes).
+-- Equipe que ficou sem ninguém e sem partidas guardadas é encerrada.
+create or replace function public.sucessao_lideranca() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare v_novo uuid;
+begin
+  if not exists (select 1 from public.equipes where id = old.equipe_id) then return null; end if;
+  if not exists (select 1 from public.membros where equipe_id = old.equipe_id) then
+    if not exists (select 1 from public.dados_equipe where equipe_id = old.equipe_id) then
+      delete from public.equipes where id = old.equipe_id;
+    end if;
+    return null;
+  end if;
+  if old.cargo <> 'lider' or exists (select 1 from public.membros where equipe_id = old.equipe_id and cargo = 'lider') then
+    return null;
+  end if;
+  select usuario_id into v_novo from public.membros where equipe_id = old.equipe_id
+   order by array_position(array['colider', 'jogador', 'treinador', 'convidado']::text[], cargo::text), entrou_em limit 1;
+  begin
+    update public.membros set cargo = 'lider' where equipe_id = old.equipe_id and usuario_id = v_novo;
+  exception when others then null;   -- sem vaga: a administradora resolve pelo painel
+  end;
+  return null;
+end $$;
+drop trigger if exists sucessao_lideranca on public.membros;
+create trigger sucessao_lideranca after delete on public.membros
+  for each row execute function public.sucessao_lideranca();
+revoke execute on function public.sucessao_lideranca(), public.validar_perfil() from public, anon, authenticated;
+
 -- ---------- Funções de apoio ----------
 create or replace function public.e_lideranca(p_equipe uuid) returns boolean
 language sql stable security definer set search_path = '' as $$

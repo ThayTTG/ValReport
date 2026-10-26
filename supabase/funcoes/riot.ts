@@ -1,7 +1,7 @@
 // ValReport · função "riot" (Supabase Edge Function)
 // Confirma o Riot ID de uma pessoa: a administradora (ou a liderança da equipe dela) confirma que a conta é dela,
 // e a função busca na API o puuid, o card e o nível. Também atualiza o card/nível e desliga o Riot ID.
-// (O desafio do card continua aqui, mas o site não usa: a API só muda o card depois de uma partida.)
+// (O desafio do card foi retirado: a API só muda o card depois de uma partida, então ele não provava nada.)
 // Como colar: Supabase → Edge Functions → Deploy a new function → Via Editor → nome "riot" → apague o exemplo,
 // cole este arquivo inteiro → Deploy. Segredos (Edge Functions → Secrets): HENRIKDEV_API_KEY e VALREPORT_SECRET_KEY.
 
@@ -9,8 +9,6 @@ const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
 const CHAVE = Deno.env.get("VALREPORT_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const HENRIK = Deno.env.get("HENRIKDEV_API_KEY") ?? "";
 const HENRIK_URL = (Deno.env.get("HENRIKDEV_URL") ?? "https://api.henrikdev.xyz").replace(/\/$/, "");
-const MINUTOS_DESAFIO = 15;
-const ESPERA_ENTRE_CONFERIDAS_S = 6;
 const ESPERA_ATUALIZAR_MIN = 10;
 
 const CORS = {
@@ -45,7 +43,8 @@ async function banco(caminho: string, metodo = "GET", corpo?: unknown, prefer?: 
     let j: { message?: string; code?: string } = {};
     try { j = JSON.parse(texto); } catch { /* sem corpo */ }
     if (j.code === "23505") throw new Problema("riot_em_uso", "Esse Riot ID já está ligado a outra conta. Fale com a administradora.", 409);
-    throw new Problema("banco", `O banco recusou (${r.status}): ${j.message ?? texto.slice(0, 200)}`, 500);
+    console.error("banco", r.status, j.message ?? texto.slice(0, 300));   // o detalhe fica só no registro da função
+    throw new Problema("banco", "O banco não aceitou a mudança agora. Tente de novo; se continuar, avise a administradora.", 500);
   }
   return texto ? JSON.parse(texto) : null;
 }
@@ -103,43 +102,6 @@ async function gravarVerificado(usuario: string, c: Conta, verificadoEm: string 
 }
 
 // ---------- Ações ----------
-type Desafio = { riot_id: string; riot_puuid: string; card_inicial: string; card_trocado: string | null; passo: number; expira_em: string; ultimo_pedido: string };
-
-async function iniciar(usuario: string, riot: string) {
-  const c = await contaPorRiot(riot);
-  await conferirDono(c.puuid, usuario);
-  const expira = new Date(Date.now() + MINUTOS_DESAFIO * 60_000).toISOString();
-  await banco("desafios_riot?on_conflict=usuario_id", "POST", {
-    usuario_id: usuario, riot_id: `${c.nome}#${c.tag}`, riot_puuid: c.puuid, card_inicial: c.card, card_trocado: null,
-    passo: 1, expira_em: expira, ultimo_pedido: new Date().toISOString(),
-  }, "resolution=merge-duplicates,return=minimal");
-  return { passo: 1, riot_id: `${c.nome}#${c.tag}`, card_inicial: c.card, expira_em: expira };
-}
-
-async function conferir(usuario: string) {
-  const d = await um(`desafios_riot?usuario_id=eq.${usuario}&select=*`) as Desafio | null;
-  if (!d) throw new Problema("sem_desafio", "Nenhum desafio em andamento. Comece de novo.", 404);
-  if (new Date(d.expira_em).getTime() < Date.now()) {
-    await banco(`desafios_riot?usuario_id=eq.${usuario}`, "DELETE");
-    throw new Problema("expirou", `O desafio passou de ${MINUTOS_DESAFIO} minutos e expirou. Comece de novo.`, 410);
-  }
-  const base = { riot_id: d.riot_id, card_inicial: d.card_inicial, expira_em: d.expira_em };
-  const espera = ESPERA_ENTRE_CONFERIDAS_S * 1000 - (Date.now() - new Date(d.ultimo_pedido).getTime());
-  if (espera > 0) return { ...base, passo: d.passo, espere_s: Math.ceil(espera / 1000) };
-  await banco(`desafios_riot?usuario_id=eq.${usuario}`, "PATCH", { ultimo_pedido: new Date().toISOString() }, "return=minimal");
-  const c = await contaPorPuuid(d.riot_puuid);
-  if (d.passo === 1) {
-    if (c.card === d.card_inicial) return { ...base, passo: 1, card_atual: c.card, mudou: false };
-    await banco(`desafios_riot?usuario_id=eq.${usuario}`, "PATCH", { passo: 2, card_trocado: c.card }, "return=minimal");
-    return { ...base, passo: 2, card_atual: c.card, mudou: true };
-  }
-  if (c.card !== d.card_inicial) return { ...base, passo: 2, card_atual: c.card, mudou: false };
-  await conferirDono(c.puuid, usuario);
-  const perfil = await gravarVerificado(usuario, c, null);
-  await banco(`desafios_riot?usuario_id=eq.${usuario}`, "DELETE");
-  return { verificado: true, ...perfil };
-}
-
 async function atualizar(usuario: string) {
   const p = await um(`perfis?id=eq.${usuario}&select=riot_puuid,riot_verificado_em,riot_atualizado_em`) as
     { riot_puuid: string | null; riot_verificado_em: string | null; riot_atualizado_em: string | null } | null;
@@ -183,7 +145,12 @@ async function liderVerificar(usuario: string, alvo: string, riot: string) {
       : [];
     if (!dela.length) throw new Problema("sem_permissao", "Só a liderança da equipe dessa pessoa pode confirmar o Riot ID.", 403);
   }
-  if (!(await um(`perfis?id=eq.${alvo}&select=id`))) throw new Problema("sem_perfil", "Essa pessoa ainda não completou o cadastro.", 404);
+  const perfil = await um(`perfis?id=eq.${alvo}&select=id,riot_id_pedido`) as { id: string; riot_id_pedido: string | null } | null;
+  if (!perfil) throw new Problema("sem_perfil", "Essa pessoa ainda não completou o cadastro.", 404);
+  // A liderança só confirma o Riot ID que a própria pessoa pediu (assim ninguém liga outra conta no nome dela)
+  if (!ehAdmin && (perfil.riot_id_pedido ?? "").toLowerCase() !== riot.trim().toLowerCase()) {
+    throw new Problema("sem_pedido", "Só dá para confirmar o Riot ID que a própria pessoa pediu no perfil dela.", 403);
+  }
   const c = await contaPorRiot(riot);
   await conferirDono(c.puuid, alvo);
   return { verificado: true, ...(await gravarVerificado(alvo, c, null)) };
@@ -197,11 +164,6 @@ Deno.serve(async (req: Request) => {
     const usuario = await quemEsta(req);
     const corpo = await req.json().catch(() => ({}));
     switch (corpo?.acao) {
-      case "iniciar": return resposta(await iniciar(usuario, String(corpo.riot_id ?? "")));
-      case "conferir": return resposta(await conferir(usuario));
-      case "cancelar":
-        await banco(`desafios_riot?usuario_id=eq.${usuario}`, "DELETE");
-        return resposta({ cancelado: true });
       case "atualizar": return resposta(await atualizar(usuario));
       case "desvincular": return resposta(await desvincular(usuario));
       case "admin_verificar": return resposta(await adminVerificar(usuario, String(corpo.usuario_id ?? ""), String(corpo.riot_id ?? "")));

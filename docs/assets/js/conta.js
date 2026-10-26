@@ -147,7 +147,7 @@ export function viewSemEquipe() {
         <span class="lp-selo">${icone("equipe")} Quase lá</span>
         <h1>Olá, ${esc(c.perfil.apelido)}!</h1>
         <p>Você ainda não está em uma equipe. Entre pelo link de convite que a sua equipe mandou, ou crie a sua.</p>
-        <div class="lp-acoes"><a class="botao-primario" href="#/perfil">${icone("verificado")} ${c.perfil.riot_verificado_em ? "Meu perfil" : "Monte seu perfil e verifique seu Riot ID"}</a>
+        <div class="lp-acoes"><a class="botao-primario" href="#/perfil">${icone("estrela")} ${c.perfil.riot_verificado_em ? "Meu perfil" : "Monte seu perfil e verifique seu Riot ID"}</a>
           <a class="botao-secundario" href="#/equipes">${icone("equipe")} Criar equipe ou usar convite</a>
           ${c.admin ? `<a class="botao-secundario" href="#/painel">${icone("escudo")} Painel da administradora</a>` : ""}</div>
       </section>`,

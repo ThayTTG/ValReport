@@ -111,15 +111,22 @@ class Editor(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(corpo)
 
+    def _host_ok(self):
+        """Só responde para o endereço do próprio PC: protege contra sites que se passam por 127.0.0.1 (DNS rebinding)."""
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
+        return host in ("127.0.0.1", "localhost")
+
     def _origem_ok(self):
         """Só aceita pedidos vindos do próprio editor (protege contra outros sites abertos no navegador)."""
         origem = self.headers.get("Origin")
         if not origem:
-            return True
+            return "application/json" in (self.headers.get("Content-Type") or "")  # sem Origin: só o fetch do próprio editor
         host = urlparse(origem).hostname
         return host in ("127.0.0.1", "localhost") and urlparse(origem).port == self.server.server_address[1]
 
     def do_GET(self):
+        if not self._host_ok():
+            return self._json(403, {"ok": False, "erro": "não permitido"})
         caminho = urlparse(self.path).path
         if caminho.endswith("/api/ping"):
             return self._json(200, {"ok": True, "editor": True})
@@ -140,7 +147,7 @@ class Editor(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
-        if not urlparse(self.path).path.endswith("/api/notas") or not self._origem_ok():
+        if not urlparse(self.path).path.endswith("/api/notas") or not self._host_ok() or not self._origem_ok():
             return self._json(403, {"ok": False, "erro": "não permitido"})
         tamanho = int(self.headers.get("Content-Length") or 0)
         if tamanho <= 0 or tamanho > LIMITE:
