@@ -1,13 +1,16 @@
 ﻿# ValReport · limpa as partidas antigas (docs/data) do histórico do GitHub
 # Roda pelo Atalhos\limpar_historico_github.bat. Faz um backup completo antes e só segue depois que você digitar LIMPAR.
+param([string]$Confirmar = "")   # -Confirmar LIMPAR pula a pergunta (para rodar por comando)
 $ErrorActionPreference = "Continue"
 $raiz = Split-Path $PSScriptRoot -Parent
 Set-Location $raiz
+$porComando = ($Confirmar -ceq "LIMPAR")
+if ($porComando) { Start-Transcript -Path (Join-Path $raiz "dados\limpar_historico.log") -Force | Out-Null }
 
 function Parar($texto) {
     Write-Host ""
     Write-Host $texto -ForegroundColor Red
-    Read-Host "Aperte Enter para fechar"
+    if ($porComando) { Stop-Transcript | Out-Null } else { Read-Host "Aperte Enter para fechar" }
     exit 1
 }
 function Conferir($etapa) {
@@ -32,7 +35,7 @@ $antes = @(git log --all --oneline -- docs/data).Count
 if ($antes -eq 0) {
     Write-Host ""
     Write-Host "O histórico já está limpo: nenhum commit guarda a pasta docs/data." -ForegroundColor Green
-    Read-Host "Aperte Enter para fechar"
+    if ($porComando) { Stop-Transcript | Out-Null } else { Read-Host "Aperte Enter para fechar" }
     exit 0
 }
 
@@ -44,7 +47,7 @@ Write-Host "  2. A pasta docs/data é apagada de todos os commits (o código fic
 Write-Host "  3. O histórico novo substitui o antigo no GitHub."
 Write-Host "Os arquivos do seu PC (dados, notas, config) não são tocados."
 Write-Host ""
-$ok = Read-Host "Para confirmar, digite LIMPAR"
+if ($Confirmar -ceq "LIMPAR") { $ok = "LIMPAR"; Write-Host "Confirmado pelo comando (-Confirmar LIMPAR)." } else { $ok = Read-Host "Para confirmar, digite LIMPAR" }
 if ($ok -cne "LIMPAR") { Parar "Cancelado. Nada foi mudado." }
 
 $quando = Get-Date -Format "yyyy-MM-dd_HHmm"
@@ -76,4 +79,4 @@ Write-Host ""
 Write-Host "Pronto! As partidas antigas saíram do histórico do GitHub." -ForegroundColor Green
 Write-Host "Backup guardado em: $backup"
 Write-Host "(Se tudo estiver certo daqui a alguns dias, você pode apagar o backup.)"
-Read-Host "Aperte Enter para fechar"
+if ($porComando) { Stop-Transcript | Out-Null } else { Read-Host "Aperte Enter para fechar" }
