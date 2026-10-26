@@ -915,3 +915,100 @@ body:not([data-modo="publico"]) .botao-entrar-topo { display: none; }
 .doc-legal h2 { font: 700 20px var(--fonte-titulo); margin: 28px 0 8px; }
 .doc-legal p, .doc-legal li { color: var(--texto-2); font-size: 15.5px; }
 .doc-legal ul { padding-left: 20px; display: grid; gap: 6px; }
+
+/* ---------- Etapa 2a: perfil, Riot ID e busca ---------- */
+.form-msg[hidden], .riot-msg[hidden], .busca[hidden], .botao-buscar[hidden] { display: none; }
+.selo--verificado { background: color-mix(in srgb, var(--cor-perfil, var(--destaque)) 18%, transparent); color: var(--texto); }
+.selo--verificado svg { color: var(--cor-perfil, var(--destaque)); font-size: 14px; }
+.cartao__titulo h3 svg { color: var(--destaque); vertical-align: -2px; }
+
+/* Botão da conta com o card */
+.conta-chip { overflow: hidden; border-color: var(--cor-perfil, transparent); }
+.conta-chip__img, .conta-chip .avatar-vazio { width: 100%; height: 100%; object-fit: cover; display: grid; place-items: center; }
+
+/* Capa do perfil */
+.perfil-capa { position: relative; margin-top: 18px; border-radius: var(--raio); overflow: hidden; border: 1px solid var(--borda);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cor-perfil, var(--destaque)) 30%, var(--superficie)), var(--superficie)); }
+.perfil-capa__fundo { position: absolute; inset: 0; }
+.perfil-capa__fundo img { width: 100%; height: 100%; object-fit: cover; opacity: .55; }
+.perfil-capa__fundo::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--superficie) 92%, transparent) 30%, color-mix(in srgb, var(--superficie) 40%, transparent)); }
+.perfil-capa__conteudo { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 22px; border-left: 5px solid var(--cor-perfil, var(--destaque)); }
+.perfil-capa__avatar { width: 84px; height: 84px; border-radius: 18px; overflow: hidden; flex: none; background: var(--superficie-2);
+  box-shadow: 0 0 0 3px var(--superficie), 0 0 0 5px var(--cor-perfil, var(--destaque)); }
+.perfil-capa__avatar img, .perfil-capa__avatar .avatar-vazio { width: 100%; height: 100%; object-fit: cover; display: grid; place-items: center; font: 700 28px var(--fonte-titulo); }
+.perfil-capa__texto { flex: 1 1 220px; min-width: 0; display: grid; gap: 4px; }
+.perfil-capa__texto h1 { font: 700 30px var(--fonte-titulo); overflow-wrap: anywhere; }
+.perfil-capa__texto p { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--texto-2); }
+.perfil-capa__sub span + span::before { content: "·"; margin-right: 8px; }
+.perfil-capa__sub span[hidden] + span::before { content: none; }
+.perfil-capa__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.perfil-bio { white-space: pre-line; line-height: 1.55; overflow-wrap: anywhere; }
+.perfil-sub { font-size: 13px; color: var(--suave); text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 8px; }
+.lista-funcoes, .lista-agentes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-funcao { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: var(--superficie-2); font-weight: 600; font-size: 14px; }
+.chip-funcao b { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--cor-perfil, var(--destaque)); color: #fff; font-size: 12px; }
+.perfil-agente { display: grid; justify-items: center; gap: 6px; width: 72px; text-align: center; font-size: 12.5px; font-weight: 600; }
+.perfil-agente img, .perfil-agente .avatar-vazio { width: 56px; height: 56px; border-radius: 14px; background: var(--superficie-2); object-fit: cover; display: grid; place-items: center; }
+
+/* Formulário do perfil */
+#form-perfil input:not([type=checkbox]):not([type=radio]), #form-perfil textarea, #form-perfil select, .desafio input {
+  font: 500 15px var(--fonte); color: var(--texto); background: var(--superficie-2); border: 1px solid var(--borda); border-radius: 12px; padding: 10px 12px; min-height: 44px; width: 100%; }
+#form-perfil textarea { resize: vertical; line-height: 1.5; }
+#form-perfil :is(input, textarea, select):focus-visible, .desafio input:focus-visible { outline: 2px solid var(--destaque); outline-offset: 1px; }
+.grade-3 { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+.seletor-agentes { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); margin-top: 8px; }
+.agente-op { position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--borda);
+  background: var(--superficie); color: var(--texto-2); font: 600 12px var(--fonte); cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+.agente-op:hover { background: var(--superficie-2); }
+.agente-op img, .agente-op .avatar-vazio { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; display: grid; place-items: center; background: var(--superficie-2); }
+.agente-op span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agente-op.escolhido { border-color: var(--cor-perfil, var(--destaque)); background: color-mix(in srgb, var(--cor-perfil, var(--destaque)) 16%, var(--superficie)); color: var(--texto); }
+.agente-op__ordem { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; background: var(--cor-perfil, var(--destaque)); color: #fff; }
+.agente-op__ordem:empty { display: none; }
+.cores { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.cor-op { position: relative; cursor: pointer; }
+.cor-op input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.cor-op span { display: block; width: 36px; height: 36px; border-radius: 50%; background: var(--c); border: 3px solid var(--superficie); box-shadow: 0 0 0 1px var(--borda); transition: box-shadow .15s, transform .15s; }
+.cor-op--padrao { background: repeating-linear-gradient(45deg, var(--superficie-2) 0 6px, var(--superficie-3) 6px 12px) !important; }
+.cor-op input:checked + span { box-shadow: 0 0 0 3px var(--texto); transform: scale(1.06); }
+.cor-op input:focus-visible + span { outline: 2px solid var(--destaque); outline-offset: 3px; }
+
+/* Desafio do card */
+.desafio { margin-top: 12px; }
+.desafio__inicio { display: grid; gap: 12px; max-width: 420px; }
+.desafio__passos { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--suave); font-weight: 600; font-size: 14px; }
+.desafio__passos li { display: flex; align-items: center; gap: 8px; }
+.desafio__passos b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--borda); font-size: 13px; }
+.desafio__passos .atual { color: var(--texto); }
+.desafio__passos .atual b { border-color: var(--destaque); background: var(--destaque); color: var(--sobre-destaque); }
+.desafio__passos .feito b { border-color: var(--vitoria); background: var(--vitoria); color: #fff; }
+.desafio__cartao { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.desafio__card { display: grid; gap: 6px; justify-items: center; width: 120px; flex: none; }
+.desafio__card img { width: 120px; height: auto; aspect-ratio: 268 / 640; object-fit: cover; border-radius: 12px; background: var(--superficie-2); box-shadow: 0 6px 18px rgb(0 0 0 / .18); }
+.desafio__card small { color: var(--suave); font-size: 12px; text-align: center; }
+.desafio__texto { flex: 1 1 240px; min-width: 0; display: grid; gap: 10px; align-content: start; }
+.desafio__ok { display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: var(--raio-p); background: var(--vitoria-suave); }
+.desafio__ok > svg { font-size: 34px; color: var(--vitoria); }
+
+/* Busca no topo */
+.busca { max-width: var(--largura); margin: 0 auto; padding: 0 var(--gutter) 12px; position: relative; }
+.busca__campo { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--borda); background: var(--superficie); }
+.busca__campo:focus-within { outline: 2px solid var(--destaque); }
+.busca__campo svg { color: var(--suave); font-size: 18px; }
+.busca__campo input { flex: 1; min-width: 0; border: 0; background: none; font: 500 15px var(--fonte); color: var(--texto); min-height: 46px; outline: none; }
+.busca__resultados { margin-top: 8px; }
+.busca__resultados > p { padding: 4px 4px; }
+.busca__resultados ul { list-style: none; margin: 0; padding: 6px; display: grid; gap: 2px; border-radius: 14px; border: 1px solid var(--borda); background: var(--superficie); box-shadow: 0 10px 30px rgb(0 0 0 / .14); }
+.busca__resultados a { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; color: var(--texto); text-decoration: none; }
+.busca__resultados a:hover, .busca__resultados a:focus-visible { background: var(--superficie-2); }
+.busca__resultados a span { display: grid; min-width: 0; }
+.busca__resultados a strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.busca__resultados small { color: var(--suave); font-size: 12.5px; }
+.busca__avatar { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; flex: none; display: grid; place-items: center; background: var(--superficie-2); box-shadow: 0 0 0 2px var(--cor-perfil, transparent); }
+body[data-modo="publico"] .botao-buscar, body[data-modo="cadastro"] .botao-buscar, body[data-modo="carregando"] .botao-buscar { display: none; }
+@media (max-width: 560px) {
+  .perfil-capa__conteudo { padding: 18px 16px; }
+  .perfil-capa__avatar { width: 68px; height: 68px; }
+  .perfil-capa__texto h1 { font-size: 24px; }
+}

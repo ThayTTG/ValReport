@@ -100,6 +100,21 @@ export const rpc = (funcao, args = {}) => pedido(`rpc/${funcao}`, { metodo: "POS
 export const inserir = (tabela, linha) => pedido(tabela, { metodo: "POST", corpo: linha, prefer: "return=minimal" });
 export const atualizar = (tabela, filtro, mudancas) => pedido(`${tabela}?${filtro}`, { metodo: "PATCH", corpo: mudancas, prefer: "return=minimal" });
 
+/** Chama uma função do servidor (Supabase Edge Function), ex.: funcao("riot", { acao: "iniciar", riot_id }) */
+export async function funcao(nome, corpo = {}) {
+  const t = await token();
+  if (!t) throw new ErroNuvem("sem_sessao", "Sua sessão terminou. Entre de novo.", 401);
+  let r;
+  try {
+    r = await fetch(`${SUPABASE_URL}/functions/v1/${nome}`, {
+      method: "POST", headers: { apikey: SUPABASE_CHAVE, Authorization: `Bearer ${t}`, "Content-Type": "application/json" }, body: JSON.stringify(corpo),
+    });
+  } catch (e) { throw new ErroNuvem("rede", "Sem conexão com o servidor agora. Tente de novo.", 0); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new ErroNuvem(j.erro || String(r.status), j.mensagem || (r.status === 404 ? "A função do servidor ainda não foi criada no Supabase." : `Erro ${r.status}`), r.status);
+  return j;
+}
+
 /** Um arquivo de dados da equipe (o mesmo JSON que antes ficava em docs/data/) */
 export async function lerDado(equipeId, caminho) {
   const linhas = await pedido(`dados_equipe?select=conteudo&equipe_id=eq.${encodeURIComponent(equipeId)}&caminho=eq.${encodeURIComponent(caminho)}`);

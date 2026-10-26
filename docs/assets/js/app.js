@@ -4,6 +4,7 @@ import { esc, imagem, imgCard, imgAgente, definirMeta, dataHora, vazio, larguraG
 import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache, detectarEditor, metaFresca } from "./dados.js";
 import { iniciarNuvem, rpc, entrar, usuario } from "./nuvem.js";
 import { viewBoasVindas, viewCadastro, viewSemEquipe, viewConta, viewPainel } from "./conta.js";
+import { viewMeuPerfil, viewPerfilPublico, ligarBusca } from "./perfil.js";
 import { alternarOrdem, trocarMiniAba, alternarMinimizado } from "./componentes.js";
 import { coroaSobre, abrirRevelacao, talvezRevelar } from "./coroa.js";
 import { viewJogador } from "./jogador.js";
@@ -68,6 +69,8 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
     else if (tela === "cadastro") v = viewCadastro();
     else if (B.conta && partes[0] === "conta") v = viewConta();
     else if (B.conta && partes[0] === "painel") v = await viewPainel();
+    else if (B.conta && partes[0] === "perfil") v = await viewMeuPerfil();
+    else if (B.conta && partes[0] === "u" && partes[1]) v = await viewPerfilPublico(decodeURIComponent(partes[1]));
     else if (tela === "sem-equipe") v = viewSemEquipe();
     else if (tela === "sem-dados") v = { titulo: "Sem dados", html: avisoSemDados };
     else if (!partes.length) v = viewHoje(q);
@@ -94,7 +97,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
 }
 
 function marcarNavegacao(partes) {
-  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : partes[0] === "equipe" ? "equipe" : partes[0] === "conta" || partes[0] === "painel" ? "conta" : "";
+  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : partes[0] === "equipe" ? "equipe" : ["conta", "painel", "perfil"].includes(partes[0]) ? "conta" : "";
   document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("ativo", a.dataset.nav === sec));
   const slug = partes[0] === "j" ? partes[1] : null;
   document.querySelectorAll(".pilula-jogador").forEach((a) => {
@@ -318,6 +321,17 @@ addEventListener("appinstalled", () => { botaoInstalar.hidden = true; });
 // Modo da tela: "publico" (sem login), "cadastro" (primeiro acesso), "sem-equipe" ou "app" (membro de equipe)
 let tela = "carregando", erroLogin = null, avisoSemDados = "";
 
+/** Botão redondo da conta: o card verificado, ou a inicial do apelido */
+function desenharChip() {
+  const u = usuario() || {}, p = B.conta?.perfil || {};
+  const el = document.getElementById("conta-inicial");
+  const inicial = esc((p.apelido || u.user_metadata?.full_name || u.email || "?").slice(0, 1).toUpperCase());
+  el.innerHTML = p.riot_card ? imagem(imgCard(p.riot_card), "", "conta-chip__img", p.apelido || "?") : inicial;
+  const chip = document.getElementById("conta-link");
+  if (/^#[0-9a-f]{6}$/i.test(p.cor || "")) chip.style.setProperty("--cor-perfil", p.cor); else chip.style.removeProperty("--cor-perfil");
+}
+window.addEventListener("valreport:perfil", desenharChip);
+
 function telaDeErro(titulo, texto) {
   main.innerHTML = vazio(titulo, `<p>${esc(texto)}</p><p><button class="botao-secundario" type="button" data-tentar>Tentar de novo</button></p>`);
   main.querySelector("[data-tentar]")?.addEventListener("click", () => location.reload());
@@ -340,8 +354,8 @@ async function iniciar() {
       return;
     }
     document.getElementById("conta-link").hidden = false;
-    const u = usuario() || {};
-    document.getElementById("conta-inicial").textContent = (B.conta.perfil?.apelido || u.user_metadata?.full_name || u.email || "?").slice(0, 1).toUpperCase();
+    desenharChip();
+    if (B.conta.perfil) { document.getElementById("buscar-topo").hidden = false; ligarBusca(); }
     if (!B.conta.perfil) { tela = "cadastro"; await renderizar(); return; }
     if (!B.conta.equipes.length) { tela = "sem-equipe"; await renderizar(); return; }
     B.equipeAtual = B.conta.equipes[0];

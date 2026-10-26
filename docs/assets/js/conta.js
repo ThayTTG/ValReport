@@ -2,7 +2,7 @@
 
 import { esc, icone, dataHora } from "./util.js";
 import { B } from "./dados.js";
-import { entrar, sair, usuario, rpc, inserir, atualizar, ErroNuvem } from "./nuvem.js";
+import { entrar, sair, usuario, rpc, inserir, atualizar, funcao, ErroNuvem } from "./nuvem.js";
 import { EQUIPE_PADRAO, VERSAO_TERMOS } from "./config.js";
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -145,8 +145,9 @@ export function viewSemEquipe() {
         <span class="lp-selo">${icone("equipe")} Quase lá</span>
         <h1>Olá, ${esc(c.perfil.apelido)}!</h1>
         <p>Você ainda não está em uma equipe. Quando a líder ou o líder liberar o seu acesso, as partidas aparecem aqui.</p>
-        <div class="lp-acoes"><a class="botao-secundario" href="#/conta">Minha conta</a>
-          ${c.admin ? `<a class="botao-primario" href="#/painel">${icone("escudo")} Painel da administradora</a>` : ""}</div>
+        <div class="lp-acoes"><a class="botao-primario" href="#/perfil">${icone("verificado")} ${c.perfil.riot_verificado_em ? "Meu perfil" : "Monte seu perfil e verifique seu Riot ID"}</a>
+          <a class="botao-secundario" href="#/conta">Minha conta</a>
+          ${c.admin ? `<a class="botao-secundario" href="#/painel">${icone("escudo")} Painel da administradora</a>` : ""}</div>
       </section>`,
   };
 }
@@ -166,7 +167,8 @@ export function viewConta() {
             <p class="pequeno suave">Conta Google: ${esc(u.email || "")} · ${c.protegido ? `<span class="selo selo--alerta">${icone("escudo")} Modo protegido (16–17)</span>` : "18 anos ou mais"}</p>
             <p class="pequeno suave">Cadastro em ${esc(dataHora(p.criado_em))} · Termos aceitos: versão ${esc(p.versao_termos)}</p>
             <p class="form-ok pequeno" hidden role="status"></p>
-            <div class="lp-acoes"><button class="botao-primario" type="submit">Salvar apelido</button></div>
+            <div class="lp-acoes"><button class="botao-primario" type="submit">Salvar apelido</button>
+              <a class="botao-secundario" href="#/perfil">Editar perfil completo</a></div>
           </form></section>
         <section class="cartao"><div class="cartao__titulo"><h3>Equipes</h3></div>
           ${c.equipes.length ? `<ul class="lista-limpa">${c.equipes.map((e) => `<li><strong>${esc(e.nome)}</strong> <span class="selo">${esc(nomeCargo(e.cargo))}</span>${e.riot_id ? ` <span class="suave pequeno">${esc(e.riot_id)}</span>` : ""}</li>`).join("")}</ul>`
@@ -230,7 +232,8 @@ export async function viewPainel() {
       <td><select data-campo="cargo" aria-label="Cargo"${pode ? "" : " disabled"}>${opcoes}</select></td>
       <td><input data-campo="riot" value="${esc(naEquipe?.riot_id || "")}" placeholder="Nick#TAG" aria-label="Riot ID"${pode ? "" : " disabled"}></td>
       <td class="painel-acoes"><button class="botao-primario botao-mini" type="button" data-acao="salvar"${pode ? "" : " disabled"}>${naEquipe ? "Atualizar" : "Adicionar"}</button>
-        ${naEquipe ? `<button class="botao-perigo botao-mini" type="button" data-acao="remover">Remover</button>` : ""}</td></tr>`;
+        ${naEquipe ? `<button class="botao-perigo botao-mini" type="button" data-acao="remover">Remover</button>` : ""}
+        ${pode ? `<button class="botao-secundario botao-mini" type="button" data-acao="verificar" title="Confirma o Riot ID desta pessoa sem o desafio do card">Verificar Riot ID</button>` : ""}</td></tr>`;
   };
   return {
     titulo: "Painel",
@@ -250,6 +253,17 @@ export async function viewPainel() {
         erro.hidden = true;
         b.disabled = true;
         try {
+          if (b.dataset.acao === "verificar") {
+            const riot = tr.querySelector("[data-campo=riot]").value.trim();
+            if (!riot) throw new Error("Escreva o Riot ID (Nome#TAG) na linha da pessoa antes de verificar.");
+            if (!confirm(`Confirmar ${riot} como o Riot ID desta pessoa?`)) { b.disabled = false; return; }
+            const r = await funcao("riot", { acao: "admin_verificar", usuario_id: tr.dataset.usuario, riot_id: riot });
+            erro.textContent = `${r.riot_id} verificado ✓`;
+            erro.className = "aviso painel-erro";
+            erro.hidden = false;
+            b.disabled = false;
+            return;
+          }
           if (b.dataset.acao === "salvar") {
             await rpc("admin_definir_membro", { p_usuario: tr.dataset.usuario, p_equipe: EQUIPE_PADRAO,
               p_cargo: tr.querySelector("[data-campo=cargo]").value, p_riot_id: tr.querySelector("[data-campo=riot]").value.trim() || null });
