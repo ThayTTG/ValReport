@@ -4,7 +4,7 @@ Report diário e site de estatísticas da nossa equipe de VALORANT, com partidas
 
 > **Projeto de fã, sem fins lucrativos.** ValReport was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.
 
-**Site:** publicado pelo GitHub Pages a partir da pasta [`docs/`](docs/). O link aparece em *Settings → Pages* depois de ativar (veja [PUBLICAR.md](PUBLICAR.md)).
+**Site:** publicado pelo GitHub Pages a partir da pasta [`docs/`](docs/). O link aparece em *Settings → Pages* depois de ativar (veja [PUBLICAR.md](guias/PUBLICAR.md)).
 
 ---
 
@@ -33,7 +33,7 @@ Report diário e site de estatísticas da nossa equipe de VALORANT, com partidas
 - **Notas da IGL:** a IGL escreve o plano de cada mapa e a leitura de partidas e rounds num editor local, e as notas aparecem no site.
 - **App instalável:** o site funciona como app no celular (PWA), com ícone e leitura sem internet, e tem prévia bonita quando o link é compartilhado.
 
-A metodologia completa está na página **Sobre** do site e em [`avaliacao.py`](avaliacao.py).
+A metodologia completa está na página **Sobre** do site e em [`avaliacao.py`](ferramentas/avaliacao.py).
 
 ---
 
@@ -68,24 +68,32 @@ O site **não chama nenhuma API**. Ele só lê os JSON gerados no PC, por isso n
 1. **Python 3.11+** ([python.org](https://www.python.org)). Marque "Add to PATH".
 2. **Chave da HenrikDev API:** gere no [dashboard](https://api.henrikdev.xyz/dashboard/) e guarde com `setx HENRIKDEV_API_KEY "sua-chave"`.
 3. Copie `config.exemplo.json` para `config.json` e preencha os jogadores.
-4. Rode `rodar_report.bat` uma vez para testar. Ele instala o Pillow sozinho se faltar.
-5. Para agendar o report das 21h e a atualização do site a cada 20 min, rode `instalar_agendamento.ps1` no PowerShell.
-6. **Discord (opcional):** crie webhooks e guarde nas variáveis `DISCORD_WEBHOOK_EQUIPE`, `..._JOGADORES`, `..._FORMACOES` e `..._DICAS` (veja o [LEIA-ME.md](LEIA-ME.md)).
-7. **Site:** siga o [PUBLICAR.md](PUBLICAR.md).
+4. Rode `Atalhos\rodar_report.bat` uma vez para testar. Ele instala o Pillow sozinho se faltar.
+5. Para agendar o report das 21h e a atualização do site a cada 20 min, rode `Atalhos\instalar_agendamento.ps1` no PowerShell.
+6. **Discord (opcional):** crie webhooks e guarde nas variáveis `DISCORD_WEBHOOK_EQUIPE`, `..._JOGADORES`, `..._FORMACOES` e `..._DICAS` (veja o [LEIA-ME.md](guias/LEIA-ME.md)).
+7. **Site:** siga o [PUBLICAR.md](guias/PUBLICAR.md).
 
 Para ver o site no próprio PC antes de publicar: `py -m http.server 8000 -d docs` e abra http://localhost:8000.
 
 ## Estrutura
 
 ```
-├── coletor_valorant.py      busca partidas (HenrikDev API) e chama o resto
-├── avaliacao.py             modelo de chance de vitória, impacto, índice por função, trades
-├── armazem.py               guarda partidas e o modelo em dados/
-├── gerar_report.py          relatórios .md por formação
-├── cards.py, mapa_calor.py  cards em imagem (Pillow)
-├── discord_envio.py         envio por webhook
-├── exportar_site.py         JSON do site + publicação (git)
-├── notas_igl.py             editor local das Notas da IGL (abre com editar_notas.bat)
+├── Atalhos/                 os botões de dois cliques
+│   ├── rodar_report.bat         coleta + report + cards + Discord (o que roda às 21h)
+│   ├── atualizar_agora.bat      procura partidas novas e atualiza o site
+│   ├── publicar_site.bat        exporta e publica tudo no GitHub
+│   ├── editar_notas.bat         abre o editor das Notas da IGL
+│   └── instalar_agendamento.ps1 agenda o report das 21h e a atualização a cada 20 min
+├── ferramentas/             o código Python
+│   ├── coletor_valorant.py      busca partidas (HenrikDev API) e chama o resto
+│   ├── avaliacao.py             modelo de chance de vitória, impacto, índice por função, trades
+│   ├── armazem.py               guarda partidas e o modelo em dados/
+│   ├── gerar_report.py          relatórios .md por formação
+│   ├── cards.py, mapa_calor.py  cards em imagem (Pillow)
+│   ├── discord_envio.py         envio por webhook
+│   ├── exportar_site.py         JSON do site + publicação (git)
+│   └── notas_igl.py             editor local das Notas da IGL
+├── guias/                   LEIA-ME (uso no dia a dia), PUBLICAR (site) e CREDITOS
 ├── docs/                    o site (HTML, CSS, JS, fontes) + docs/data (gerado)
 ├── fontes/                  Inter (SIL OFL 1.1) para os cards
 ├── config.exemplo.json      modelo do config.json (o real fica fora do Git)
@@ -95,7 +103,7 @@ Para ver o site no próprio PC antes de publicar: `py -m http.server 8000 -d doc
 
 ## Créditos
 
-Tudo o que usamos está em [CREDITOS.md](CREDITOS.md) e na página **Sobre** do site. Destaques: [HenrikDev Unofficial VALORANT API](https://github.com/Henrik-3/unofficial-valorant-api) (dados), [valorant-api.com](https://valorant-api.com) (imagens e dados dos mapas), Riot Games (o jogo e seus assets) e [Inter](https://rsms.me/inter/) (fonte, SIL OFL 1.1). O código foi escrito com ajuda do Claude (Anthropic).
+Tudo o que usamos está em [CREDITOS.md](guias/CREDITOS.md) e na página **Sobre** do site. Destaques: [HenrikDev Unofficial VALORANT API](https://github.com/Henrik-3/unofficial-valorant-api) (dados), [valorant-api.com](https://valorant-api.com) (imagens e dados dos mapas), Riot Games (o jogo e seus assets) e [Inter](https://rsms.me/inter/) (fonte, SIL OFL 1.1). O código foi escrito com ajuda do Claude (Anthropic).
 
 ## Licença
 

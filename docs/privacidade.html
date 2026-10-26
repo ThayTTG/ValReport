@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Política de Privacidade · ValReport</title>
+  <meta name="description" content="Política de Privacidade do ValReport by NokyLabs.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script>try { var t = localStorage.getItem("valreport.tema"); if (t === "claro" || t === "escuro") document.documentElement.dataset.tema = t; } catch (e) {}</script>
+</head>
+<body>
+  <header class="topo"><div class="topo__linha">
+    <a class="marca" href="./" aria-label="ValReport, página inicial">
+      <svg class="marca__logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16"/><path d="M22 46V22m0 9c0-5.5 4.5-10 10-10s10 4.5 10 10v15" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="marca__texto"><strong>ValReport</strong><small>by NokyLabs</small></span></a>
+  </div></header>
+  <main class="doc-legal">
+    <h1>Política de Privacidade</h1>
+    <p class="suave">Versão 2026-10 · vale a partir da publicação do ValReport 2.0</p>
+    <p>O ValReport mostra estatísticas e a leitura tática das partidas de VALORANT para equipes. Esta política explica, em linguagem simples, quais dados usamos, por quê, quem vê e como você controla tudo isso. Ela segue a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018).</p>
+
+    <h2>1. Quem é responsável pelos seus dados</h2>
+    <p>O ValReport é um projeto pessoal e sem fins lucrativos da NokyLabs, mantido por Noky, que é a <strong>controladora</strong> dos dados. Contato para qualquer assunto de privacidade: <a href="mailto:{{EMAIL_CONTATO}}">{{EMAIL_CONTATO}}</a>.</p>
+
+    <h2>2. Quais dados usamos</h2>
+    <ul>
+      <li><strong>Da sua conta Google:</strong> nome, e-mail e foto, que o Google envia quando você entra. Não recebemos nem guardamos a sua senha.</li>
+      <li><strong>Do seu perfil:</strong> apelido, mês e ano de nascimento (nunca o dia), a versão dos termos aceita e, só para quem tem 16 ou 17 anos, o e-mail de um responsável.</li>
+      <li><strong>Da equipe:</strong> o seu cargo, o seu Riot ID (nome#tag do VALORANT) e as notas e estratégias que a equipe escrever.</li>
+      <li><strong>Do jogo:</strong> estatísticas das partidas (abates, rounds, agentes, mapas, posições), obtidas pela HenrikDev API a partir dos dados públicos do VALORANT.</li>
+      <li><strong>Registros técnicos:</strong> os provedores de hospedagem e de banco de dados mantêm registros de acesso (como endereço IP e horário) por segurança, por tempo limitado.</li>
+    </ul>
+    <p>Não usamos anúncios, não vendemos dados e não montamos perfis para publicidade.</p>
+
+    <h2>3. Para que usamos</h2>
+    <ul>
+      <li>Criar e manter a sua conta e confirmar a idade mínima de 16 anos (execução do serviço que você pediu).</li>
+      <li>Mostrar as estatísticas e as análises da sua equipe só para quem faz parte dela (execução do serviço).</li>
+      <li>Manter o serviço seguro e combater abusos (legítimo interesse).</li>
+      <li>Para adolescentes de 16 e 17 anos, todo uso considera o melhor interesse deles, como pede o art. 14 da LGPD.</li>
+    </ul>
+
+    <h2>4. Quem vê o quê</h2>
+    <ul>
+      <li><strong>Visitantes sem login</strong> veem só a página inicial. Nenhum dado de partida.</li>
+      <li><strong>Membros da equipe</strong> (líder, co-líderes, treinadores e jogadores) veem as partidas, as análises e as notas da equipe.</li>
+      <li><strong>Convidados</strong> veem as partidas e as análises, mas não as notas, as estratégias e as conversas.</li>
+      <li><strong>Colegas de equipe</strong> veem o seu apelido. Seu mês e ano de nascimento e o e-mail do responsável não aparecem para eles.</li>
+      <li><strong>A administradora</strong> vê a lista de contas (e-mail, apelido, faixa de idade e equipe) para liberar acessos e cuidar da segurança.</li>
+    </ul>
+    <p>Essas regras ficam no próprio banco de dados: mesmo que alguém altere o site no navegador, o banco não entrega o que a pessoa não pode ver.</p>
+
+    <h2>5. Onde os dados ficam</h2>
+    <ul>
+      <li><strong>Supabase</strong> (banco de dados e login), com servidores em São Paulo.</li>
+      <li><strong>Vercel</strong> (hospedagem do site).</li>
+      <li><strong>Google</strong> (login com a sua conta).</li>
+      <li><strong>Computador da administradora</strong>, onde roda a coleta das partidas e os relatórios da equipe.</li>
+    </ul>
+    <p>Esses provedores tratam os dados em nosso nome e podem usar servidores fora do Brasil, com as proteções que oferecem aos seus clientes.</p>
+
+    <h2>6. Por quanto tempo</h2>
+    <p>Enquanto a sua conta existir. Ao apagar a conta, o login, o perfil e os vínculos com as equipes são apagados na hora. Quando isso não puder ser automático, a administradora conclui em até 7 dias. As estatísticas de partidas que envolvem outras pessoas da equipe podem continuar nos relatórios da equipe, sem o seu perfil.</p>
+
+    <h2>7. Adolescentes de 16 e 17 anos</h2>
+    <p>O ValReport não aceita menores de 16 anos. Quem tem 16 ou 17 anos usa o <strong>modo protegido</strong>: o perfil fica fora da busca de quem não é da equipe, só a equipe comenta nele, os prints enviados passam por moderação, e um responsável informado pode pedir a exclusão da conta a qualquer momento pelo contato acima.</p>
+
+    <h2>8. Seus direitos</h2>
+    <p>Pela LGPD, você pode pedir: confirmação e acesso aos seus dados, correção, anonimização ou exclusão, portabilidade, informação sobre com quem compartilhamos e revogação do consentimento. Para apagar tudo, use <strong>Minha conta → Apagar minha conta e meus dados</strong>. Para os outros pedidos, escreva para <a href="mailto:{{EMAIL_CONTATO}}">{{EMAIL_CONTATO}}</a>. Respondemos em até 15 dias. Você também pode procurar a Autoridade Nacional de Proteção de Dados (ANPD).</p>
+
+    <h2>9. Armazenamento no navegador</h2>
+    <p>O site guarda no seu navegador a sessão de login e preferências como o tema claro ou escuro e os cartões minimizados. Não usamos cookies de rastreamento nem de publicidade.</p>
+
+    <h2>10. Segurança</h2>
+    <p>Login sem senha própria (via Google), conexão criptografada, regras de acesso no banco de dados e chaves secretas guardadas só com a administradora. Se acontecer um incidente que possa trazer risco a você, avisaremos os afetados e a ANPD, como a lei pede.</p>
+
+    <h2>11. Mudanças nesta política</h2>
+    <p>Quando esta política mudar de forma importante, o site pedirá que você leia e aceite a nova versão.</p>
+
+  </main>
+  <footer class="rodape"><p><a href="./">Voltar ao ValReport</a> · <a href="privacidade.html">Política de Privacidade</a> · <a href="termos.html">Termos de Uso</a></p>
+    <p>ValReport é um projeto de fã da NokyLabs, sem fins lucrativos, sem vínculo com a Riot Games.</p></footer>
+</body>
+</html>

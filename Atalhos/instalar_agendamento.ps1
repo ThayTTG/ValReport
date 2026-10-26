@@ -5,14 +5,15 @@
 # Rode com: botão direito > "Executar com o PowerShell"
 # Se o PC estiver desligado às 21h, o dia é pulado e o próximo report avisa "N dias sem leitura".
 
-$pasta  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$bat    = Join-Path $pasta "rodar_report.bat"
+$atalhos = Split-Path -Parent $MyInvocation.MyCommand.Path
+$pasta  = Split-Path -Parent $atalhos   # pasta principal do projeto
+$bat    = Join-Path $atalhos "rodar_report.bat"
 $nome   = "NokyLabs - Report VALORANT"
 $nomeR  = "NokyLabs - Atualizar site VALORANT"
 $minutos = 20
 
 if (-not (Test-Path $bat)) {
-    Write-Host "Não encontrei o rodar_report.bat nesta pasta." -ForegroundColor Red
+    Write-Host "Não encontrei o rodar_report.bat na pasta Atalhos." -ForegroundColor Red
     Read-Host "Enter para sair"; exit 1
 }
 if (-not [Environment]::GetEnvironmentVariable("HENRIKDEV_API_KEY", "User")) {
@@ -32,16 +33,16 @@ Write-Host "Pronto! A tarefa '$nome' vai rodar todo dia às 21:00." -ForegroundC
 # ---------- 2. Atualização do site a cada 20 minutos (sem janela) ----------
 # pyw/pythonw rodam o Python sem abrir console; se não existirem, cai no py normal (abre uma janelinha rápida)
 $semJanela = (Get-Command pyw.exe -ErrorAction SilentlyContinue).Source
-$argsR = "-3 `"coletor_valorant.py`" --rapido"
+$argsR = "-3 `"ferramentas\coletor_valorant.py`" --rapido"
 if (-not $semJanela) {
     $semJanela = (Get-Command pythonw.exe -ErrorAction SilentlyContinue).Source
-    $argsR = "`"coletor_valorant.py`" --rapido"
+    $argsR = "`"ferramentas\coletor_valorant.py`" --rapido"
 }
 if ($semJanela) {
     $acaoR = New-ScheduledTaskAction -Execute $semJanela -Argument $argsR -WorkingDirectory $pasta
 } else {
     Write-Host "Aviso: não achei o pyw.exe nem o pythonw.exe; a atualização vai abrir uma janela rápida a cada $minutos min." -ForegroundColor Yellow
-    $acaoR = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c py -3 coletor_valorant.py --rapido" -WorkingDirectory $pasta
+    $acaoR = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c py -3 ferramentas\coletor_valorant.py --rapido" -WorkingDirectory $pasta
 }
 $inicio = (Get-Date).AddMinutes(2)
 try {

@@ -37,7 +37,7 @@ from pathlib import Path
 import armazem
 import avaliacao as av
 
-PASTA = Path(__file__).resolve().parent
+PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
 ARQ_CONFIG = PASTA / "config.json"
 DADOS = PASTA / "dados"
 PASTA_RESUMOS = DADOS / "resumos"
@@ -598,11 +598,8 @@ def _rapido_travado(chave, cfg):
             time.sleep(1)
     import exportar_site
     site = cfg.get("site") or {}
-    if site.get("ativo", True) is not False and exportar_site.exportar(cfg):
-        if site.get("publicar_automatico", False):
-            exportar_site.publicar(f"Novas partidas ({agora_br():%d/%m %Hh%M})")
-        else:
-            log("Site exportado (publicação automática desligada: rode o publicar_site.bat).")
+    if site.get("ativo", True) is not False and not exportar_site.exportar_e_publicar(cfg):
+        log("Site exportado, mas não enviado ao Supabase (veja a mensagem acima).")
     log(f"Coleta rápida: {novas_total} partida(s) nova(s); entram também no report das 21h.")
     return True
 

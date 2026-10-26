@@ -30,9 +30,12 @@ from pathlib import Path
 import avaliacao as av
 import gerar_report as gr
 
-PASTA = Path(__file__).resolve().parent
+PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
 PASTA_SITE = PASTA / "docs"
-PASTA_DATA = PASTA_SITE / "data"
+PASTA_DATA = PASTA / "dados" / "site"      # os dados do site ficam no PC e vão para o Supabase (nunca mais para o GitHub)
+PASTA_DATA_ANTIGA = PASTA_SITE / "data"    # onde ficavam até a versão 1.x (público no GitHub)
+SUPABASE_URL_PADRAO = "https://qmstulzsoizdrhqwcrbu.supabase.co"
+EQUIPE_PADRAO = "juventus-academy"
 ARQ_MAPAS = PASTA / "dados" / "cache" / "mapas" / "mapas.json"
 ARQ_NOTAS = PASTA / "notas" / "notas.json"
 PASTA_ELO = PASTA / "dados" / "elo"
@@ -413,30 +416,12 @@ def semana_com_slugs(sem, slug):
     return sem
 
 
-def fim_da_semana_fechada(agora):
-    """A semana fecha no domingo às 21h (junto com o report e o card do Discord)."""
-    domingo = agora - timedelta(days=(agora.weekday() + 1) % 7)
-    fim = domingo.replace(hour=21, minute=0, second=0, microsecond=0)
-    return fim if fim <= agora else fim - timedelta(days=7)
-
-
-def semana_fechada(ctx, cfg, autorizados, slug, agora=None, max_semanas=8):
-    """Última semana fechada (segunda a domingo 21h): o MVP dela fica com a coroa até a próxima fechar.
-    "seguidas" = quantas semanas fechadas seguidas a mesma pessoa foi MVP."""
-    fim = fim_da_semana_fechada(agora or datetime.now(av.FUSO_BR))
-    sem = semana_com_slugs(gr.resumo_semana(ctx, cfg, autorizados, fim), slug)
-    seguidas, anterior = (1 if sem["mvp"] else 0), None
-    for k in range(1, max_semanas):
-        outra = gr.resumo_semana(ctx, cfg, autorizados, fim - timedelta(days=7 * k))
-        mvp = slug.get(outra["mvp"]) if outra["mvp"] else None
-        if k == 1:
-            anterior = mvp
-        if not sem["mvp"] or mvp != sem["mvp"]:
-            break
-        seguidas += 1
-    sem["id"] = fim.date().isoformat()
-    sem["seguidas"] = seguidas
-    sem["mvp_anterior"] = anterior
+def semana_fechada(ctx, cfg, autorizados, slug, agora=None):
+    """Última semana fechada (segunda a domingo 21h): o MVP dela fica com a coroa até a próxima fechar."""
+    sem = gr.semana_fechada(ctx, cfg, autorizados, agora or datetime.now(av.FUSO_BR))
+    anterior = sem.pop("mvp_anterior")
+    sem = semana_com_slugs(sem, slug)
+    sem["mvp_anterior"] = slug.get(anterior) if anterior else None
     sem["destaques"] = sem["destaques"][:1]  # só o round da semana (a lista completa fica na aba Semana)
     sem["rever"] = []
     return sem
@@ -619,6 +604,8 @@ def exportar(cfg=None, verificar=False):
                               "partidas": 0, "ultima": None, "card": None, "tier": 0, "tn": "Unrated",
                               "lvl": None, "funcoes": Counter(), "agentes": Counter()} for r in autorizados}
 
+    if PASTA_DATA_ANTIGA.exists():  # migração: os dados saem da pasta pública do site
+        shutil.rmtree(PASTA_DATA_ANTIGA, ignore_errors=True)
     if PASTA_DATA.exists():
         shutil.rmtree(PASTA_DATA)
     (PASTA_DATA / "partidas").mkdir(parents=True)
@@ -767,6 +754,10 @@ def publicar(mensagem=None, tudo=False):
         if not all(x in ign for x in ("config.json", "dados/", "notas/")):
             print("Site: o .gitignore não protege config.json, dados/ e notas/. Publicando só a pasta docs por segurança.")
             tudo = False
+    # Os dados das partidas não vão mais para o GitHub: tira do repositório o que tinha ficado lá
+    if git("ls-files", "--error-unmatch", "docs/data").returncode == 0:
+        git("rm", "-r", "--cached", "--quiet", "docs/data")
+        print("Site: dados das partidas retirados do GitHub (agora ficam no Supabase).")
     git("add", "." if tudo else "docs")
     if git("diff", "--cached", "--quiet").returncode == 0:
         print("Site: nada mudou desde a última publicação.")
@@ -780,21 +771,101 @@ def publicar(mensagem=None, tudo=False):
     if p.returncode != 0:
         print(f"Site: o push falhou (confira o login do GitHub no PC): {(p.stderr or p.stdout).strip()[:300]}")
         return False
-    print("Site: publicado no GitHub. O GitHub Pages atualiza em 1–2 minutos.")
+    print("Site: código publicado no GitHub. A Vercel atualiza o site em 1–2 minutos.")
     return True
 
 
+# ----------------------------------------------------------------------------
+# Envio para o Supabase (só a equipe, logada, consegue ler)
+# ----------------------------------------------------------------------------
+
+def _supabase(cfg):
+    import os
+    site = cfg.get("site") or {}
+    url = (os.environ.get("SUPABASE_URL") or site.get("supabase_url") or SUPABASE_URL_PADRAO).rstrip("/")
+    chave = os.environ.get("SUPABASE_SECRET_KEY", "").strip()
+    return url, chave, site.get("equipe") or EQUIPE_PADRAO
+
+
+def _pedido(metodo, url, chave, corpo=None, extra=None):
+    import urllib.request
+    cab = {"apikey": chave, "Content-Type": "application/json", "Accept": "application/json",
+           "User-Agent": "NokyLabs-ValReport/2.0"}
+    if chave.startswith("eyJ"):  # chave service_role antiga (JWT) também vai no Authorization
+        cab["Authorization"] = f"Bearer {chave}"
+    cab.update(extra or {})
+    dados = json.dumps(corpo, ensure_ascii=False, separators=(",", ":")).encode("utf-8") if corpo is not None else None
+    req = urllib.request.Request(url, data=dados, method=metodo, headers=cab)
+    with urllib.request.urlopen(req, timeout=60) as r:
+        texto = r.read().decode("utf-8")
+        return json.loads(texto) if texto.strip() else None
+
+
+def enviar_supabase(cfg=None, apenas=None):
+    """Envia os JSON de dados/site para a tabela dados_equipe da equipe (upsert) e apaga o que saiu da janela.
+    apenas = lista de caminhos (ex.: ["notas.json"]) para mandar só esses. Precisa da variável SUPABASE_SECRET_KEY."""
+    import urllib.error
+    import urllib.parse
+    cfg = cfg or gr.ler_json(PASTA / "config.json", {})
+    url, chave, equipe = _supabase(cfg)
+    if not chave:
+        print("Site: SUPABASE_SECRET_KEY não configurada no PC; os dados ficaram só no PC (veja o guia da etapa 1).")
+        return False
+    if not PASTA_DATA.exists():
+        print("Site: nada exportado ainda para enviar.")
+        return False
+    try:
+        eq = _pedido("GET", f"{url}/rest/v1/equipes?slug=eq.{urllib.parse.quote(equipe)}&select=id", chave)
+        if not eq:
+            print(f"Site: a equipe '{equipe}' não existe no Supabase (rode o SQL da etapa 1).")
+            return False
+        equipe_id = eq[0]["id"]
+        carimbo = datetime.now(av.FUSO_BR).isoformat(timespec="seconds")
+        arquivos = sorted(PASTA_DATA.rglob("*.json"))
+        if apenas:
+            arquivos = [a for a in arquivos if a.relative_to(PASTA_DATA).as_posix() in apenas]
+        linhas = [{"equipe_id": equipe_id, "caminho": a.relative_to(PASTA_DATA).as_posix(),
+                   "conteudo": json.loads(a.read_text(encoding="utf-8")), "atualizado_em": carimbo} for a in arquivos]
+        lote, tam = [], 0
+        enviados = 0
+        for ln in linhas + [None]:
+            t = len(json.dumps(ln["conteudo"])) if ln else 0
+            if ln is None or (lote and tam + t > 900_000):
+                if lote:
+                    _pedido("POST", f"{url}/rest/v1/dados_equipe?on_conflict=equipe_id,caminho", chave, lote,
+                            {"Prefer": "resolution=merge-duplicates,return=minimal"})
+                    enviados += len(lote)
+                lote, tam = [], 0
+            if ln:
+                lote.append(ln)
+                tam += t
+        if not apenas:  # o que não veio nesta exportação (partida que saiu da janela) é apagado
+            _pedido("DELETE", f"{url}/rest/v1/dados_equipe?equipe_id=eq.{equipe_id}"
+                              f"&atualizado_em=lt.{urllib.parse.quote(carimbo)}", chave, None, {"Prefer": "return=minimal"})
+        print(f"Site: {enviados} arquivo(s) enviado(s) ao Supabase (equipe {equipe}).")
+        return True
+    except urllib.error.HTTPError as e:
+        corpo = e.read().decode("utf-8", "replace")[:300]
+        dica = " Confira a SUPABASE_SECRET_KEY." if e.code in (401, 403) else ""
+        print(f"Site: o Supabase recusou o envio (erro {e.code}).{dica} {corpo}")
+    except urllib.error.URLError as e:
+        print(f"Site: sem conexão com o Supabase ({e.reason}). Os dados ficam no PC e vão no próximo envio.")
+    return False
+
+
 def exportar_e_publicar(cfg=None):
-    """Chamado pelo report diário: exporta sempre; publica só se "site" -> "publicar_automatico" for true."""
+    """Chamado pelo report diário e pela coleta rápida: exporta e envia para o Supabase.
+    O GitHub agora recebe só o código (pelo publicar_site.bat), nunca os dados das partidas."""
     cfg = cfg or gr.ler_json(PASTA / "config.json", {})
     site = cfg.get("site") or {}
     if site.get("ativo", True) is False:
-        return
-    if exportar(cfg) and site.get("publicar_automatico", False):
-        publicar()
+        return False
+    return bool(exportar(cfg)) and enviar_supabase(cfg)
 
 
 if __name__ == "__main__":
     ok = exportar(verificar="--verificar" in sys.argv)
+    if ok and ("--publicar" in sys.argv or "--enviar" in sys.argv):
+        enviar_supabase()
     if ok and "--publicar" in sys.argv:
         publicar(tudo="--tudo" in sys.argv)

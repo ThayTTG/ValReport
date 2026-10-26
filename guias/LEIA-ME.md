@@ -1,5 +1,13 @@
 # 🎮 Report Diário de VALORANT — NokyLabs (versão 2)
 
+
+## Onde fica cada coisa
+
+- **`Atalhos\`**: os botões de dois cliques (report, atualizar agora, publicar o site, notas da IGL e o instalador do agendamento).
+- **`ferramentas\`**: o código Python. Para rodar algo na mão, abra o PowerShell na pasta principal e use `py ferramentas\nome.py`.
+- **`guias\`**: este LEIA-ME, o PUBLICAR e os CREDITOS.
+- **`docs\`**: o site. **`dados\`** e **`notas\`**: só no seu PC. **`config.json`**: na pasta principal.
+
 Coleta as partidas da equipe pela HenrikDev API e gera, todo dia às 21h, reports em `.md`
 com análise tática por partida, avaliação justa por função e análise de duos/trios/five stack.
 
@@ -7,19 +15,19 @@ com análise tática por partida, avaliação justa por função e análise de d
 
 | Arquivo | Para que serve |
 | :--- | :--- |
-| `coletor_valorant.py` | Busca as partidas novas, guarda e chama o gerador |
-| `avaliacao.py` | O "cérebro": chance de vitória, impacto, trades, distâncias, avaliação por função |
-| `armazem.py` | Guarda as partidas compactadas e o modelo de chance de vitória |
-| `gerar_report.py` | Escreve os reports (`py gerar_report.py 2026-10-23` refaz um dia) |
+| `ferramentas\coletor_valorant.py` | Busca as partidas novas, guarda e chama o gerador |
+| `ferramentas\avaliacao.py` | O "cérebro": chance de vitória, impacto, trades, distâncias, avaliação por função |
+| `ferramentas\armazem.py` | Guarda as partidas compactadas e o modelo de chance de vitória |
+| `ferramentas\gerar_report.py` | Escreve os reports (`py ferramentas\gerar_report.py 2026-10-23` refaz um dia) |
 | `config.json` | Jogadores, apelidos, filas e ajustes finos |
-| `rodar_report.bat` | Roda tudo com dois cliques |
-| `instalar_agendamento.ps1` | Agenda o report diário às 21h e a atualização do site a cada 20 min |
-| `atualizar_agora.bat` | Procura partidas novas agora e atualiza o site (sem report nem Discord) |
+| `Atalhos\rodar_report.bat` | Roda tudo com dois cliques |
+| `Atalhos\instalar_agendamento.ps1` | Agenda o report diário às 21h e a atualização do site a cada 20 min |
+| `Atalhos\atualizar_agora.bat` | Procura partidas novas agora e atualiza o site (sem report nem Discord) |
 
 ## Atualizando da versão 1
 
 1. Substitua os arquivos `.py` e o `config.json` pelos novos. **Não apague a pasta `dados`.**
-2. Rode o `rodar_report.bat`. Na primeira vez ele faz uma migração automática:
+2. Rode o `Atalhos\rodar_report.bat`. Na primeira vez ele faz uma migração automática:
    - compacta as partidas guardadas (ficam ~10x menores);
    - refaz o `historico.csv` com as correções (o antigo fica em `historico_v1.csv`);
    - busca de novo as partidas que tinham sido ignoradas — inclusive as **personalizadas (scrims)**,
@@ -151,7 +159,7 @@ Cada dia gera, em `dados\reports\AAAA-MM-DD\`, uma pasta por formação:
   (baixados na primeira execução e atualizados a cada 14 dias). Sem internet, o mapa é redesenhado pelas posições.
 - Mortes na própria spike não entram (igual ao placar oficial).
 
-Os cards são desenhados pelo `cards.py` (Pillow, fonte Inter da pasta `fontes`), direto no seu PC. Não usam IA nem API de imagem.
+Os cards são desenhados pelo `ferramentas\cards.py` (Pillow, fonte Inter da pasta `fontes`), direto no seu PC. Não usam IA nem API de imagem.
 
 ## Discord (novo)
 
@@ -167,8 +175,8 @@ Os cards são desenhados pelo `cards.py` (Pillow, fonte Inter da pasta `fontes`)
    setx DISCORD_WEBHOOK_DICAS "https://discord.com/api/webhooks/..."
    ```
    Feche e abra o terminal depois (e reinicie o agendamento, se já estiver criado). Canal sem webhook é pulado.
-4. Teste: `py discord_envio.py --teste` — cada canal recebe uma mensagem de teste.
-5. Pronto: o `rodar_report.bat` envia sozinho depois de gerar o report. Cada dia é enviado uma vez; para reenviar: `py discord_envio.py 2026-10-23 --forcar`.
+4. Teste: `py ferramentas\discord_envio.py --teste` — cada canal recebe uma mensagem de teste.
+5. Pronto: o `Atalhos\rodar_report.bat` envia sozinho depois de gerar o report. Cada dia é enviado uma vez; para reenviar: `py ferramentas\discord_envio.py 2026-10-23 --forcar`.
 
 > A URL do webhook é como uma senha: quem tiver o link consegue postar no canal. Não compartilhe nem cole em prints.
 > Para trocar nome/foto do remetente, use `"discord": {"nome": "NokyLabs", "avatar_url": "https://..."}` no `config.json`.
@@ -177,14 +185,14 @@ Os cards são desenhados pelo `cards.py` (Pillow, fonte Inter da pasta `fontes`)
 
 ## Site (ValReport)
 
-Depois do report e do Discord, o `exportar_site.py` gera os dados do site em `docs\data\`. O site é estático: o GitHub Pages só serve os arquivos da pasta `docs\`.
+Depois do report e do Discord, o `ferramentas\exportar_site.py` gera os dados do site em `docs\data\`. O site é estático: o GitHub Pages só serve os arquivos da pasta `docs\`.
 
 - **Quem aparece:** só quem estiver em `"site" → "jogadores_autorizados"` no `config.json`. Sem essa parte, só a primeira pessoa da lista de jogadores aparece. Todo o resto vira "Aliado/Adversário", sem nome.
 - **Ver no PC:** `py -m http.server 8000 -d docs` e abra http://localhost:8000.
-- **Publicar:** siga o `PUBLICAR.md` uma vez. Depois disso, `publicar_site.bat` publica com dois cliques, ou ponha `"publicar_automatico": true` para publicar sozinho.
-- **Atualização a cada 20 min:** o `instalar_agendamento.ps1` cria também a tarefa "NokyLabs - Atualizar site VALORANT", que roda escondida e só publica quando acha partida nova. O que ela achar fica em `dados/pendentes.json` e entra no report das 21h normalmente. Para pausar, use `"coleta_rapida": false` no `config.json`. O site também confere sozinho a cada 20 min e tem o botão de atualizar no topo.
+- **Publicar:** siga o `guias\PUBLICAR.md` uma vez. Depois disso, `Atalhos\publicar_site.bat` publica com dois cliques, ou ponha `"publicar_automatico": true` para publicar sozinho.
+- **Atualização a cada 20 min:** o `Atalhos\instalar_agendamento.ps1` cria também a tarefa "NokyLabs - Atualizar site VALORANT", que roda escondida e só publica quando acha partida nova. O que ela achar fica em `dados/pendentes.json` e entra no report das 21h normalmente. Para pausar, use `"coleta_rapida": false` no `config.json`. O site também confere sozinho a cada 20 min e tem o botão de atualizar no topo.
 - **Créditos e transparência:** `CREDITOS.md` e a página Sobre do site.
-- **Notas da IGL:** dois cliques em `editar_notas.bat`. Abre o site no seu PC com campos para escrever: na partida (aba *Notas da IGL* e no *Placar*), em cada round (aba *Rounds*) e no plano de cada mapa (*Equipe → Mapas*). Salve com o botão ou Ctrl+Enter. As notas vão para o site na próxima publicação. O site é público, então não cite pelo nome quem não autorizou aparecer. Para não publicar notas: `"site": {"publicar_notas": false}`.
+- **Notas da IGL:** dois cliques em `Atalhos\editar_notas.bat`. Abre o site no seu PC com campos para escrever: na partida (aba *Notas da IGL* e no *Placar*), em cada round (aba *Rounds*) e no plano de cada mapa (*Equipe → Mapas*). Salve com o botão ou Ctrl+Enter. As notas vão para o site na próxima publicação. O site é público, então não cite pelo nome quem não autorizou aparecer. Para não publicar notas: `"site": {"publicar_notas": false}`.
 - **Elo:** o coletor guarda o histórico de RR de cada jogador em `dados\elo\` (gráfico na aba *Performance*). Para desligar: `"coletar_elo": false`.
 - **Resumo da semana:** aos domingos, o card `semana.png` (MVP, cada um contra a semana anterior e rounds para rever) vai junto da mensagem da equipe no Discord. No site, fica na aba *Equipe → Semana*.
 - **Prévia do link e app:** ao compartilhar o link, aparece a imagem `docs\assets\img\og.png`. Se o endereço do site mudar, ponha `"url_publica"` em `"site"`. No celular, o site pode ser instalado como app.

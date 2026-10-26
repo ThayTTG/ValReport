@@ -30,7 +30,7 @@ from pathlib import Path
 import armazem
 import avaliacao as av
 
-PASTA = Path(__file__).resolve().parent
+PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
 DADOS = PASTA / "dados"
 PASTA_RESUMOS = DADOS / "resumos"
 PASTA_REPORTS = DADOS / "reports"
@@ -876,6 +876,45 @@ def resumo_semana(ctx, cfg, rids, fim, dias=7):
         "destaques": [item(x) for x in rounds[:8] if x[0] * 100 >= 15],
         "rever": [item(x) for x in rounds[::-1][:5] if x[0] * 100 <= -15],
     }
+
+
+SITE_PADRAO = "https://thayttg.github.io/ValReport/"
+
+
+def url_site(cfg):
+    """Endereço público do site: "site" -> "url_publica", ou o GitHub Pages do "repositorio", ou o padrão do projeto."""
+    import re
+    site = cfg.get("site") or {}
+    if site.get("url_publica"):
+        return site["url_publica"].rstrip("/") + "/"
+    m = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$", site.get("repositorio") or "")
+    return f"https://{m.group(1).lower()}.github.io/{m.group(2)}/" if m else SITE_PADRAO
+
+
+def fim_da_semana_fechada(agora):
+    """A semana fecha no domingo às 21h (junto com o report e o card do Discord)."""
+    domingo = agora - timedelta(days=(agora.weekday() + 1) % 7)
+    fim = domingo.replace(hour=21, minute=0, second=0, microsecond=0)
+    return fim if fim <= agora else fim - timedelta(days=7)
+
+
+def semana_fechada(ctx, cfg, rids, agora, max_semanas=8):
+    """Última semana fechada + a coroa: quem foi MVP, há quantas semanas seguidas e de quem tomou a coroa.
+    Usado pelo site (semana_fechada.json) e pelo card da Semana no Discord, para os dois mostrarem o mesmo MVP."""
+    fim = fim_da_semana_fechada(agora)
+    sem = resumo_semana(ctx, cfg, rids, fim)
+    seguidas, anterior = (1 if sem["mvp"] else 0), None
+    for k in range(1, max_semanas):
+        mvp = resumo_semana(ctx, cfg, rids, fim - timedelta(days=7 * k))["mvp"]
+        if k == 1:
+            anterior = mvp
+        if not sem["mvp"] or mvp != sem["mvp"]:
+            break
+        seguidas += 1
+    sem["id"] = fim.date().isoformat()
+    sem["seguidas"] = seguidas
+    sem["mvp_anterior"] = anterior
+    return sem
 
 
 def md_grupos(ctx, mids_hoje, cfg):

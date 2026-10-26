@@ -14,7 +14,9 @@ const CREDITOS = [
   { nome: "Pillow", papel: "Cards em imagem", texto: "Biblioteca usada para desenhar os cards (PNG) enviados ao Discord.", licenca: "Licença HPND (MIT-CMU). Jeffrey A. Clark e colaboradores.", url: "https://python-pillow.org", rotulo: "python-pillow.org" },
   { nome: "fontTools", papel: "Conversão da fonte", texto: "Usado uma vez para recortar e converter a fonte Inter para WOFF, deixando o site leve no celular.", licenca: "MIT.", url: "https://github.com/fonttools/fonttools", rotulo: "github.com/fonttools" },
   { nome: "Discord (webhooks)", papel: "Entrega dos reports", texto: "Os reports diários e os cards chegam aos canais da equipe por webhooks.", licenca: "Serviço da Discord Inc.", url: "https://discord.com", rotulo: "discord.com" },
-  { nome: "GitHub e GitHub Pages", papel: "Código e hospedagem", texto: "O código fica aberto no GitHub e o site é servido de graça pelo GitHub Pages, como arquivos estáticos.", licenca: "Serviço da GitHub Inc.", url: "https://pages.github.com", rotulo: "pages.github.com" },
+  { nome: "GitHub", papel: "Código", texto: "O código do site fica aberto no GitHub. Os dados das partidas não ficam lá.", licenca: "Serviço da GitHub Inc.", url: "https://github.com", rotulo: "github.com" },
+  { nome: "Vercel", papel: "Hospedagem", texto: "Serve as páginas do site (só o código, sem dados das partidas), no plano gratuito.", licenca: "Serviço da Vercel Inc.", url: "https://vercel.com", rotulo: "vercel.com" },
+  { nome: "Supabase", papel: "Login e banco de dados", texto: "Guarda as contas, as equipes e os dados das partidas, com regras de acesso no próprio banco: cada pessoa só recebe o que a sua equipe pode ver. O login é feito com a conta Google.", licenca: "Serviço da Supabase Inc. (servidores em São Paulo).", url: "https://supabase.com", rotulo: "supabase.com" },
   { nome: "Playwright", papel: "Testes", texto: "Usado para abrir o site como celular e como computador e conferir telas, links e erros antes de publicar. Também gerou a imagem de prévia do link e os ícones do app.", licenca: "Apache 2.0 (Microsoft).", url: "https://playwright.dev", rotulo: "playwright.dev" },
   { nome: "Agendador de Tarefas e PowerShell", papel: "Report diário", texto: "Fazem o report rodar sozinho às 21h no PC da equipe.", licenca: "Componentes do Windows (Microsoft).", url: "https://learn.microsoft.com/powershell/", rotulo: "Documentação" },
   { nome: "Tracker Network (tracker.gg)", papel: "Inspiração", texto: "A organização das abas (Geral, Partidas, Agentes, Mapas, Armas, Performance) foi inspirada nos trackers que a comunidade já conhece. Nenhum dado, código ou imagem do tracker.gg é usado, e não temos relação com eles.", licenca: "Só referência visual.", url: "https://tracker.gg/valorant", rotulo: "tracker.gg" },
@@ -36,11 +38,11 @@ export function viewSobre() {
 
     <h2 id="transparencia">Transparência: de onde vêm os números</h2>
     <ul>
-      <li><strong>O site não consulta nenhuma API.</strong> Ele é estático (GitHub Pages) e só lê arquivos gerados uma vez por dia.</li>
+      <li><strong>O site não consulta a API do jogo.</strong> Ele lê os dados que a coleta da equipe envia para o banco (Supabase), e só depois do login de quem é da equipe.</li>
       <li><strong>Coleta:</strong> um script em Python roda no PC da equipe às 21h. Ele busca as partidas na HenrikDev API (não oficial), guarda tudo localmente, manda o report para o Discord e exporta os dados deste site.</li>
       <li><strong>Quais partidas entram:</strong> só 5v5 no modo padrão (competitivo, Premier e personalizadas 5v5). Swiftplay, Skirmish, Deathmatch e afins ficam de fora, porque distorceriam as médias.</li>
       <li><strong>Elo:</strong> o histórico de RR vem do mesmo serviço (HenrikDev), e o report guarda cada atualização para montar o gráfico de evolução.</li>
-      <li><strong>Notas da IGL:</strong> textos escritos pela IGL no PC da equipe (editor local) e publicados junto com os dados. São opinião e leitura tática da equipe, não um número calculado.</li>
+      <li><strong>Notas da IGL:</strong> textos escritos pela IGL no PC da equipe (editor local) e enviados junto com os dados, só para os membros. São opinião e leitura tática da equipe, não um número calculado.</li>
       <li><strong>Código aberto:</strong> todo cálculo pode ser conferido em ${link(repo, "o repositório do projeto")}.</li>
       <li><strong>Agora:</strong> ${num(m.contagem?.partidas)} partidas e ${num(m.contagem?.rounds)} rounds exportados em ${esc(dataHora(m.gerado_em))}. Modelo de chance de vitória treinado com ${num(m.modelo?.rounds)} rounds. Referências por função (outros jogadores dos lobbies): ${esc(refs || "—")}.</li>
       <li><strong>Feito com IA:</strong> o código foi escrito com ajuda do Claude (Anthropic), e isso está nos créditos abaixo.</li>
@@ -52,10 +54,11 @@ export function viewSobre() {
       <li><strong>Todo o resto é anônimo.</strong> Aliados aleatórios, adversários e membros que não autorizaram aparecem como “Aliado 2” ou “Adversário 4”, sem nome, Riot ID, card ou nível. Agente, elo e números da partida continuam, porque sem eles o placar não faz sentido. A API pede que dados só sejam mostrados com consentimento e proíbe revelar nomes ocultos. Por isso anonimizamos todo mundo de fora.</li>
       <li><strong>Riot ID</strong> dos membros fica oculto, a menos que a equipe ative essa opção.</li>
       <li><strong>Nada sensível vai para o site:</strong> nenhuma chave de API, webhook ou senha.</li>
-      <li><strong>Sem rastreamento:</strong> não há cookies, analytics nem anúncios. O site só guarda no seu navegador a escolha de tema claro ou escuro. Se você instalar o ValReport como app, uma cópia das páginas e imagens já vistas fica no aparelho para abrir sem internet (dá para apagar desinstalando o app ou limpando os dados do site).</li>
-      <li><strong>Notas da IGL</strong> são públicas como o resto do site. Elas não citam pelo nome quem está fora da lista de autorizados.</li>
+      <li><strong>Só para a equipe:</strong> as partidas aparecem apenas para quem entrou com Google e foi adicionado à equipe. Convidados não veem as notas da IGL. Veja a ${link("privacidade.html", "Política de Privacidade")} completa.</li>
+      <li><strong>Sem rastreamento:</strong> não há cookies de rastreamento, analytics nem anúncios. O site guarda no seu navegador a sessão de login e escolhas como o tema claro ou escuro. Se você instalar o ValReport como app, uma cópia das páginas e imagens já vistas fica no aparelho para abrir sem internet (dá para apagar desinstalando o app ou limpando os dados do site).</li>
+      <li><strong>Notas da IGL</strong> são vistas só pelos membros da equipe (convidados não veem). Elas não citam pelo nome quem está fora da lista de autorizados.</li>
       <li><strong>Imagens externas:</strong> ícones, mapas e cards vêm de <code>media.valorant-api.com</code>, então seu navegador faz pedidos a esse servidor. A fonte é servida pelo próprio site.</li>
-      <li><strong>Quer sair?</strong> Qualquer pessoa da equipe pode pedir para sair a qualquer momento. Se você é de fora e se reconheceu em alguma partida, ${link(`${repo}/issues`, "abra uma issue")} e a gente remove.</li>
+      <li><strong>Quer sair?</strong> Qualquer pessoa da equipe pode pedir para sair a qualquer momento. Se você é de fora e se reconheceu em alguma partida, ${link(`${repo}/issues`, "abra uma issue")} e a gente remove. Para apagar a sua conta, use Minha conta.</li>
     </ul>
 
     <h2 id="metodologia">Como calculamos</h2>

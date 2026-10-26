@@ -34,7 +34,7 @@ export function blocoNota(tipo, id, texto, { n = null, titulo = "Nota da IGL", v
   const chave = [tipo, id, n ?? ""].join("|");
   if (B.editor) {
     return `<div class="nota nota--editor" data-nota="${esc(chave)}">
-      <div class="nota__topo">${icone("nota")}<strong>${esc(titulo)}</strong><span class="suave pequeno">vai para o site público</span></div>
+      <div class="nota__topo">${icone("nota")}<strong>${esc(titulo)}</strong><span class="suave pequeno">vai para o site da equipe</span></div>
       <textarea rows="${tipo === "round" ? 3 : 6}" placeholder="Escreva aqui. Dá para usar **negrito**, *itálico* e listas começando com - ">${esc(texto || "")}</textarea>
       <div class="nota__acoes"><button class="botao" type="button" data-salvar-nota="${esc(chave)}">Salvar</button><span class="nota__status pequeno" aria-live="polite"></span></div>
     </div>`;

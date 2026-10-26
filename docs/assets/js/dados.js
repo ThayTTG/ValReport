@@ -1,26 +1,38 @@
 // Carregamento dos JSONs gerados pelo exportar_site.py, filtros e agregação das estatísticas
 
 import { div, chaveDia } from "./util.js";
+import { lerDado } from "./nuvem.js";
 
 const cache = new Map();
 /** Esquece os JSONs guardados (usado quando chegam dados novos) */
 export const limparCache = () => cache.clear();
-async function json(caminho) {
-  if (!cache.has(caminho)) {
-    cache.set(caminho, fetch(caminho, { cache: "no-cache" }).then((r) => {
+
+/** Um JSON de dados: no site, vem do Supabase (só a equipe lê); no editor de notas do PC, dos arquivos locais. */
+function buscar(caminho) {
+  if (B.editor || !caminho.startsWith("data/")) {
+    return fetch(caminho, { cache: "no-store" }).then((r) => {
       if (!r.ok) throw new Error(`${caminho}: ${r.status}`);
       return r.json();
-    }).catch((e) => { cache.delete(caminho); throw e; }));
+    });
+  }
+  if (!B.equipeAtual) return Promise.reject(new Error("Sem equipe selecionada."));
+  return lerDado(B.equipeAtual.id, caminho.slice("data/".length));
+}
+async function json(caminho) {
+  if (!cache.has(caminho)) {
+    cache.set(caminho, buscar(caminho).catch((e) => { cache.delete(caminho); throw e; }));
   }
   return cache.get(caminho);
 }
+/** meta.json sem cache (para conferir se chegaram dados novos) */
+export const metaFresca = () => buscar("data/meta.json");
 
 const NOTAS_VAZIAS = { partidas: {}, mapas: {} };
 export const B = { meta: null, partidas: [], avaliacao: {}, formacoes: { formacoes: [], pares: [] }, porId: new Map(), equipe: [], porSlug: new Map(),
-  semana: null, coroa: null, notas: NOTAS_VAZIAS, elo: {}, editor: false };
+  semana: null, coroa: null, notas: NOTAS_VAZIAS, elo: {}, editor: false, conta: null, equipeAtual: null };
 
 /** No PC da IGL (editar_notas.bat), o site ganha botões para escrever notas */
-async function detectarEditor() {
+export async function detectarEditor() {
   if (!["127.0.0.1", "localhost"].includes(location.hostname)) return false;
   try {
     const r = await fetch("api/ping", { cache: "no-store" });
@@ -29,7 +41,7 @@ async function detectarEditor() {
 }
 
 export async function carregarBase() {
-  const editor = await detectarEditor();
+  const editor = B.editor;
   const [meta, partidas, avaliacao, formacoes, semana, notas, elo, fechada] = await Promise.all([
     json("data/meta.json"), json("data/partidas.json"),
     json("data/avaliacao.json").catch(() => ({})), json("data/formacoes.json").catch(() => ({ formacoes: [], pares: [] })),

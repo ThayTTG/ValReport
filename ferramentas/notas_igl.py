@@ -19,6 +19,7 @@ Uso: dois cliques em editar_notas.bat (ou: py notas_igl.py). Feche a janela para
 import json
 import os
 import sys
+import threading
 import tempfile
 import webbrowser
 from datetime import datetime
@@ -26,7 +27,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-PASTA = Path(__file__).resolve().parent
+PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
 DOCS = PASTA / "docs"
 ARQ = PASTA / "notas" / "notas.json"
 PORTA = 8765
@@ -56,8 +57,10 @@ def salvar(dados):
         import exportar_site as es
         import gerar_report as gr
         cfg = gr.ler_json(PASTA / "config.json", {})
-        ids = {p["id"] for p in gr.ler_json(DOCS / "data" / "partidas.json", []) or []}
-        es.gravar(DOCS / "data" / "notas.json", es.notas_json(cfg, ids))
+        ids = {p["id"] for p in gr.ler_json(es.PASTA_DATA / "partidas.json", []) or []}
+        es.gravar(es.PASTA_DATA / "notas.json", es.notas_json(cfg, ids))
+        # manda só as notas para o site (sem travar o editor enquanto envia)
+        threading.Thread(target=es.enviar_supabase, args=(cfg, ["notas.json"]), daemon=True).start()
     except Exception as e:  # noqa: BLE001
         print(f"Aviso: a nota foi salva, mas o site só mostra depois de exportar ({e}).")
 
@@ -122,6 +125,18 @@ class Editor(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "editor": True})
         if caminho.endswith("/api/notas"):
             return self._json(200, ler())
+        if caminho.startswith("/data/"):  # os dados do site moram em dados/site (fora do GitHub)
+            import exportar_site as es
+            alvo = (es.PASTA_DATA / caminho[len("/data/"):]).resolve()
+            if es.PASTA_DATA.resolve() not in alvo.parents or not alvo.is_file():
+                return self._json(404, {"ok": False, "erro": "não encontrado"})
+            corpo = alvo.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(corpo)))
+            self.end_headers()
+            self.wfile.write(corpo)
+            return None
         return super().do_GET()
 
     def do_POST(self):
@@ -145,9 +160,9 @@ def main():
     if not (DOCS / "index.html").exists():
         print("Não encontrei a pasta docs (o site). Rode este arquivo na pasta do ValReport.")
         sys.exit(1)
-    if not (DOCS / "data" / "partidas.json").exists():
+    import exportar_site
+    if not (exportar_site.PASTA_DATA / "partidas.json").exists():
         try:
-            import exportar_site
             exportar_site.exportar()
         except Exception as e:  # noqa: BLE001
             print(f"Rode py exportar_site.py antes ({e}).")
@@ -166,8 +181,8 @@ def main():
     print(" Editor das Notas da IGL")
     print(f" Abra: {url}")
     print(" Em cada partida, aba 'Notas da IGL'. No Rounds e nos Mapas também.")
-    print(" O site é PÚBLICO: as notas aparecem para quem tiver o link.")
-    print(" Depois, publique com publicar_site.bat. Para sair, feche esta janela.")
+    print(" As notas vão para o site sozinhas ao salvar (só a equipe vê; convidados não).")
+    print(" Para sair, feche esta janela.")
     print("=" * 64)
     try:
         webbrowser.open(url)

@@ -34,7 +34,7 @@ No `git status`, confira que **não aparecem** `config.json` nem a pasta `dados/
 ## 3. Gerar os dados e enviar
 
 ```powershell
-py exportar_site.py --verificar
+py ferramentas\exportar_site.py --verificar
 git add .
 git commit -m "Primeira versão do ValReport"
 git push -u origin main
@@ -52,12 +52,12 @@ Em 1–2 minutos o link aparece no topo dessa página (algo como `https://thaytt
 
 ## 5. Atualizar todo dia
 
-- **Manual:** dois cliques em `publicar_site.bat` (exporta e faz `git push`).
+- **Manual:** dois cliques em `Atalhos\publicar_site.bat` (exporta e faz `git push`).
 - **Automático:** no `config.json`, troque `"publicar_automatico": false` para `true`. O report das 21h e a atualização de 20 em 20 minutos passam a publicar sozinhos (a de 20 min só publica quando acha partida nova).
-- **Notas da IGL:** depois de escrever no `editar_notas.bat`, publique (manual ou automático) para elas irem ao site.
+- **Notas da IGL:** depois de escrever no `Atalhos\editar_notas.bat`, publique (manual ou automático) para elas irem ao site.
 
 ## Dicas
 
 - **Ver antes de publicar:** `py -m http.server 8000 -d docs` e abra http://localhost:8000.
 - **Tirar alguém do site:** remova o Riot ID de `jogadores_autorizados` e publique de novo. O histórico do Git ainda guarda versões antigas dos arquivos. Se precisar apagar de vez, me peça ajuda para limpar o histórico.
-- **Algo não apareceu?** Rode `py exportar_site.py --verificar` e leia as mensagens que começam com "Site:".
+- **Algo não apareceu?** Rode `py ferramentas\exportar_site.py --verificar` e leia as mensagens que começam com "Site:".

@@ -42,7 +42,7 @@
     } catch (e) {}
   </script>
 </head>
-<body>
+<body data-modo="carregando">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
       <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
@@ -94,6 +94,8 @@
       <button class="botao-icone" id="instalar" type="button" aria-label="Instalar o ValReport no aparelho" title="Instalar no aparelho" hidden>
         <svg aria-hidden="true"><use href="#i-instalar"/></svg>
       </button>
+      <button class="botao-primario botao-entrar-topo" id="entrar-topo" type="button">Entrar</button>
+      <a class="conta-chip" id="conta-link" href="#/conta" data-nav="conta" title="Minha conta" aria-label="Minha conta" hidden><span id="conta-inicial">?</span></a>
       <button class="botao-icone" id="alternar-tema" type="button" aria-label="Alternar tema claro ou escuro">
         <svg class="so-escuro" aria-hidden="true"><use href="#i-sol"/></svg>
         <svg class="so-claro" aria-hidden="true"><use href="#i-lua"/></svg>
@@ -117,7 +119,8 @@
       Riot Games does not endorse or sponsor this project.</p>
     <p>Dados: <a href="https://github.com/Henrik-3/unofficial-valorant-api" rel="noopener" target="_blank">HenrikDev API (não oficial)</a> ·
       Imagens: <a href="https://valorant-api.com" rel="noopener" target="_blank">valorant-api.com</a> ·
-      <a href="#/sobre">Créditos, privacidade e metodologia</a></p>
+      <a href="#/sobre">Créditos e metodologia</a> ·
+      <a href="privacidade.html">Política de Privacidade</a> · <a href="termos.html">Termos de Uso</a></p>
     <p><a class="rodape__noky" href="https://thayttg.github.io/nokylabs/">← Voltar para a NokyLabs</a></p>
     <p class="rodape__gerado" id="gerado-em"></p>
   </footer>

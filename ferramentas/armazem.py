@@ -16,7 +16,7 @@ from pathlib import Path
 
 import avaliacao as av
 
-PASTA = Path(__file__).resolve().parent
+PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
 DADOS = PASTA / "dados"
 PASTA_PARTIDAS = DADOS / "partidas"
 ARQ_INDICE = DADOS / "indice_partidas.json"

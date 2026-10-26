@@ -10,8 +10,9 @@ Uso direto (gera os cards de um dia já processado):
     py cards.py 2026-10-23
 """
 
+import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -19,7 +20,7 @@ from PIL import Image, ImageDraw, ImageFont
 import avaliacao as av
 import gerar_report as gr
 
-PASTA = Path(__file__).resolve().parent
+PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
 PASTA_FONTES = PASTA / "fontes"
 PASTA_ICONES = PASTA / "dados" / "cache" / "agentes"
 
@@ -42,6 +43,8 @@ VERMELHO = (246, 112, 112)
 VERMELHO_CLARO = (66, 30, 38)
 AMBAR = (246, 184, 76)
 CINZA_CLARO = (44, 38, 62)
+OURO = (242, 179, 61)          # MVP, coroa e destaques (o mesmo dourado do site)
+OURO_CLARO = (66, 50, 24)
 # nomes antigos usados no código
 LARANJA, LARANJA_ESC, LARANJA_CLARO = ROXO, ROXO_TEXTO, ROXO_CLARO
 
@@ -49,6 +52,28 @@ LARANJA, LARANJA_ESC, LARANJA_CLARO = ROXO, ROXO_TEXTO, ROXO_CLARO
 # ----------------------------------------------------------------------------
 # Fontes e desenho
 # ----------------------------------------------------------------------------
+
+_DECIMAL = re.compile(r"(?<=\d)\.(?=\d)")
+
+
+def br(texto):
+    """1.29 -> 1,29 e +10.4% -> +10,4% (números no padrão brasileiro, como no site)."""
+    return _DECIMAL.sub(",", texto) if isinstance(texto, str) else texto
+
+
+class Pincel(ImageDraw.ImageDraw):
+    """ImageDraw que escreve os números com vírgula decimal."""
+
+    def text(self, xy, text, *args, **kwargs):
+        return super().text(xy, br(text), *args, **kwargs)
+
+    def textlength(self, text, *args, **kwargs):
+        return super().textlength(br(text), *args, **kwargs)
+
+
+# Endereço do site e dono da coroa (preenchidos em gerar_cards)
+URL_SITE = ""
+COROA = {"rid": None, "seguidas": 0, "anterior": None}
 
 _FONTES = {}
 _ARQ_FONTE = {
@@ -162,10 +187,29 @@ def cor_nivel(bom, ruim, valor):
 
 
 def faixa_marca(d, tipo_card, data_txt):
-    """Linha do topo: logo + NokyLabs à esquerda, tipo do card e data à direita."""
+    """Linha do topo: logo + ValReport by NokyLabs à esquerda; tipo do card, data e endereço do site à direita."""
     logo(d, M, 36, 46)
-    d.text((M + 62, 59), "NokyLabs", font=fonte("negrito", 26), fill=TEXTO, anchor="lm")
-    d.text((W - M, 59), f"{tipo_card} · {data_txt}", font=fonte("medio", 22), fill=SUAVE, anchor="rm")
+    d.text((M + 62, 50), "ValReport", font=fonte("negrito", 26), fill=TEXTO, anchor="lm")
+    d.text((M + 63, 74), "by NokyLabs", font=fonte("medio", 16), fill=SUAVE, anchor="lm")
+    d.text((W - M, 50), f"{tipo_card} · {data_txt}", font=fonte("medio", 22), fill=SUAVE, anchor="rm")
+    if URL_SITE:
+        d.text((W - M, 77), URL_SITE, font=fonte("semi", 16), fill=ROXO_TEXTO, anchor="rm")
+
+
+def coroa(d, cx, base, larg):
+    """Coroa dourada (o MVP da semana fechada fica com ela até a próxima semana fechar)."""
+    a = larg * 0.78
+    pts = [(cx - larg / 2, base), (cx - larg / 2, base - a * 0.55), (cx - larg * 0.26, base - a * 0.25), (cx, base - a),
+           (cx + larg * 0.26, base - a * 0.25), (cx + larg / 2, base - a * 0.55), (cx + larg / 2, base)]
+    d.polygon(pts, fill=OURO, outline=(120, 80, 10))
+    r = larg * 0.07
+    for x, y in ((cx - larg / 2, base - a * 0.55), (cx, base - a), (cx + larg / 2, base - a * 0.55)):
+        d.ellipse((x - r, y - r, x + r, y + r), fill=OURO)
+    d.rectangle((cx - larg / 2, base - larg * 0.1, cx + larg / 2, base), fill=(214, 150, 40))
+
+
+def tem_coroa(rid):
+    return bool(COROA["rid"]) and COROA["rid"] == rid
 
 
 def rotulo(d, x, y, texto, cor=None):
@@ -230,7 +274,7 @@ def dados_do_dia(dia, cfg):
 
 def card_solo(rid, cfg, ctx, hoje, avals, dia):
     img = Image.new("RGB", (W, H), FUNDO)
-    d = ImageDraw.Draw(img)
+    d = Pincel(img)
     lista = hoje.get(rid, [])
     recs = [r for _, j in lista for r in j["rounds"]]
     aval = (avals.get(rid) or [None])[0]
@@ -346,7 +390,7 @@ def card_solo(rid, cfg, ctx, hoje, avals, dia):
 
 def card_equipe(cfg, ctx, hoje, avals, jogos, dia):
     img = Image.new("RGB", (W, H), FUNDO)
-    d = ImageDraw.Draw(img)
+    d = Pincel(img)
     faixa_marca(d, "Report Diário", f"{datetime.fromisoformat(dia):%d/%m/%Y}")
     d.text((M - 3, 112), "Equipe", font=fonte("display", 68), fill=TEXTO, anchor="la")
     n_hoje = len({a["match_id"] for l in hoje.values() for a, _ in l})
@@ -360,6 +404,10 @@ def card_equipe(cfg, ctx, hoje, avals, jogos, dia):
         painel(d, M, y, W - M, y + alt, raio=20)
         selo_agente(img, d, M + 22, y + 22, 76, agente)
         d.text((M + 118, y + 24), gr.apelido(rid, cfg), font=fonte("negrito", 32), fill=TEXTO, anchor="la")
+        if tem_coroa(rid):
+            coroa(d, M + 60, y + 30, 40)
+            xn = M + 118 + largura(d, gr.apelido(rid, cfg), fonte("negrito", 32)) + 12
+            chip(d, xn, y + 26, "MVP da semana", OURO_CLARO, OURO, fonte("semi", 16), alt=30, pad=12)
         partidas = len(hoje.get(rid, []))
         if aval:
             sub = f"{aval['funcao']} · {agente}" + (f" · {partidas} hoje" if partidas else "")
@@ -441,6 +489,56 @@ def pct(a, b):
     return round(100 * a / b) if b else 0
 
 
+TEAL = (59, 179, 195)  # defesa (o mesmo tom do site)
+
+# Estilo de jogo pelas armas (os mesmos textos da aba Armas do site)
+FAMILIA = {
+    "Operator": "longa", "Marshal": "longa", "Outlaw": "longa", "Warden": "longa",
+    "Vandal": "rifle", "Phantom": "rifle", "Bulldog": "rifle",
+    "Guardian": "precisao", "Sheriff": "precisao", "Ghost": "precisao",
+    "Spectre": "curta", "Stinger": "curta", "Bucky": "curta", "Judge": "curta", "Shorty": "curta",
+    "Ares": "pesada", "Odin": "pesada",
+    "Classic": "pistola", "Frenzy": "pistola", "Bandit": "pistola",
+}
+TEXTO_FAMILIA = {
+    "longa": "O seu jogo é preciso e meticuloso: você busca vantagem com picks a longa distância e abates que mudam o round logo no começo.",
+    "rifle": "O seu jogo gira em torno do rifle: duelos de média distância, posicionamento firme e consistência round após round.",
+    "precisao": "Você gosta de tiro calculado: poucas balas, paciência e mira na altura da cabeça para vencer o duelo no primeiro acerto.",
+    "curta": "O seu jogo é agressivo e de perto: entradas rápidas, cantos fechados e pressão em cima de quem está segurando o site.",
+    "pesada": "Você segura espaço com volume de fogo: spam nas entradas, wallbang e controle de área para atrasar o inimigo.",
+    "pistola": "Você aproveita muito bem os rounds de economia: boa parte dos seus abates sai da arma secundária, o que rende rounds baratos.",
+}
+DETALHE_ARMA = {
+    "Vandal": "A Vandal na frente mostra preferência pelo tiro certeiro: um acerto na cabeça resolve em qualquer distância.",
+    "Phantom": "A Phantom na frente mostra preferência por spray controlado e ângulos de média distância.",
+    "Operator": "Com a Operator, cada pick seu dá vantagem numérica para o time.",
+    "Sheriff": "Com a Sheriff, você transforma round de economia em ameaça real.",
+    "Ghost": "A Ghost mostra calma nos rounds de pistola e eco: tiro a tiro, sem desperdiçar bala.",
+}
+COMPLEMENTO = {
+    "longa": "E ainda puxa a {} para segurar ângulos longos.",
+    "rifle": "Quando o dinheiro permite, a {} é a base.",
+    "precisao": "Nos rounds mais apertados, a {} entra com tiro calculado, sem desperdiçar bala.",
+    "curta": "A {} aparece nos momentos de entrar rápido ou segurar de perto.",
+    "pesada": "A {} entra para segurar spam e controle de área.",
+    "pistola": "Nos ecos, a {} ainda garante abates.",
+}
+
+
+def estilo_de_jogo(nomes, total, com_lista=True):
+    lista = f"{', '.join(nomes[:-1])} e {nomes[-1]}" if len(nomes) > 1 else nomes[0]
+    fam = FAMILIA.get(nomes[0], "rifle")
+    frases = ([f"{lista}."] if com_lista else []) + [TEXTO_FAMILIA[fam]]
+    if nomes[0] in DETALHE_ARMA:
+        frases.append(DETALHE_ARMA[nomes[0]])
+    outra = next((n for n in nomes[1:] if FAMILIA.get(n, "rifle") != fam), None)
+    if outra:
+        frases.append(COMPLEMENTO[FAMILIA.get(outra, "rifle")].format(outra))
+    if total < 15:
+        frases.append(f"(Ainda são só {total} abates; o retrato fica mais fiel com mais partidas.)")
+    return " ".join(frases)
+
+
 # ----------------------------------------------------------------------------
 # Card: Agente (vertical)
 # ----------------------------------------------------------------------------
@@ -448,7 +546,7 @@ def pct(a, b):
 def card_agente(rid, cfg, ctx, hoje, avals, dia):
     from collections import Counter, defaultdict
     img = Image.new("RGB", (W, H), FUNDO)
-    d = ImageDraw.Draw(img)
+    d = Pincel(img)
     aval = (avals.get(rid) or [None])[0]
     agente, _ = agente_principal(hoje.get(rid, []), aval)
     funcao = av.funcao_do_agente(agente, cfg)
@@ -526,50 +624,64 @@ def card_agente(rid, cfg, ctx, hoje, avals, dia):
     else:
         d.text((M + 28, yk + 50), "Kit: amostra pequena", font=fonte("semi", 26), fill=SUAVE, anchor="la")
 
-    # Ataque x Defesa
+    # Ataque × Defesa: barras espelhadas (ataque à esquerda, defesa à direita), como no site
     ys = yk + 132 + 20
-    painel(d, M, ys, W - M, ys + 120, raio=18)
-    for i, (lado, nome) in enumerate((("ataque", "Ataque"), ("defesa", "Defesa"))):
-        rs = [r for r in recs if r["lado"] == lado]
-        x = M + i * (W - 2 * M) // 2 + 24
-        rotulo(d, x, ys + 20, nome)
-        if rs:
-            ip = 100 * sum(r["wpa"] for r in rs) / len(rs)
-            d.text((x, ys + 82), f"{ip:+.1f}%", font=fonte("display", 44), fill=cor_pp(ip), anchor="ls")
-            d.text((x + 8 + largura(d, f"{ip:+.1f}%", fonte("display", 44)), ys + 80),
-                   f"{len(rs)} rounds · {pct(sum(r['venceu'] for r in rs), len(rs))}% vitória",
-                   font=fonte("regular", 18), fill=SUAVE, anchor="ls")
-        else:
-            d.text((x, ys + 60), "—", font=fonte("semi", 28), fill=SUAVE, anchor="la")
-    d.line((W // 2, ys + 20, W // 2, ys + 100), fill=BORDA, width=2)
+    painel(d, M, ys, W - M, ys + 196, raio=18)
+    lados = {lado: [r for r in recs if r["lado"] == lado] for lado in ("ataque", "defesa")}
+    cx = W // 2
 
-    # Armas
-    yw = ys + 120 + 20
-    painel(d, M, yw, W - M, yw + 104, raio=18)
-    rotulo(d, M + 24, yw + 18, "Armas com mais abates")
-    armas = Counter(w for r in recs for w in r["armas_kills"])
-    xa = M + 24
-    if armas:
-        for arma, n in armas.most_common(4):
-            xa = chip(d, xa, yw + 50, f"{arma} · {n}", ROXO_CLARO, ROXO_TEXTO, fonte("semi", 21), alt=40, pad=16) + 10
+    def resumo_lado(rs):
+        if not rs:
+            return None
+        k, mo = sum(r["kills"] for r in rs), sum(r["morreu"] for r in rs)
+        return {"vit": 100 * sum(r["venceu"] for r in rs) / len(rs), "imp": 100 * sum(r["wpa"] for r in rs) / len(rs),
+                "kd": k / mo if mo else float(k), "n": len(rs)}
+    A, D = resumo_lado(lados["ataque"]), resumo_lado(lados["defesa"])
+    rotulo(d, M + 24, ys + 20, "Ataque", ROXO_TEXTO)
+    rotulo(d, W - M - 24 - largura(d, "DEFESA", fonte("negrito", 17)), ys + 20, "Defesa", TEAL)
+    if A:
+        d.text((M + 24, ys + 44), f"{A['n']} rounds", font=fonte("regular", 17), fill=SUAVE, anchor="la")
+    if D:
+        d.text((W - M - 24, ys + 44), f"{D['n']} rounds", font=fonte("regular", 17), fill=SUAVE, anchor="ra")
+    linhas = [("Rounds vencidos", "vit", lambda v: f"{v:.0f}%"), ("Impacto/round", "imp", lambda v: f"{v:+.1f}%"),
+              ("K/D", "kd", lambda v: f"{v:.2f}")]
+    xa0, xa1, xd0, xd1 = M + 120, cx - 6, cx + 6, W - M - 120
+    for i, (rot, k, fmt) in enumerate(linhas):
+        yy = ys + 78 + i * 38
+        d.text((cx, yy - 1), rot, font=fonte("semi", 14), fill=SUAVE, anchor="ms")
+        va, vd = (A or {}).get(k), (D or {}).get(k)
+        maior = max(abs(va or 0), abs(vd or 0)) or 1
+        for v, (x0, x1), cor, lado in ((va, (xa0, xa1), ROXO, "a"), (vd, (xd0, xd1), TEAL, "d")):
+            d.rounded_rectangle((x0, yy + 4, x1, yy + 16), radius=6, fill=CINZA_CLARO)
+            if v:
+                w = (x1 - x0) * abs(v) / maior
+                caixa = (x1 - w, yy + 4, x1, yy + 16) if lado == "a" else (x0, yy + 4, x0 + w, yy + 16)
+                d.rounded_rectangle(caixa, radius=6, fill=VERMELHO if v < 0 else cor)
+        d.text((M + 24, yy + 10), fmt(va) if va is not None else "—", font=fonte("negrito", 20), fill=TEXTO, anchor="lm")
+        d.text((W - M - 24, yy + 10), fmt(vd) if vd is not None else "—", font=fonte("negrito", 20), fill=TEXTO, anchor="rm")
+
+    # Top 3 armas + estilo de jogo (o mesmo texto do site)
+    yw = ys + 196 + 16
+    painel(d, M, yw, W - M, H - 80, raio=18)
+    armas = Counter(w for r in recs for w in r["armas_kills"] if w in FAMILIA)
+    top = armas.most_common(3)
+    rotulo(d, M + 24, yw + 18, "Top 3 armas · estilo de jogo" + (" · poucos abates ainda" if sum(armas.values()) < 15 else ""))
+    if top:
+        total = sum(armas.values())
+        cw = (W - 2 * M - 48) / 3
+        for i, (arma, n) in enumerate(top):
+            x = M + 24 + i * cw
+            ouro = i == 0
+            d.rounded_rectangle((x, yw + 44, x + cw - 12, yw + 98), radius=14, fill=OURO_CLARO if ouro else CINZA_CLARO,
+                                outline=OURO if ouro else None, width=2)
+            d.text((x + 14, yw + 54), f"{i + 1}º", font=fonte("negrito", 16), fill=OURO if ouro else SUAVE, anchor="la")
+            d.text((x + 48, yw + 50), arma, font=fonte("negrito", 22), fill=TEXTO, anchor="la")
+            d.text((x + 48, yw + 76), f"{n} abate{'s' if n != 1 else ''} · {pct(n, total)}%", font=fonte("regular", 16), fill=SUAVE, anchor="la")
+        texto = estilo_de_jogo([a for a, _ in top], 99, com_lista=False)  # o aviso de amostra fica no título
+        for li, linha in enumerate(quebrar(d, texto, fonte("regular", 18), W - 2 * M - 48, 3)):
+            d.text((M + 24, yw + 110 + li * 24), linha, font=fonte("regular", 18), fill=TEXTO, anchor="la")
     else:
-        d.text((M + 24, yw + 56), "Sem abates registrados", font=fonte("regular", 20), fill=SUAVE, anchor="la")
-
-    # Seus agentes
-    yg = yw + 104 + 20
-    lista = sorted(por_ag, key=lambda k: -len(por_ag[k]))[:3]
-    painel(d, M, yg, W - M, yg + 62 + 42 * len(lista), raio=18)
-    rotulo(d, M + 24, yg + 18, "Seus agentes na janela")
-    for i, ag in enumerate(lista):
-        rs = por_ag[ag]
-        yy = yg + 52 + i * 42
-        mm = av.metricas(rs)
-        d.text((M + 24, yy), ag, font=fonte("semi", 23), fill=TEXTO, anchor="la")
-        d.text((M + 260, yy + 2), f"{len(rs)} rounds · {partidas_ag[ag]} partida{'s' if partidas_ag[ag] != 1 else ''}",
-               font=fonte("regular", 19), fill=SUAVE, anchor="la")
-        if mm:
-            d.text((W - M - 24, yy - 2), f"{mm['impacto']:+.1f}%/round", font=fonte("negrito", 24),
-                   fill=cor_pp(mm["impacto"], 0.5), anchor="ra")
+        d.text((M + 24, yw + 60), "Sem abates com armas na janela", font=fonte("regular", 20), fill=SUAVE, anchor="la")
 
     rodape(d, "Mesmo agente, mesma função: a comparação é sempre com a média da função nos lobbies de vocês.")
     return img
@@ -585,7 +697,7 @@ ORDEM_TIPOS = ("pistol", "eco", "force", "armado", "anti-eco")
 def card_economia(cfg, ctx, hoje, avals, jogos, dia):
     from collections import Counter
     img = Image.new("RGB", (W, H), FUNDO)
-    d = ImageDraw.Draw(img)
+    d = Pincel(img)
     faixa_marca(d, "Economia", f"{datetime.fromisoformat(dia):%d/%m/%Y}")
     d.text((M - 3, 112), "Economia", font=fonte("display", 68), fill=TEXTO, anchor="la")
     tot = [(rid, a, j, r) for rid, l in hoje.items() for a, j in l for r in j["rounds"]]
@@ -681,7 +793,7 @@ def card_economia(cfg, ctx, hoje, avals, jogos, dia):
 def card_mapas(cfg, ctx, hoje, avals, jogos, dia):
     from collections import defaultdict
     img = Image.new("RGB", (W, H), FUNDO)
-    d = ImageDraw.Draw(img)
+    d = Pincel(img)
     faixa_marca(d, "Mapas", f"{datetime.fromisoformat(dia):%d/%m/%Y}")
     d.text((M - 3, 112), "Mapas", font=fonte("display", 68), fill=TEXTO, anchor="la")
     d.text((M, 196), f"desempenho da equipe nos últimos {cfg['janela_dias']} dias", font=fonte("medio", 22),
@@ -763,7 +875,7 @@ def dicas_do_jogador(ctx, lista):
 
 def card_dicas(rid, cfg, ctx, hoje, avals, dia):
     img = Image.new("RGB", (W, H), FUNDO)
-    d = ImageDraw.Draw(img)
+    d = Pincel(img)
     lista = hoje.get(rid, [])
     aval = (avals.get(rid) or [None])[0]
     agente, agentes = agente_principal(lista, aval)
@@ -851,7 +963,7 @@ def texto_dicas(rid, cfg, ctx, lista):
 
 def card_formacao(df, cfg, ctx, dia):
     img = Image.new("RGB", (W, H), FUNDO)
-    d = ImageDraw.Draw(img)
+    d = Pincel(img)
     membros = df["membros"]
     faixa_marca(d, "Formação", f"{datetime.fromisoformat(dia):%d/%m/%Y}")
     d.text((M - 3, 112), gr.FORMACAO.get(len(membros), "Grupo"), font=fonte("display", 68), fill=TEXTO, anchor="la")
@@ -977,16 +1089,31 @@ def card_formacao(df, cfg, ctx, dia):
     rotulo(d, M + 28, yp + 22, "Partidas juntos hoje")
     cabem = (H - 74 - yp - 58) // 50
     if len(js) <= cabem:
-        for i, j in enumerate(js):
-            yy = yp + 58 + i * 50
+        def linha_partida(j, yy, apagada=False):
             ganhou = j["resultado"] == "vitória"
-            d.rounded_rectangle((M + 28, yy + 4, M + 36, yy + 36), radius=4, fill=VERDE if ganhou else VERMELHO)
-            hora = f"{j['inicio']:%Hh%M}" if j["inicio"] else ""
-            d.text((M + 52, yy + 4), j["mapa"], font=fonte("semi", 23), fill=TEXTO, anchor="la")
+            cor = VERDE if ganhou else VERMELHO
+            d.rounded_rectangle((M + 28, yy + 4, M + 36, yy + 36), radius=4, fill=cor)
+            quando = (f"{j['inicio']:%d/%m}" if apagada else f"{j['inicio']:%Hh%M}") if j["inicio"] else ""
+            d.text((M + 52, yy + 4), j["mapa"], font=fonte("semi", 23), fill=SUAVE if apagada else TEXTO, anchor="la")
             agentes = " · ".join(j["jogs"][r]["agente"] for r in membros)
             d.text((M + 200, yy + 7), agentes, font=fonte("regular", 19), fill=SUAVE, anchor="la")
-            d.text((W - M - 28, yy + 4), f"{j['placar']}  {hora}", font=fonte("semi", 21),
-                   fill=VERDE if ganhou else VERMELHO, anchor="ra")
+            d.text((W - M - 28, yy + 4), f"{j.get('placar', '')}  {quando}", font=fonte("semi", 21), fill=cor, anchor="ra")
+        for i, j in enumerate(js):
+            linha_partida(j, yp + 58 + i * 50)
+        # Sobrou espaço: as partidas anteriores juntos na janela (preenche o card em vez de deixar vazio)
+        ids_hoje = {j["mid"] for j in js}
+        antes = sorted([j for j in df.get("juntos", []) if j["mid"] not in ids_hoje],
+                       key=lambda j: j["inicio"] or datetime.min, reverse=True)
+        sobra = cabem - len(js) - 1
+        if antes and sobra > 0:
+            ya = yp + 58 + len(js) * 50 + 6
+            d.line((M + 28, ya, W - M - 28, ya), fill=BORDA, width=2)
+            va = sum(1 for j in antes if j["resultado"] == "vitória")
+            rotulo(d, M + 28, ya + 14, f"Antes, juntos nos últimos {cfg['janela_dias']} dias · {va}V {len(antes) - va}D")
+            for i, j in enumerate(antes[:sobra]):
+                linha_partida(j, ya + 46 + i * 50, apagada=True)
+            if len(antes) > sobra:
+                d.text((W - M - 28, ya + 14), f"+{len(antes) - sobra} mais", font=fonte("semi", 17), fill=SUAVE, anchor="ra")
     else:  # pouco espaço: um selo por partida (mapa + placar)
         xc, yc = M + 28, yp + 54
         for i, j in enumerate(js):
@@ -1010,39 +1137,62 @@ def card_formacao(df, cfg, ctx, dia):
 # Card: Semana (domingo)
 # ----------------------------------------------------------------------------
 
+def endereco_site(cfg):
+    """thayttg.github.io/ValReport, sem o https:// (para caber no cabeçalho)."""
+    return gr.url_site(cfg).replace("https://", "").replace("http://", "").rstrip("/")
+
+
+def momento_do_dia(dia):
+    """Fim do dia do report (ou agora, se o dia ainda não acabou): define qual semana já fechou."""
+    fim_dia = datetime.fromisoformat(dia).replace(hour=23, minute=59, tzinfo=av.FUSO_BR)
+    return min(datetime.now(av.FUSO_BR), fim_dia)
+
+
+def texto_coroa(seguidas, anterior, rid, cfg):
+    if seguidas > 1:
+        return f"{seguidas} semanas seguidas com a coroa!"
+    if anterior and anterior != rid:
+        return f"Tomou a coroa de {gr.apelido(anterior, cfg)}!"
+    return "A coroa é sua até a próxima semana fechar."
+
+
 def card_semana(cfg, ctx, dia):
-    from datetime import timedelta
-    fim = datetime.fromisoformat(dia).replace(tzinfo=av.FUSO_BR) + timedelta(days=1)
-    s = gr.resumo_semana(ctx, cfg, ctx["equipe"], fim)
+    # A mesma semana fechada do site: segunda a domingo, fecha no domingo às 21h
+    s = gr.semana_fechada(ctx, cfg, ctx["equipe"], momento_do_dia(dia))
     img = Image.new("RGB", (W, H), FUNDO)
-    d = ImageDraw.Draw(img)
-    ini = datetime.fromisoformat(s["ini"])
-    faixa_marca(d, "Semana", f"{ini:%d/%m} a {datetime.fromisoformat(dia):%d/%m}")
+    d = Pincel(img)
+    ini, fim = datetime.fromisoformat(s["ini"]), datetime.fromisoformat(s["fim"])
+    faixa_marca(d, "Semana", f"{ini + timedelta(hours=3):%d/%m} a {fim:%d/%m}")
     d.text((M - 3, 112), "Semana", font=fonte("display", 68), fill=TEXTO, anchor="la")
-    d.text((M, 196), f"{s['partidas']} partida{'s' if s['partidas'] != 1 else ''} · {s['v']}V {s['d']}D · últimos 7 dias",
+    d.text((M, 196), f"{s['partidas']} partida{'s' if s['partidas'] != 1 else ''} · {s['v']}V {s['d']}D · fechou domingo às 21h",
            font=fonte("medio", 22), fill=SUAVE, anchor="la")
 
-    # MVP da semana
+    # MVP da semana (dourado, com a coroa)
     y0 = 248
-    painel(d, M, y0, W - M, y0 + 176)
-    d.rounded_rectangle((M, y0, M + 10, y0 + 176), radius=5, fill=ROXO)
-    rotulo(d, M + 32, y0 + 24, "MVP da semana")
+    painel(d, M, y0, W - M, y0 + 214, cor=(36, 29, 34), borda=OURO)
+    d.rounded_rectangle((M, y0, M + 10, y0 + 214), radius=5, fill=OURO)
+    rotulo(d, M + 32, y0 + 24, "MVP da semana · dono da coroa", OURO)
     mvp = next((x for x in s["jogadores"] if x["rid"] == s["mvp"]), None)
     if mvp:
         lista = [(a, j) for a in ctx["analises"].values() for j in [a["jogadores"].get(ctx["puuid_de"].get(mvp["rid"]))] if j]
         agente, _ = agente_principal(lista[-6:], None) if lista else ("?", [])
-        selo_agente(img, d, M + 32, y0 + 58, 96, agente)
-        d.text((M + 148, y0 + 62), gr.apelido(mvp["rid"], cfg), font=fonte("display", 46), fill=TEXTO, anchor="la")
+        d.ellipse((M + 26, y0 + 94, M + 134, y0 + 202), fill=OURO)
+        selo_agente(img, d, M + 32, y0 + 100, 96, agente)
+        coroa(d, M + 80, y0 + 100, 54)
+        d.text((M + 152, y0 + 78), gr.apelido(mvp["rid"], cfg), font=fonte("display", 46), fill=TEXTO, anchor="la")
         sm = mvp["semana"]
-        d.text((M + 150, y0 + 122), f"{sm['partidas']} partidas · K/D {sm['kd']:.2f} · ADR {sm['adr']:.0f}",
+        d.text((M + 154, y0 + 134), f"{sm['partidas']} partidas · K/D {sm['kd']:.2f} · ADR {sm['adr']:.0f}",
                font=fonte("regular", 21), fill=SUAVE, anchor="la")
-        d.text((W - M - 28, y0 + 60), f"{sm['impacto']:+.1f}%", font=fonte("display", 60), fill=cor_pp(sm["impacto"], 0.5), anchor="ra")
-        d.text((W - M - 28, y0 + 132), "impacto por round", font=fonte("regular", 18), fill=SUAVE, anchor="ra")
+        d.text((M + 154, y0 + 166), texto_coroa(s["seguidas"], s["mvp_anterior"], mvp["rid"], cfg), font=fonte("semi", 21),
+               fill=OURO, anchor="la")
+        d.text((W - M - 28, y0 + 74), f"{sm['impacto']:+.1f}%", font=fonte("display", 60), fill=cor_pp(sm["impacto"], 0.5), anchor="ra")
+        d.text((W - M - 28, y0 + 146), "impacto por round", font=fonte("regular", 18), fill=SUAVE, anchor="ra")
     else:
-        d.text((M + 32, y0 + 80), "Precisa de 20+ rounds na semana", font=fonte("semi", 26), fill=SUAVE, anchor="la")
+        d.text((M + 32, y0 + 80), "Ninguém chegou a 20 rounds na semana: sem coroa desta vez.", font=fonte("semi", 25),
+               fill=SUAVE, anchor="la")
 
     # Jogadores (com a comparação com a semana anterior)
-    y1 = y0 + 176 + 20
+    y1 = y0 + 214 + 20
     ativos = [x for x in s["jogadores"] if x["semana"]]
     alt = 70 + 62 * max(1, len(ativos))
     painel(d, M, y1, W - M, y1 + alt)
@@ -1093,7 +1243,7 @@ def card_semana(cfg, ctx, dia):
             for li, linha in enumerate(quebrar(d, x["resumo"], fonte("regular", 19), W - 2 * M - 180, 2)):
                 d.text((M + 150, yy + 34 + li * 25), linha, font=fonte("regular", 19), fill=SUAVE, anchor="la")
             yy += 100
-    rodape(d, "Impacto = quanto as ações mudaram a chance do time vencer o round. Comparação com os 7 dias anteriores.")
+    rodape(d, "Impacto = quanto as ações mudaram a chance do time vencer o round. Semana de segunda a domingo; comparação com a anterior.")
     return img
 
 
@@ -1125,6 +1275,13 @@ def gerar_cards(dia, cfg=None, base=None):
     cfg = cfg or gr.ler_json(PASTA / "config.json", {})
     baixar_icones()
     cfg, ctx, hoje, avals, jogos = dados_do_dia(dia, cfg)
+    global URL_SITE
+    URL_SITE = endereco_site(cfg)
+    try:
+        sf = gr.semana_fechada(ctx, cfg, ctx["equipe"], momento_do_dia(dia))
+        COROA.update(rid=sf["mvp"], seguidas=sf["seguidas"], anterior=sf["mvp_anterior"])
+    except Exception:  # noqa: BLE001 — a coroa é só um enfeite; nunca derruba os cards
+        COROA.update(rid=None, seguidas=0, anterior=None)
     gr.VIDEOS.clear()
     gr.VIDEOS.update(cfg.get("videos") or {})
     base = Path(base or (gr.PASTA_REPORTS / dia))

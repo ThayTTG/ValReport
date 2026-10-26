@@ -1,7 +1,9 @@
 // ValReport · NokyLabs — rotas, tema, filtros e eventos
 
 import { esc, imagem, imgCard, imgAgente, definirMeta, dataHora, vazio, larguraGrafico } from "./util.js";
-import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache } from "./dados.js";
+import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache, detectarEditor, metaFresca } from "./dados.js";
+import { iniciarNuvem, rpc, entrar, usuario } from "./nuvem.js";
+import { viewBoasVindas, viewCadastro, viewSemEquipe, viewConta, viewPainel } from "./conta.js";
 import { alternarOrdem, trocarMiniAba, alternarMinimizado } from "./componentes.js";
 import { coroaSobre, abrirRevelacao, talvezRevelar } from "./coroa.js";
 import { viewJogador } from "./jogador.js";
@@ -62,7 +64,13 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
   const rolagem = window.scrollY;
   let v;
   try {
-    if (!partes.length) v = viewHoje(q);
+    if (tela === "publico") v = viewBoasVindas(erroLogin);
+    else if (tela === "cadastro") v = viewCadastro();
+    else if (B.conta && partes[0] === "conta") v = viewConta();
+    else if (B.conta && partes[0] === "painel") v = await viewPainel();
+    else if (tela === "sem-equipe") v = viewSemEquipe();
+    else if (tela === "sem-dados") v = { titulo: "Sem dados", html: avisoSemDados };
+    else if (!partes.length) v = viewHoje(q);
     else if (partes[0] === "equipe") v = await viewEquipe(partes[1] || "visao", f, q);
     else if (partes[0] === "j") v = await viewJogador(decodeURIComponent(partes[1] || ""), partes[2] || "geral", f, q);
     else if (partes[0] === "p") v = await viewPartida(decodeURIComponent(partes[1] || ""), partes[2] || "placar", q);
@@ -78,6 +86,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
   document.title = v.titulo ? `${v.titulo} · ValReport` : "ValReport · NokyLabs";
   marcarNavegacao(partes);
   if (v.depois) requestAnimationFrame(() => v.depois(main));
+  document.body.dataset.modo = tela;
   if (mesmaPagina || manterRolagem) window.scrollTo(0, rolagem);
   else { window.scrollTo(0, 0); main.focus({ preventScroll: true }); }
   ultimoCaminho = caminho;
@@ -85,7 +94,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
 }
 
 function marcarNavegacao(partes) {
-  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : partes[0] === "equipe" ? "equipe" : "";
+  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : partes[0] === "equipe" ? "equipe" : partes[0] === "conta" || partes[0] === "painel" ? "conta" : "";
   document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("ativo", a.dataset.nav === sec));
   const slug = partes[0] === "j" ? partes[1] : null;
   document.querySelectorAll(".pilula-jogador").forEach((a) => {
@@ -167,7 +176,7 @@ async function gravarNota(botao) {
   status.textContent = "salvando…";
   try {
     await salvarNota({ tipo, id, n: n ? Number(n) : null, texto });
-    status.textContent = texto.trim() ? "salvo ✓ (publique para ir ao site)" : "nota apagada";
+    status.textContent = texto.trim() ? "salvo ✓ (já segue para o site da equipe)" : "nota apagada";
     caixa.classList.remove("pendente");
     caixa.classList.add("salvo");
     setTimeout(() => caixa.classList.remove("salvo"), 900);
@@ -255,9 +264,7 @@ async function conferirDados(manual = false) {
   botaoAtualizar.classList.add("girando-icone");
   botaoAtualizar.disabled = true;
   try {
-    const r = await fetch("data/meta.json", { cache: "no-store" });
-    if (!r.ok) throw new Error(String(r.status));
-    const meta = await r.json();
+    const meta = await metaFresca();
     ultimaConferida = Date.now();
     if (meta.gerado_em === B.meta.gerado_em) {
       if (manual) avisar(`Tudo em dia · dados de ${dataHora(B.meta.gerado_em)}`);
@@ -308,21 +315,59 @@ botaoInstalar.addEventListener("click", async () => {
 addEventListener("appinstalled", () => { botaoInstalar.hidden = true; });
 
 // ---------- Início ----------
+// Modo da tela: "publico" (sem login), "cadastro" (primeiro acesso), "sem-equipe" ou "app" (membro de equipe)
+let tela = "carregando", erroLogin = null, avisoSemDados = "";
+
+function telaDeErro(titulo, texto) {
+  main.innerHTML = vazio(titulo, `<p>${esc(texto)}</p><p><button class="botao-secundario" type="button" data-tentar>Tentar de novo</button></p>`);
+  main.querySelector("[data-tentar]")?.addEventListener("click", () => location.reload());
+}
+
 async function iniciar() {
+  B.editor = await detectarEditor();
+  if (!B.editor) {
+    const login = await iniciarNuvem();
+    erroLogin = login.erro;
+    if (!login.logado) {
+      tela = "publico";
+      await renderizar();
+      return;
+    }
+    try {
+      B.conta = await rpc("minha_conta");
+    } catch (erro) {
+      telaDeErro("Não foi possível abrir a sua conta", erro.message);
+      return;
+    }
+    document.getElementById("conta-link").hidden = false;
+    const u = usuario() || {};
+    document.getElementById("conta-inicial").textContent = (B.conta.perfil?.apelido || u.user_metadata?.full_name || u.email || "?").slice(0, 1).toUpperCase();
+    if (!B.conta.perfil) { tela = "cadastro"; await renderizar(); return; }
+    if (!B.conta.equipes.length) { tela = "sem-equipe"; await renderizar(); return; }
+    B.equipeAtual = B.conta.equipes[0];
+  }
   try {
     await carregarBase();
   } catch (erro) {
-    main.innerHTML = vazio("Ainda não há dados para mostrar", `<p>Os arquivos em <code>docs/data/</code> não foram encontrados. Rode <code>py ferramentas\\exportar_site.py</code> no PC da equipe e publique de novo.</p><p class="pequeno suave">${esc(erro.message)}</p>`);
+    avisoSemDados = vazio("Ainda não há dados para mostrar", B.editor
+      ? `<p>Rode <code>py ferramentas\\exportar_site.py</code> no PC da equipe.</p><p class="pequeno suave">${esc(erro.message)}</p>`
+      : `<p>Os dados da ${esc(B.equipeAtual?.nome || "equipe")} ainda não chegaram. Eles são enviados pela coleta no PC da administradora.</p><p class="pequeno suave">${esc(erro.message)}</p>
+         <p><a class="botao-secundario" href="#/conta">Minha conta</a></p>`);
+    tela = "sem-dados";
+    await renderizar();
     return;
   }
   if (B.editor) {
     document.body.classList.add("modo-editor");
-    main.insertAdjacentHTML("beforebegin", `<div class="faixa-editor" role="status">Modo editor das notas da IGL · o que você salvar aparece no site público depois de publicar. Evite citar pelo nome quem não autorizou aparecer.</div>`);
+    main.insertAdjacentHTML("beforebegin", `<div class="faixa-editor" role="status">Modo editor das notas da IGL · o que você salvar vai para o site da equipe sozinho (só membros veem; convidados não).</div>`);
   }
+  tela = "app";
   preencherTopo();
   ultimaConferida = Date.now();
   ligarBrilho(main);
   await renderizar();
   talvezRevelar();
 }
+window.addEventListener("valreport:recarregar", () => location.reload());
+document.getElementById("entrar-topo")?.addEventListener("click", () => entrar());
 iniciar();

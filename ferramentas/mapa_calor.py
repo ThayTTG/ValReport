@@ -32,7 +32,7 @@ import avaliacao as av
 import cards as cd
 import gerar_report as gr
 
-PASTA = Path(__file__).resolve().parent
+PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
 PASTA_MAPAS = PASTA / "dados" / "cache" / "mapas"
 ARQ_MAPAS = PASTA_MAPAS / "mapas.json"
 
@@ -340,7 +340,7 @@ def desenhar_mapa(info, nome, evs, tam):
 
 def card_calor(titulo_mapa, subtitulo, evs, info, cfg, dia, ctx, agente=None, nomes_por_puuid=None):
     img = Image.new("RGB", (cd.W, cd.H), cd.FUNDO)
-    d = ImageDraw.Draw(img)
+    d = cd.Pincel(img)
     cd.faixa_marca(d, "Mapa de calor", f"{datetime.fromisoformat(dia):%d/%m/%Y}")
     if agente:
         cd.selo_agente(img, d, cd.M, 112, 132, agente)
@@ -361,7 +361,7 @@ def card_calor(titulo_mapa, subtitulo, evs, info, cfg, dia, ctx, agente=None, no
     cd.painel(d, cd.M, y0 - 12, cd.W - cd.M, y0 + tam + 12, raio=22)
     mapa, tipo = desenhar_mapa(info, titulo_mapa, evs, tam)
     img.paste(mapa, (x0, y0), mapa)
-    d = ImageDraw.Draw(img)
+    d = cd.Pincel(img)
     if not info:
         d.text((cd.W / 2, y0 + tam / 2), "Mapa sem dados de projeção ainda", font=cd.fonte("semi", 26),
                fill=cd.SUAVE, anchor="mm")

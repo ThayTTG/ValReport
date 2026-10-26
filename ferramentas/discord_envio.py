@@ -28,7 +28,7 @@ from pathlib import Path
 
 import gerar_report as gr
 
-PASTA = Path(__file__).resolve().parent
+PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
 ARQ_ESTADO = gr.DADOS / "discord_enviado.json"
 CANAIS = {"equipe": "DISCORD_WEBHOOK_EQUIPE", "jogadores": "DISCORD_WEBHOOK_JOGADORES",
           "formacoes": "DISCORD_WEBHOOK_FORMACOES", "dicas": "DISCORD_WEBHOOK_DICAS"}
@@ -99,8 +99,26 @@ def testar(cfg):
     if not hooks:
         print("Nenhum webhook configurado (veja o LEIA-ME, seção Discord).")
     for canal, url in hooks.items():
-        ok = postar(url, f"✅ Teste do canal **{canal}** — NokyLabs conectado.", nome=(cfg.get("discord") or {}).get("nome", "NokyLabs"))
+        ok = postar(url, f"✅ Teste do canal **{canal}** — ValReport conectado · {link_site(cfg)}", nome=(cfg.get("discord") or {}).get("nome", "NokyLabs"))
         print(f"  {canal}: {'ok' if ok else 'falhou'}")
+
+
+def link_site(cfg, caminho="", texto="Abrir no site"):
+    """Link para a página certa do site. Os <> evitam que o Discord monte uma prévia grande do link."""
+    return f"[{texto}](<{gr.url_site(cfg)}#/{caminho}>)"
+
+
+def link_jogador(rid, cfg, aba=""):
+    """Só para quem autorizou aparecer no site (os outros não têm página pública)."""
+    site = cfg.get("site") or {}
+    if rid not in (site.get("jogadores_autorizados") or []):
+        return ""
+    try:
+        import exportar_site
+        slug = exportar_site.slug_de(rid, cfg)
+    except Exception:  # noqa: BLE001
+        return ""
+    return " · " + link_site(cfg, f"j/{slug}" + (f"/{aba}" if aba else ""), "ver o perfil no site")
 
 
 def resumo_formacoes(jogos, cfg, dia):
@@ -113,6 +131,7 @@ def resumo_formacoes(jogos, cfg, dia):
         nomes = " & ".join(gr.apelido(r, cfg) for r in membros)
         linhas.append(f"**{gr.FORMACAO.get(len(membros), '?')} · {nomes}** — {len(js)} partida{'s' if len(js) > 1 else ''}, "
                       f"{vit}V {len(js) - vit}D, {trades} trade{'s' if trades != 1 else ''} entre vocês")
+    linhas += ["", link_site(cfg, "equipe/formacoes", "Ver formações e sinergia no site")]
     return "\n".join(linhas) if formacoes else None
 
 
@@ -142,17 +161,20 @@ def enviar(dia, cfg=None, base=None, forcar=False):
             feitos.append((canal, ok))
 
     ce = base / gr.PASTA_EQUIPE / "cards"
-    mandar("equipe", f"📊 **Report diário da equipe — {data}**", [ce / "equipe.png", ce / "economia.png", ce / "mapas.png", ce / "calor_equipe.png", ce / "semana.png"])
+    texto_eq = f"📊 **Report diário da equipe — {data}** · {link_site(cfg, '', 'resumo do dia no site')}"
+    if (ce / "semana.png").exists():
+        texto_eq += f"\n👑 **A semana fechou!** O MVP leva a coroa até domingo que vem · {link_site(cfg, 'equipe/semana', 'ver a semana no site')}"
+    mandar("equipe", texto_eq, [ce / "equipe.png", ce / "economia.png", ce / "mapas.png", ce / "calor_equipe.png", ce / "semana.png"])
 
     resumo = gr.ler_json(gr.PASTA_RESUMOS / f"{dia}.json") or {"jogadores": {}}
     for rid in resumo.get("jogadores", {}):
         pasta = base / gr.nome_pasta((rid,), cfg) / "cards"
         if not pasta.exists():
             continue
-        mandar("jogadores", f"👤 **{gr.apelido(rid, cfg)}** — {data}", [pasta / "resumo_solo.png", pasta / "agente.png", pasta / "calor.png"])
+        mandar("jogadores", f"👤 **{gr.apelido(rid, cfg)}** — {data}{link_jogador(rid, cfg)}", [pasta / "resumo_solo.png", pasta / "agente.png", pasta / "calor.png"])
         dicas_md = pasta / "dicas.md"
         texto = dicas_md.read_text(encoding="utf-8") if dicas_md.exists() else ""
-        mandar("dicas", f"💡 **{gr.apelido(rid, cfg)}** — dicas de {data}\n" + cortar(texto.split("\n", 2)[-1], 1700), [pasta / "dicas.png"])
+        mandar("dicas", f"💡 **{gr.apelido(rid, cfg)}** — dicas de {data}{link_jogador(rid, cfg, 'performance')}\n" + cortar(texto.split("\n", 2)[-1], 1650), [pasta / "dicas.png"])
 
     if "formacoes" in hooks:
         try:
