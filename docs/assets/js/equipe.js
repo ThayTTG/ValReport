@@ -18,10 +18,11 @@ function cabecalhoEquipe(f) {
   const res = ps.map(resultadoEquipe);
   const v = res.filter((r) => r === "V").length, d = res.filter((r) => r === "D").length;
   return `<header class="cabecalho"><div class="cabecalho__corpo" style="padding-top:22px">
-      <div class="cabecalho__info"><h1>Equipe</h1>
+      <div class="cabecalho__info"><h1>${esc(B.equipeAtual?.nome || "Equipe")}</h1>
         <div class="sub"><span>${B.equipe.length} jogador${B.equipe.length === 1 ? "" : "es"} no site</span><span>${ps.length} partida${ps.length === 1 ? "" : "s"} · ${v}V ${d}D</span>
           <span>atualizado ${esc(relativo(B.meta.gerado_em))} (${esc(dataHora(B.meta.gerado_em))})</span></div></div>
-      <div class="cabecalho__lado"><div class="rank"><div style="padding:0 8px;font:700 26px var(--fonte-titulo);color:var(--destaque-texto)">${pct(div(v, v + d))}</div><div><small>Vitórias</small><strong>com alguém da equipe</strong></div></div></div>
+      <div class="cabecalho__lado"><div class="rank"><div style="padding:0 8px;font:700 26px var(--fonte-titulo);color:var(--destaque-texto)">${pct(div(v, v + d))}</div><div><small>Vitórias</small><strong>com alguém da equipe</strong></div></div>
+        ${B.equipeAtual?.slug ? `<a class="botao-secundario botao-mini" href="#/time/${esc(B.equipeAtual.slug)}">Membros e convites</a>` : ""}</div>
     </div></header>`;
 }
 

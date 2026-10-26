@@ -1,5 +1,7 @@
 // ValReport · função "riot" (Supabase Edge Function)
-// Confirma que a pessoa é dona do Riot ID com o desafio do card: trocar para outro card e depois voltar.
+// Confirma o Riot ID de uma pessoa: a administradora (ou a liderança da equipe dela) confirma que a conta é dela,
+// e a função busca na API o puuid, o card e o nível. Também atualiza o card/nível e desliga o Riot ID.
+// (O desafio do card continua aqui, mas o site não usa: a API só muda o card depois de uma partida.)
 // Como colar: Supabase → Edge Functions → Deploy a new function → Via Editor → nome "riot" → apague o exemplo,
 // cole este arquivo inteiro → Deploy. Segredos (Edge Functions → Secrets): HENRIKDEV_API_KEY e VALREPORT_SECRET_KEY.
 
@@ -168,6 +170,25 @@ async function adminVerificar(usuario: string, alvo: string, riot: string) {
   return { verificado: true, ...(await gravarVerificado(alvo, c, null)) };
 }
 
+// A liderança (líder ou co-líder) confirma o Riot ID de alguém da própria equipe aprovada
+async function liderVerificar(usuario: string, alvo: string, riot: string) {
+  if (!/^[0-9a-f-]{36}$/.test(alvo ?? "")) throw new Problema("formato", "Pessoa inválida.");
+  const ehAdmin = Boolean(await um(`administradores?usuario_id=eq.${usuario}&select=usuario_id`));
+  if (!ehAdmin) {
+    const minhas = (await banco(`membros?usuario_id=eq.${usuario}&cargo=in.(lider,colider)&select=equipe_id`)) as { equipe_id: string }[];
+    const ids = minhas.map((m) => m.equipe_id);
+    const aprovadas = ids.length ? (await banco(`equipes?id=in.(${ids.join(",")})&status=eq.aprovada&select=id`)) as { id: string }[] : [];
+    const dela = aprovadas.length
+      ? (await banco(`membros?usuario_id=eq.${alvo}&equipe_id=in.(${aprovadas.map((e) => e.id).join(",")})&select=equipe_id`)) as unknown[]
+      : [];
+    if (!dela.length) throw new Problema("sem_permissao", "Só a liderança da equipe dessa pessoa pode confirmar o Riot ID.", 403);
+  }
+  if (!(await um(`perfis?id=eq.${alvo}&select=id`))) throw new Problema("sem_perfil", "Essa pessoa ainda não completou o cadastro.", 404);
+  const c = await contaPorRiot(riot);
+  await conferirDono(c.puuid, alvo);
+  return { verificado: true, ...(await gravarVerificado(alvo, c, null)) };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (req.method !== "POST") return resposta({ erro: "metodo", mensagem: "Use POST." }, 405);
@@ -184,6 +205,7 @@ Deno.serve(async (req: Request) => {
       case "atualizar": return resposta(await atualizar(usuario));
       case "desvincular": return resposta(await desvincular(usuario));
       case "admin_verificar": return resposta(await adminVerificar(usuario, String(corpo.usuario_id ?? ""), String(corpo.riot_id ?? "")));
+      case "lider_verificar": return resposta(await liderVerificar(usuario, String(corpo.usuario_id ?? ""), String(corpo.riot_id ?? "")));
       default: throw new Problema("acao", "Ação desconhecida.");
     }
   } catch (e) {

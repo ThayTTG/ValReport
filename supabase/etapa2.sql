@@ -1,5 +1,6 @@
 -- =============================================================================
 -- ValReport 2.0 · Etapa 2a — perfil personalizável, Riot ID verificado e busca
+-- (o Riot ID é confirmado à mão: a pessoa pede, a administradora ou a liderança confirma)
 -- Rode DEPOIS do etapa1.sql: SQL Editor → New query → cole tudo → Run.
 -- Pode rodar de novo sem estragar nada. Se um dia rodar o etapa1.sql de novo, rode este logo depois.
 -- =============================================================================
@@ -18,7 +19,8 @@ alter table public.perfis
   add column if not exists riot_titulo text,
   add column if not exists riot_nivel int,
   add column if not exists riot_verificado_em timestamptz,
-  add column if not exists riot_atualizado_em timestamptz;
+  add column if not exists riot_atualizado_em timestamptz,
+  add column if not exists riot_id_pedido text;                        -- Riot ID que a pessoa pediu para confirmarem
 
 -- Um Riot ID (puuid) só pode estar ligado a uma conta
 create unique index if not exists perfis_riot_puuid_unico on public.perfis (riot_puuid) where riot_puuid is not null;
@@ -74,6 +76,12 @@ begin
     end if;
   end if;
 
+  -- Pedido de verificação: a própria pessoa escreve; quem confirma é a administradora (ou a liderança, na etapa 3)
+  new.riot_id_pedido := nullif(btrim(coalesce(new.riot_id_pedido, '')), '');
+  if new.riot_id_pedido is not null and new.riot_id_pedido !~ '^[^#]{3,16}#[A-Za-z0-9]{2,5}$' then
+    raise exception 'riot_pedido: escreva o Riot ID no formato Nome#TAG.' using errcode = 'P0001';
+  end if;
+
   -- O Riot ID verificado só muda pela função "riot" ou pela administradora
   if tg_op = 'INSERT' then
     v_mudou_riot := num_nonnulls(new.riot_id, new.riot_puuid, new.riot_card, new.riot_titulo, new.riot_nivel,
@@ -84,7 +92,10 @@ begin
                     (old.riot_id, old.riot_puuid, old.riot_card, old.riot_titulo, old.riot_nivel, old.riot_verificado_em, old.riot_atualizado_em);
   end if;
   if v_mudou_riot and current_user not in ('service_role', 'postgres', 'supabase_admin') and not public.eh_admin() then
-    raise exception 'O Riot ID só é confirmado pelo desafio do card.' using errcode = '42501';
+    raise exception 'O Riot ID só é confirmado pela administradora ou pela liderança da equipe.' using errcode = '42501';
+  end if;
+  if v_mudou_riot and new.riot_verificado_em is not null then
+    new.riot_id_pedido := null;   -- confirmado: o pedido some
   end if;
   return new;
 end $$;
@@ -94,7 +105,17 @@ create trigger validar_perfil_2 before insert or update on public.perfis
   for each row execute function public.validar_perfil_2();
 
 -- A própria pessoa edita o perfil (os campos do Riot ID ficam de fora)
-grant update (apelido, bio, agentes, funcoes, cor, historico_publico) on public.perfis to authenticated;
+grant update (apelido, bio, agentes, funcoes, cor, historico_publico, riot_id_pedido) on public.perfis to authenticated;
+
+-- Painel: pedidos de verificação do Riot ID (só a administradora)
+create or replace function public.admin_pedidos_riot() returns table (id uuid, riot_id_pedido text, riot_id text)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.eh_admin() then raise exception 'Somente a administradora.' using errcode = '42501'; end if;
+  return query select p.id, p.riot_id_pedido, p.riot_id from public.perfis p;
+end $$;
+revoke execute on function public.admin_pedidos_riot() from public, anon;
+grant execute on function public.admin_pedidos_riot() to authenticated;
 
 -- ---------- Quem pode ver o perfil de quem ----------
 -- Perfil público: conta verificada, que não pediu exclusão. Quem tem 16 ou 17 anos (modo protegido)
@@ -161,4 +182,4 @@ revoke execute on function public.validar_perfil_2() from public, anon, authenti
 select count(*) as colunas_novas from information_schema.columns
 where table_schema = 'public' and table_name = 'perfis'
   and column_name in ('bio', 'agentes', 'funcoes', 'cor', 'historico_publico', 'riot_id', 'riot_puuid', 'riot_card',
-                      'riot_titulo', 'riot_nivel', 'riot_verificado_em', 'riot_atualizado_em');
+                      'riot_titulo', 'riot_nivel', 'riot_verificado_em', 'riot_atualizado_em', 'riot_id_pedido');

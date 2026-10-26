@@ -4,6 +4,7 @@ import { esc, icone, dataHora } from "./util.js";
 import { B } from "./dados.js";
 import { entrar, sair, usuario, rpc, inserir, atualizar, funcao, ErroNuvem } from "./nuvem.js";
 import { EQUIPE_PADRAO, VERSAO_TERMOS } from "./config.js";
+import { blocoAprovacoes, ligarAprovacoes } from "./equipes.js";
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const CARGOS = [["lider", "Líder"], ["colider", "Co-líder"], ["treinador", "Treinador"], ["jogador", "Jogador"], ["convidado", "Convidado"]];
@@ -37,7 +38,7 @@ function ligarSair(el) {
 }
 
 // ---------- Visitante sem login ----------
-export function viewBoasVindas(erro) {
+export function viewBoasVindas(erro, convite = false) {
   const recurso = (ic, t, d) => `<div class="lp-recurso">${icone(ic)}<strong>${t}</strong><p>${d}</p></div>`;
   return {
     titulo: "Bem-vindo",
@@ -46,6 +47,7 @@ export function viewBoasVindas(erro) {
         <h1>Entenda cada round da sua equipe.</h1>
         <p>O ValReport junta as partidas do time, mostra quem decidiu cada round, guarda as notas da IGL e coroa o MVP da semana. Tudo privado, só para quem é da equipe.</p>
         ${erro ? `<p class="aviso aviso--erro" role="alert">${icone("info")}<span>${esc(erro)}</span></p>` : ""}
+        ${convite ? `<p class="aviso" role="status">${icone("equipe")}<span><strong>Você recebeu um convite para uma equipe.</strong> Entre com Google (ou cadastre-se) para aceitar.</span></p>` : ""}
         <div class="lp-acoes">${botaoGoogle("Entrar com Google")}${botaoGoogle("Cadastrar-se", "botao-secundario")}</div>
         <p class="pequeno suave">O cadastro também começa pela sua conta Google. É preciso ter 16 anos ou mais.</p>
       </section>
@@ -123,7 +125,7 @@ export function viewCadastro() {
         try {
           await inserir("perfis", { id: usuario()?.id, apelido: f.apelido.value.trim(), nascimento_ano: Number(f.ano.value),
             nascimento_mes: Number(f.mes.value), responsavel_email: idade < 18 ? f.responsavel.value.trim() : null, versao_termos: VERSAO_TERMOS });
-          location.hash = "#/";
+          if (!location.hash.startsWith("#/convite/")) location.hash = "#/";
           location.reload();
         } catch (e) {
           erro.textContent = mensagemErro(e);
@@ -144,9 +146,9 @@ export function viewSemEquipe() {
     html: `<section class="lp-hero lp-hero--menor">
         <span class="lp-selo">${icone("equipe")} Quase lá</span>
         <h1>Olá, ${esc(c.perfil.apelido)}!</h1>
-        <p>Você ainda não está em uma equipe. Quando a líder ou o líder liberar o seu acesso, as partidas aparecem aqui.</p>
+        <p>Você ainda não está em uma equipe. Entre pelo link de convite que a sua equipe mandou, ou crie a sua.</p>
         <div class="lp-acoes"><a class="botao-primario" href="#/perfil">${icone("verificado")} ${c.perfil.riot_verificado_em ? "Meu perfil" : "Monte seu perfil e verifique seu Riot ID"}</a>
-          <a class="botao-secundario" href="#/conta">Minha conta</a>
+          <a class="botao-secundario" href="#/equipes">${icone("equipe")} Criar equipe ou usar convite</a>
           ${c.admin ? `<a class="botao-secundario" href="#/painel">${icone("escudo")} Painel da administradora</a>` : ""}</div>
       </section>`,
   };
@@ -217,20 +219,28 @@ export function viewConta() {
 export async function viewPainel() {
   if (!B.conta?.admin) return { titulo: "Painel", html: `<div class="vazio"><strong>Somente a administradora acessa o painel.</strong></div>` };
   let lista = [];
-  try { lista = await rpc("admin_listar_usuarios"); } catch (e) {
+  let riots = new Map();
+  const aprovacoes = await blocoAprovacoes();
+  try {
+    lista = await rpc("admin_listar_usuarios");
+    riots = new Map((await rpc("admin_pedidos_riot").catch(() => [])).map((r) => [r.id, r]));
+  } catch (e) {
     return { titulo: "Painel", html: `<div class="vazio"><strong>Não foi possível abrir o painel</strong><p>${esc(mensagemErro(e))}</p></div>` };
   }
   const linha = (u) => {
     const naEquipe = u.equipes.find((e) => e.slug === EQUIPE_PADRAO);
     const opcoes = CARGOS.map(([k, t]) => `<option value="${k}"${(naEquipe?.cargo || "jogador") === k ? " selected" : ""}>${t}</option>`).join("");
     const pode = u.idade_faixa !== "sem cadastro";
+    const rp = riots.get(u.id) || {};
     return `<tr data-usuario="${esc(u.id)}">
       <td><strong>${esc(u.apelido || "—")}</strong><small class="suave" style="display:block">${esc(u.email || "")}</small>
-        ${u.exclusao_solicitada_em ? `<span class="selo selo--derrota">pediu exclusão</span>` : ""}</td>
+        ${u.exclusao_solicitada_em ? `<span class="selo selo--derrota">pediu exclusão</span>` : ""}
+        ${rp.riot_id_pedido ? `<span class="selo selo--alerta" title="Confira se a conta é mesmo dessa pessoa antes de confirmar">pediu verificação: ${esc(rp.riot_id_pedido)}</span>`
+          : rp.riot_id ? `<span class="selo selo--verificado">${icone("verificado")} ${esc(rp.riot_id)}</span>` : ""}</td>
       <td>${u.idade_faixa === "16-17" ? `<span class="selo selo--alerta">16–17</span>` : u.idade_faixa === "18+" ? "18+" : `<span class="suave">sem cadastro</span>`}</td>
       <td>${naEquipe ? `<span class="selo selo--vitoria">${esc(nomeCargo(naEquipe.cargo))}</span>` : `<span class="suave">fora</span>`}</td>
       <td><select data-campo="cargo" aria-label="Cargo"${pode ? "" : " disabled"}>${opcoes}</select></td>
-      <td><input data-campo="riot" value="${esc(naEquipe?.riot_id || "")}" placeholder="Nick#TAG" aria-label="Riot ID"${pode ? "" : " disabled"}></td>
+      <td><input data-campo="riot" value="${esc(rp.riot_id_pedido || naEquipe?.riot_id || rp.riot_id || "")}" placeholder="Nick#TAG" aria-label="Riot ID"${pode ? "" : " disabled"}></td>
       <td class="painel-acoes"><button class="botao-primario botao-mini" type="button" data-acao="salvar"${pode ? "" : " disabled"}>${naEquipe ? "Atualizar" : "Adicionar"}</button>
         ${naEquipe ? `<button class="botao-perigo botao-mini" type="button" data-acao="remover">Remover</button>` : ""}
         ${pode ? `<button class="botao-secundario botao-mini" type="button" data-acao="verificar" title="Confirma o Riot ID desta pessoa sem o desafio do card">Verificar Riot ID</button>` : ""}</td></tr>`;
@@ -239,12 +249,15 @@ export async function viewPainel() {
     titulo: "Painel",
     html: `<section class="secao">
       <h1>Painel da administradora</h1>
+      ${aprovacoes}
+      <h2 class="painel-sub">Pessoas e a Juventus Academy</h2>
       <p class="suave">Quem já entrou com Google aparece aqui. Adicione as pessoas à <strong>Juventus Academy</strong> com o cargo certo e o Riot ID confirmado. Convidados veem as partidas, mas não as notas da IGL.</p>
       <p class="aviso aviso--erro painel-erro" hidden role="alert"></p>
       <div class="cartao rolagem secao"><table class="tabela painel"><thead><tr><th>Pessoa</th><th>Idade</th><th>Juventus</th><th>Cargo</th><th>Riot ID</th><th></th></tr></thead>
         <tbody>${lista.map(linha).join("")}</tbody></table></div>
       <p class="pequeno suave">Novas pessoas aparecem depois que entram no site pela primeira vez. Recarregue a página para ver a lista atualizada.</p></section>`,
     depois: (el) => {
+      ligarAprovacoes(el);
       const erro = el.querySelector(".painel-erro");
       el.querySelector("tbody").addEventListener("click", async (ev) => {
         const b = ev.target.closest("[data-acao]");

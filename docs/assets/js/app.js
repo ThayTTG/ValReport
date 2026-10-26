@@ -5,6 +5,7 @@ import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache, detectarEdito
 import { iniciarNuvem, rpc, entrar, usuario } from "./nuvem.js";
 import { viewBoasVindas, viewCadastro, viewSemEquipe, viewConta, viewPainel } from "./conta.js";
 import { viewMeuPerfil, viewPerfilPublico, ligarBusca } from "./perfil.js";
+import { viewMinhasEquipes, viewTime, viewConvite, guardarConvitePendente } from "./equipes.js";
 import { alternarOrdem, trocarMiniAba, alternarMinimizado } from "./componentes.js";
 import { coroaSobre, abrirRevelacao, talvezRevelar } from "./coroa.js";
 import { viewJogador } from "./jogador.js";
@@ -65,12 +66,15 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
   const rolagem = window.scrollY;
   let v;
   try {
-    if (tela === "publico") v = viewBoasVindas(erroLogin);
+    if (tela === "publico") { if (partes[0] === "convite") guardarConvitePendente(partes[1] || ""); v = viewBoasVindas(erroLogin, partes[0] === "convite"); }
     else if (tela === "cadastro") v = viewCadastro();
     else if (B.conta && partes[0] === "conta") v = viewConta();
     else if (B.conta && partes[0] === "painel") v = await viewPainel();
     else if (B.conta && partes[0] === "perfil") v = await viewMeuPerfil();
     else if (B.conta && partes[0] === "u" && partes[1]) v = await viewPerfilPublico(decodeURIComponent(partes[1]));
+    else if (B.conta && partes[0] === "equipes") v = await viewMinhasEquipes();
+    else if (B.conta && partes[0] === "time" && partes[1]) v = await viewTime(decodeURIComponent(partes[1]), partes[2] || "membros");
+    else if (B.conta && partes[0] === "convite" && partes[1]) v = await viewConvite(partes[1]);
     else if (tela === "sem-equipe") v = viewSemEquipe();
     else if (tela === "sem-dados") v = { titulo: "Sem dados", html: avisoSemDados };
     else if (!partes.length) v = viewHoje(q);
@@ -97,7 +101,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
 }
 
 function marcarNavegacao(partes) {
-  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : partes[0] === "equipe" ? "equipe" : ["conta", "painel", "perfil"].includes(partes[0]) ? "conta" : "";
+  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : ["equipe", "equipes", "time"].includes(partes[0]) ? "equipe" : ["conta", "painel", "perfil"].includes(partes[0]) ? "conta" : "";
   document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("ativo", a.dataset.nav === sec));
   const slug = partes[0] === "j" ? partes[1] : null;
   document.querySelectorAll(".pilula-jogador").forEach((a) => {
@@ -321,6 +325,39 @@ addEventListener("appinstalled", () => { botaoInstalar.hidden = true; });
 // Modo da tela: "publico" (sem login), "cadastro" (primeiro acesso), "sem-equipe" ou "app" (membro de equipe)
 let tela = "carregando", erroLogin = null, avisoSemDados = "";
 
+/** Selo no botão do perfil: equipes esperando aprovação (administradora) e pedidos de Riot ID (liderança) */
+async function mostrarPendencias() {
+  if (!B.conta?.perfil) return;
+  try {
+    const pend = await rpc("minhas_pendencias");
+    B.pendencias = pend;
+    const total = (pend.equipes_pendentes || 0) + (pend.pedidos_riot || 0);
+    const chip = document.getElementById("conta-link");
+    chip.querySelector(".conta-chip__selo")?.remove();
+    if (total) {
+      chip.insertAdjacentHTML("beforeend", `<b class="conta-chip__selo" aria-label="${total} pendência${total === 1 ? "" : "s"}">${total > 9 ? "9+" : total}</b>`);
+      chip.title = `Meu perfil · ${total} pendência${total === 1 ? "" : "s"}`;
+    }
+  } catch (e) { /* sem avisos agora */ }
+}
+
+/** Quem está em duas equipes escolhe de qual ver as estatísticas */
+function trocaDeEquipe() {
+  const lista = B.conta?.equipes || [];
+  if (lista.length < 2) return;
+  const sel = document.createElement("select");
+  sel.className = "troca-equipe";
+  sel.id = "troca-equipe";
+  sel.setAttribute("aria-label", "Equipe");
+  sel.innerHTML = lista.map((e) => `<option value="${esc(e.slug)}"${e.slug === B.equipeAtual?.slug ? " selected" : ""}>${esc(e.nome)}</option>`).join("");
+  document.querySelector(".marca")?.after(sel);
+  sel.addEventListener("change", () => {
+    try { localStorage.setItem("valreport.equipe", sel.value); } catch (e) { /* sem armazenamento */ }
+    location.hash = "#/";
+    location.reload();
+  });
+}
+
 /** Botão redondo da conta: o card verificado, ou a inicial do apelido */
 function desenharChip() {
   const u = usuario() || {}, p = B.conta?.perfil || {};
@@ -357,16 +394,21 @@ async function iniciar() {
     desenharChip();
     if (B.conta.perfil) { document.getElementById("buscar-topo").hidden = false; ligarBusca(); }
     if (!B.conta.perfil) { tela = "cadastro"; await renderizar(); return; }
+    await mostrarPendencias();
     if (!B.conta.equipes.length) { tela = "sem-equipe"; await renderizar(); return; }
-    B.equipeAtual = B.conta.equipes[0];
+    let salva = null;
+    try { salva = localStorage.getItem("valreport.equipe"); } catch (e) { /* sem armazenamento */ }
+    B.equipeAtual = B.conta.equipes.find((e) => e.slug === salva) || B.conta.equipes[0];
+    trocaDeEquipe();
   }
   try {
     await carregarBase();
   } catch (erro) {
     avisoSemDados = vazio("Ainda não há dados para mostrar", B.editor
       ? `<p>Rode <code>py ferramentas\\exportar_site.py</code> no PC da equipe.</p><p class="pequeno suave">${esc(erro.message)}</p>`
-      : `<p>Os dados da ${esc(B.equipeAtual?.nome || "equipe")} ainda não chegaram. Eles são enviados pela coleta no PC da administradora.</p><p class="pequeno suave">${esc(erro.message)}</p>
-         <p><a class="botao-secundario" href="#/conta">Minha conta</a></p>`);
+      : `<p>As estatísticas da ${esc(B.equipeAtual?.nome || "equipe")} ainda não chegaram. Elas aparecem quando a coleta da administradora começar a buscar as partidas da equipe.</p>
+         <p class="lp-acoes" style="justify-content:center"><a class="botao-primario" href="#/time/${esc(B.equipeAtual?.slug || "")}">Membros e convites</a>
+           <a class="botao-secundario" href="#/equipes">Minhas equipes</a><a class="botao-secundario" href="#/perfil">Meu perfil</a></p>`);
     tela = "sem-dados";
     await renderizar();
     return;

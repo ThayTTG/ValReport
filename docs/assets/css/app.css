@@ -1012,3 +1012,62 @@ body[data-modo="publico"] .botao-buscar, body[data-modo="cadastro"] .botao-busca
   .perfil-capa__avatar { width: 68px; height: 68px; }
   .perfil-capa__texto h1 { font-size: 24px; }
 }
+
+/* ---------- Etapa 3a: equipes, membros e convites ---------- */
+.cabecalho__lado { flex-wrap: wrap; }
+.painel-sub { font: 700 20px var(--fonte-titulo); margin: 26px 0 6px; }
+.conta-chip { position: relative; overflow: visible; }
+.conta-chip #conta-inicial { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; }
+.conta-chip__selo { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center;
+  background: var(--derrota, #e5484d); color: #fff; font: 700 11px var(--fonte); box-shadow: 0 0 0 2px var(--fundo); }
+.troca-equipe { font: 600 13.5px var(--fonte); color: var(--texto); background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px; padding: 6px 8px; max-width: 170px; }
+.equipe-img, .equipe-img.avatar-vazio { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; flex: none; display: grid; place-items: center; background: var(--superficie-2); font: 700 18px var(--fonte-titulo); }
+.equipe-img--grande, .equipe-img--grande.avatar-vazio { width: 76px; height: 76px; border-radius: 18px; font-size: 26px; }
+.equipes-lista { display: grid; gap: 10px; }
+.equipe-cartao { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--raio); border: 1px solid var(--borda); background: var(--superficie); color: var(--texto); text-decoration: none; }
+.equipe-cartao:hover { text-decoration: none; background: var(--superficie-2); }
+.equipe-cartao > svg { margin-left: auto; color: var(--suave); transform: rotate(-90deg); }
+.equipe-cartao__texto { display: grid; gap: 4px; min-width: 0; }
+.equipe-cartao__texto small { color: var(--suave); }
+.equipe-cartao__selos { display: flex; flex-wrap: wrap; gap: 6px; }
+.time-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 22px; }
+.time-cabeca__texto { flex: 1 1 220px; min-width: 0; display: grid; gap: 6px; }
+.time-cabeca__texto h1 { font: 700 30px var(--fonte-titulo); overflow-wrap: anywhere; }
+.time .abas { margin-top: 16px; }
+.vagas { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--texto-2); font-size: 14px; margin-bottom: 12px; }
+.membros { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.membro { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--raio-p); border: 1px solid var(--borda); background: var(--superficie); border-left: 4px solid var(--cor-perfil, var(--borda)); }
+.membro__avatar img, .membro__avatar .avatar-vazio { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; display: grid; place-items: center; background: var(--superficie-2); }
+.membro__texto { flex: 1 1 200px; min-width: 0; display: grid; gap: 4px; }
+.membro__texto > span { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13.5px; color: var(--texto-2); }
+.membro__acoes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.membro__acoes select, .convite-form select, #form-ajustes input:not([type=radio]), #form-criar-equipe input:not([type=radio]), #form-convite input, .galeria input, .convites input {
+  font: 500 14px var(--fonte); color: var(--texto); background: var(--superficie-2); border: 1px solid var(--borda); border-radius: 10px; padding: 8px 10px; min-height: 38px; }
+#form-ajustes input:not([type=radio]), #form-criar-equipe input:not([type=radio]), #form-convite input, .galeria input, .convites input { width: 100%; min-height: 44px; font-size: 15px; }
+.convite-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.convite-form .campo { flex: 1 1 140px; }
+.convites { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.convites li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--borda); }
+.convites li:last-child { border-bottom: 0; padding-bottom: 0; }
+.convites li.inativo { opacity: .6; }
+.convites small { color: var(--suave); }
+.campo-card__linha { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.campo-card__previa img, .campo-card__previa .avatar-vazio { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; display: grid; place-items: center; background: var(--superficie-2); }
+.galeria { display: grid; gap: 10px; margin-top: 10px; padding: 12px; border-radius: var(--raio-p); border: 1px solid var(--borda); background: var(--superficie-2); }
+.galeria[hidden], [data-limpar-card][hidden] { display: none; }
+.galeria__grade { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); max-height: 320px; overflow-y: auto; }
+.galeria__item { padding: 0; border: 2px solid transparent; border-radius: 10px; background: none; cursor: pointer; aspect-ratio: 1; overflow: hidden; }
+.galeria__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.galeria__item:hover, .galeria__item:focus-visible, .galeria__item.escolhido { border-color: var(--destaque); }
+.convite { text-align: left; }
+.convite__equipe { display: flex; align-items: center; gap: 16px; }
+.convite__equipe h1 { font: 700 26px var(--fonte-titulo); overflow-wrap: anywhere; }
+.aprovacao { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--borda); }
+.aprovacao > div:first-of-type { flex: 1 1 220px; min-width: 0; }
+.aprovacao:last-child { border-bottom: 0; }
+@media (max-width: 560px) {
+  .troca-equipe { max-width: 110px; font-size: 12.5px; }
+  .time-cabeca__texto h1 { font-size: 24px; }
+  .membro__acoes { width: 100%; }
+}
+.membros + p, .vagas + .membros + p { margin-top: 10px; }

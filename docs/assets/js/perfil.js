@@ -1,4 +1,4 @@
-// Perfil: "Meu perfil" (editar + verificar o Riot ID pelo desafio do card), perfil público e busca por nick#tag
+// Perfil: "Meu perfil" (editar + pedir a verificação do Riot ID), perfil público e busca por nick#tag
 
 import { esc, icone, imagem, imgCard } from "./util.js";
 import { B } from "./dados.js";
@@ -84,7 +84,7 @@ function preencherTitulos(el) {
 
 const urlPerfil = (riot) => `#/u/${encodeURIComponent(riot)}`;
 const corValida = (c) => (/^#[0-9a-f]{6}$/i.test(c || "") ? c : null);
-const seloVerificado = `<span class="selo selo--verificado" title="Riot ID verificado pelo desafio do card">${icone("verificado")} verificado</span>`;
+const seloVerificado = `<span class="selo selo--verificado" title="Riot ID confirmado pela administradora ou pela liderança da equipe">${icone("verificado")} verificado</span>`;
 
 /** Capa do perfil: card largo do jogo, avatar, nome, Riot ID, título e nível */
 const estiloCor = (p) => (corValida(p.cor) ? ` style="--cor-perfil:${corValida(p.cor)}"` : "");
@@ -146,48 +146,28 @@ export async function viewPerfilPublico(riot) {
 }
 
 // ---------- Meu perfil ----------
-const K_DESAFIO = "valreport.desafio";
-const lerDesafio = () => { try { const d = JSON.parse(sessionStorage.getItem(K_DESAFIO)); return d && new Date(d.expira_em) > new Date() ? d : null; } catch (e) { return null; } };
-const gravarDesafio = (d) => { try { if (d) sessionStorage.setItem(K_DESAFIO, JSON.stringify(d)); else sessionStorage.removeItem(K_DESAFIO); } catch (e) { /* sem armazenamento */ } };
-
 function blocoRiot(p) {
   if (p.riot_verificado_em) {
     return `<section class="cartao secao" id="bloco-riot"><div class="cartao__titulo"><h3>${icone("verificado")} Riot ID verificado</h3></div>
       <p><strong>${esc(p.riot_id)}</strong> · verificado em ${esc(new Date(p.riot_verificado_em).toLocaleDateString("pt-BR"))}</p>
-      <p class="suave pequeno">Mudou de card, de nome ou subiu de nível? Atualize aqui (uma vez a cada 10 minutos).</p>
+      <p class="suave pequeno">Mudou de card, de nome ou subiu de nível? Atualize aqui (uma vez a cada 10 minutos). O card novo aparece depois da sua próxima partida.</p>
       <p class="riot-msg pequeno" role="status" hidden></p>
       <div class="lp-acoes"><button class="botao-secundario" type="button" data-riot="atualizar">${icone("atualizar")} Atualizar card e nível</button>
         <a class="botao-secundario" href="${urlPerfil(p.riot_id)}">Ver meu perfil público</a>
         <button class="botao-perigo botao-mini" type="button" data-riot="desvincular">Trocar de Riot ID</button></div></section>`;
   }
+  const pedido = p.riot_id_pedido;
   return `<section class="cartao secao" id="bloco-riot"><div class="cartao__titulo"><h3>${icone("verificado")} Verifique o seu Riot ID</h3></div>
-    <p>Para provar que a conta é sua, o ValReport pede uma troca rápida de card no VALORANT. Pode ser <strong>qualquer card que você tenha</strong>, inclusive o padrão.</p>
-    <div class="desafio" data-desafio></div></section>`;
-}
-
-function passoHtml(d) {
-  if (!d) {
-    return `<form class="desafio__inicio" data-riot-form>
-      <label class="campo"><span>Seu Riot ID</span><input name="riot" placeholder="Nome#TAG" autocomplete="off" required maxlength="22"></label>
-      <p class="riot-msg aviso aviso--erro" role="alert" hidden></p>
-      <div class="lp-acoes"><button class="botao-primario" type="submit">Começar a verificação</button></div></form>`;
-  }
-  const passo1 = d.passo === 1;
-  return `<ol class="desafio__passos">
-      <li class="${passo1 ? "atual" : "feito"}"><b>1</b>Troque para <strong>outro card</strong></li>
-      <li class="${passo1 ? "" : "atual"}"><b>2</b>Volte para o card de antes</li></ol>
-    <div class="desafio__cartao">
-      <div class="desafio__card">${imagem(imgCard(d.card_inicial, "largeart"), "Card de antes", "", "")}<small>${passo1 ? "Seu card agora" : "Volte para este card"}</small></div>
-      <div class="desafio__texto">
-        <p><strong>${esc(d.riot_id)}</strong></p>
-        ${passo1
-          ? `<p>No VALORANT, abra <strong>Coleção → Cards</strong> e equipe <strong>qualquer outro card</strong>. Depois toque em Conferir.</p>`
-          : `<p>Boa, a troca chegou! Agora equipe de novo <strong>este card</strong> (o de antes) e toque em Conferir.</p>`}
-        <p class="suave pequeno">O jogo pode levar alguns segundos para avisar a troca. Se não reconhecer, espere um pouco e confira de novo. O desafio vale até <span data-expira>${esc(new Date(d.expira_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))}</span>.</p>
-        <p class="riot-msg pequeno" role="status" hidden></p>
-        <div class="lp-acoes"><button class="botao-primario" type="button" data-riot="conferir">Conferir</button>
-          <button class="botao-secundario" type="button" data-riot="cancelar">Cancelar</button></div>
-      </div></div>`;
+    ${pedido
+      ? `<p class="aviso">${icone("relogio")}<span>Pedido enviado: <strong>${esc(pedido)}</strong>. A administradora ou a liderança da sua equipe confirma que a conta é sua, e o selo aparece aqui.</span></p>
+         <p class="riot-msg pequeno" role="status" hidden></p>
+         <div class="lp-acoes"><button class="botao-secundario" type="button" data-riot="cancelar-pedido">Cancelar pedido</button></div>`
+      : `<p>Escreva o seu Riot ID e peça a verificação. Quem confirma é a administradora ou a liderança da sua equipe, que conhece você. Assim ninguém usa a conta de outra pessoa.</p>
+         <form class="desafio__inicio" data-riot-form>
+           <label class="campo"><span>Seu Riot ID</span><input name="riot" placeholder="Nome#TAG" autocomplete="off" required maxlength="22"></label>
+           <p class="riot-msg aviso aviso--erro" role="alert" hidden></p>
+           <div class="lp-acoes"><button class="botao-primario" type="submit">Pedir verificação</button></div></form>`}
+  </section>`;
 }
 
 function formPerfil(p, agentes, protegido) {
@@ -226,6 +206,9 @@ export async function viewMeuPerfil() {
     titulo: "Meu perfil",
     html: `<div class="perfil"${estiloCor(p)}>${capa(vp, { extra: `<a class="botao-secundario" href="#/conta">${icone("escudo")} Conta e privacidade</a>` })}
       ${c.protegido ? `<p class="aviso secao">${icone("escudo")}<span><strong>Modo protegido.</strong> O seu perfil só aparece para quem é da sua equipe.</span></p>` : ""}
+      ${B.pendencias?.equipes_pendentes ? `<p class="aviso secao">${icone("relogio")}<span><strong>${B.pendencias.equipes_pendentes} equipe${B.pendencias.equipes_pendentes === 1 ? "" : "s"} esperando a sua aprovação.</strong> <a href="#/painel">Abrir o painel</a></span></p>` : ""}
+      ${B.pendencias?.pedidos_riot ? `<p class="aviso secao">${icone("verificado")}<span><strong>${B.pendencias.pedidos_riot} pedido${B.pendencias.pedidos_riot === 1 ? "" : "s"} de verificação de Riot ID</strong> na sua equipe. <a href="${c.admin ? "#/painel" : "#/equipes"}">Ver quem pediu</a></span></p>` : ""}
+      <p class="lp-acoes secao"><a class="botao-secundario" href="#/equipes">${icone("equipe")} Minhas equipes</a></p>
       ${blocoRiot(p)}
       ${formPerfil(p, agentes, c.protegido)}</div>`,
     depois: (el) => { preencherTitulos(el); ligarRiot(el); ligarFormPerfil(el); },
@@ -286,89 +269,40 @@ function ligarFormPerfil(el) {
 
 function ligarRiot(el) {
   const bloco = el.querySelector("#bloco-riot");
-  const area = bloco.querySelector("[data-desafio]");
-  let relogio = null;
-  const pararRelogio = () => { clearInterval(relogio); relogio = null; };
-
-  const desenhar = (d) => {
-    area.innerHTML = passoHtml(d);
-    pararRelogio();
-    const form = area.querySelector("[data-riot-form]");
-    if (form) {
-      form.addEventListener("submit", async (ev) => {
-        ev.preventDefault();
-        const msg = form.querySelector(".riot-msg"), b = form.querySelector("button");
-        b.disabled = true;
-        b.textContent = "Procurando a conta…";
-        try {
-          const r = await funcao("riot", { acao: "iniciar", riot_id: form.riot.value.trim() });
-          gravarDesafio(r);
-          desenhar(r);
-        } catch (e) {
-          mensagem(msg, e.message, "erro");
-          b.disabled = false;
-          b.textContent = "Começar a verificação";
-        }
-      });
-    }
-  };
-
-  const esperar = (botao, s, depois = null) => {
-    botao.disabled = true;
-    let falta = s;
-    const passo = () => {
-      if (!botao.isConnected) { pararRelogio(); return; }
-      if (falta <= 0) { pararRelogio(); botao.disabled = false; botao.textContent = "Conferir"; if (depois) depois(); return; }
-      botao.textContent = `Conferir (${falta}s)`;
-      falta--;
-    };
-    pararRelogio();
-    passo();
-    relogio = setInterval(passo, 1000);
-  };
-
+  const meuId = () => `id=eq.${encodeURIComponent(usuario().id)}`;
+  const form = bloco.querySelector("[data-riot-form]");
+  if (form) {
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const msg = form.querySelector(".riot-msg"), b = form.querySelector("button");
+      const riot = form.riot.value.trim().replace(/\s*#\s*/, "#");
+      if (!/^[^#]{3,16}#[A-Za-z0-9]{2,5}$/.test(riot)) { mensagem(msg, "Escreva o Riot ID no formato Nome#TAG (ex.: NokyTTG#1178).", "erro"); return; }
+      b.disabled = true;
+      try {
+        await atualizar("perfis", meuId(), { riot_id_pedido: riot });
+        B.conta.perfil.riot_id_pedido = riot;
+        window.dispatchEvent(new CustomEvent("valreport:recarregar"));
+      } catch (e) { mensagem(msg, String(e.message || e).replace(/^riot_pedido: /, ""), "erro"); b.disabled = false; }
+    });
+  }
   bloco.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-riot]");
     if (!b) return;
     const acao = b.dataset.riot;
     const msg = bloco.querySelector(".riot-msg");
-    if (acao === "desvincular" && !confirm("Desligar este Riot ID da sua conta? Você poderá verificar outro (ou o mesmo) depois.")) return;
+    if (acao === "desvincular" && !confirm("Desligar este Riot ID da sua conta? Para ligar de novo, será preciso pedir uma nova verificação.")) return;
     b.disabled = true;
     try {
-      const r = await funcao("riot", { acao });
-      if (acao === "cancelar") { gravarDesafio(null); desenhar(null); return; }
-      if (acao === "conferir") {
-        if (r.verificado) {
-          gravarDesafio(null);
-          Object.assign(B.conta.perfil, { riot_id: r.riot_id, riot_card: r.riot_card, riot_titulo: r.riot_titulo, riot_nivel: r.riot_nivel, riot_verificado_em: new Date().toISOString() });
-          area.innerHTML = `<div class="desafio__ok">${icone("verificado")}<div><strong>Pronto, ${esc(r.riot_id)} verificado!</strong><p class="suave pequeno">O selo já aparece no seu perfil.</p></div></div>`;
-          window.dispatchEvent(new CustomEvent("valreport:perfil"));
-          setTimeout(() => window.dispatchEvent(new CustomEvent("valreport:recarregar")), 1800);
-          return;
-        }
-        gravarDesafio(r);
-        if (r.passo === 2 && r.mudou) { desenhar(r); return; }
-        if (r.espere_s) { esperar(b, r.espere_s, () => b.click()); mensagem(msg, "Só um instante: confiro sozinho em seguida.", ""); return; }
-        mensagem(msg, r.passo === 1 ? "Ainda aparece o mesmo card. Troque de card no jogo e confira de novo." : "Ainda aparece o outro card. Volte para o card de antes e confira de novo.", "erro");
-        esperar(b, 6);
-        return;
-      }
-      if (acao === "atualizar") {
-        Object.assign(B.conta.perfil, { riot_id: r.riot_id, riot_card: r.riot_card, riot_titulo: r.riot_titulo, riot_nivel: r.riot_nivel });
-        window.dispatchEvent(new CustomEvent("valreport:recarregar"));
-        return;
-      }
-      if (acao === "desvincular") { window.dispatchEvent(new CustomEvent("valreport:recarregar")); return; }
+      if (acao === "cancelar-pedido") await atualizar("perfis", meuId(), { riot_id_pedido: null });
+      else await funcao("riot", { acao });
+      window.dispatchEvent(new CustomEvent("valreport:recarregar"));
     } catch (e) {
-      if (["expirou", "sem_desafio"].includes(e.codigo)) { gravarDesafio(null); desenhar(null); mensagem(area.querySelector(".riot-msg"), e.message, "erro"); return; }
       if (msg) mensagem(msg, e.message, "erro");
       b.disabled = false;
     }
-    if (b.isConnected && !relogio) b.disabled = false;
   });
-
-  if (area) desenhar(lerDesafio());
 }
+
 
 // ---------- Busca por nick#tag (no topo) ----------
 export function ligarBusca() {
