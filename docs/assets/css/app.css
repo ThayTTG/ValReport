@@ -1035,13 +1035,13 @@ body[data-modo="publico"] .botao-buscar, body[data-modo="cadastro"] .botao-busca
 .time-cabeca__texto h1 { font: 700 30px var(--fonte-titulo); overflow-wrap: anywhere; }
 .time .abas { margin-top: 16px; }
 .vagas { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--texto-2); font-size: 14px; margin-bottom: 12px; }
-.membros { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.membro { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--raio-p); border: 1px solid var(--borda); background: var(--superficie); border-left: 4px solid var(--cor-perfil, var(--borda)); }
-.membro__avatar img, .membro__avatar .avatar-vazio { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; display: grid; place-items: center; background: var(--superficie-2); }
-.membro__texto { flex: 1 1 200px; min-width: 0; display: grid; gap: 4px; }
-.membro__texto > span { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13.5px; color: var(--texto-2); }
-.membro__acoes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.membro__acoes select, .convite-form select, #form-ajustes input:not([type=radio]), #form-criar-equipe input:not([type=radio]), #form-convite input, .galeria input, .convites input {
+.integrantes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.integrante { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--raio-p); border: 1px solid var(--borda); background: var(--superficie); border-left: 4px solid var(--cor-perfil, var(--borda)); }
+.integrante__avatar img, .integrante__avatar .avatar-vazio { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; display: grid; place-items: center; background: var(--superficie-2); }
+.integrante__texto { flex: 1 1 200px; min-width: 0; display: grid; gap: 4px; }
+.integrante__texto > span { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13.5px; color: var(--texto-2); }
+.integrante__acoes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.integrante__acoes select, .convite-form select, #form-ajustes input:not([type=radio]), #form-criar-equipe input:not([type=radio]), #form-convite input, .galeria input, .convites input {
   font: 500 14px var(--fonte); color: var(--texto); background: var(--superficie-2); border: 1px solid var(--borda); border-radius: 10px; padding: 8px 10px; min-height: 38px; }
 #form-ajustes input:not([type=radio]), #form-criar-equipe input:not([type=radio]), #form-convite input, .galeria input, .convites input { width: 100%; min-height: 44px; font-size: 15px; }
 .convite-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
@@ -1068,9 +1068,9 @@ body[data-modo="publico"] .botao-buscar, body[data-modo="cadastro"] .botao-busca
 @media (max-width: 560px) {
   .troca-equipe { max-width: 110px; font-size: 12.5px; }
   .time-cabeca__texto h1 { font-size: 24px; }
-  .membro__acoes { width: 100%; }
+  .integrante__acoes { width: 100%; }
 }
-.membros + p, .vagas + .membros + p { margin-top: 10px; }
+.integrantes + p, .vagas + .integrantes + p { margin-top: 10px; }
 
 /* ---------- Revisão de 26/10 ---------- */
 /* Pílulas dos jogadores não encolhem (com o card carregado, o nome ficava cortado no celular) */
@@ -1089,10 +1089,56 @@ body[data-modo="publico"] .botao-buscar, body[data-modo="cadastro"] .botao-busca
 }
 .conta-chip, .topo__linha .botao-icone { flex: none; }
 @media (max-width: 430px) { .topo__linha .botao-nokylabs { display: none; } }  /* o link da NokyLabs continua no rodapé */
-/* Troca de equipe: no celular, numa linha própria abaixo do topo */
-.topo__equipe { display: none; }
+
+/* ---------- Celular: topo só com o logo e a foto; o resto vai para o menu lateral ---------- */
+html, body { overflow-x: clip; }   /* nada passa da largura da tela (sem "zoom para fora" estranho) */
 @media (max-width: 700px) {
-  .topo__linha .troca-equipe { display: none; }
-  .topo__equipe { display: block; max-width: var(--largura); margin: 0 auto; padding: 0 var(--gutter) 6px; }
-  .topo__equipe .troca-equipe { width: 100%; max-width: none; font-size: 14px; min-height: 36px; }
+  body:not([data-modo="publico"]):not([data-modo="carregando"]) .topo__linha > :not(.marca):not(.conta-chip) { display: none !important; }
+  body:not([data-modo="publico"]) .marca { margin-right: auto; }
+  .conta-chip { width: 42px; height: 42px; }
 }
+.gaveta { position: fixed; inset: 0; z-index: 60; }
+.gaveta[hidden] { display: none; }
+.gaveta__fundo { position: absolute; inset: 0; background: rgb(0 0 0 / .45); opacity: 0; transition: opacity .2s ease; }
+.gaveta__painel { position: absolute; top: 0; right: 0; bottom: 0; width: min(86vw, 330px); background: var(--fundo); border-left: 1px solid var(--borda);
+  box-shadow: -12px 0 40px rgb(0 0 0 / .25); display: flex; flex-direction: column; gap: 6px; padding: 14px 12px calc(14px + env(safe-area-inset-bottom));
+  overflow-y: auto; transform: translateX(100%); transition: transform .22s ease; }
+.gaveta.aberta .gaveta__fundo { opacity: 1; }
+.gaveta.aberta .gaveta__painel { transform: none; }
+body.gaveta-aberta { overflow: hidden; }
+.gaveta__topo { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--borda); }
+.gaveta__topo .botao-icone { flex: none; }
+.gaveta__perfil { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 6px; border-radius: 14px; color: var(--texto); text-decoration: none; }
+.gaveta__perfil:hover, .gaveta__perfil:focus-visible { background: var(--superficie-2); text-decoration: none; }
+.gaveta__avatar img, .gaveta__avatar .avatar-vazio { width: 48px; height: 48px; border-radius: 14px; object-fit: cover; display: grid; place-items: center; background: var(--superficie-2);
+  box-shadow: 0 0 0 2px var(--cor-perfil, var(--destaque)); font: 700 18px var(--fonte-titulo); }
+.gaveta__nome { display: grid; min-width: 0; }
+.gaveta__nome strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.gaveta__nome small { color: var(--suave); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gaveta__equipe { display: grid; gap: 4px; padding: 6px 4px; font-size: 12.5px; font-weight: 700; color: var(--suave); }
+.gaveta__equipe select { font: 600 15px var(--fonte); color: var(--texto); background: var(--superficie); border: 1px solid var(--borda); border-radius: 12px; padding: 8px 10px; min-height: 42px; }
+.gaveta__secao { display: grid; gap: 2px; padding: 6px 0; border-bottom: 1px solid var(--borda); }
+.gaveta__secao:last-child { border-bottom: 0; }
+.gaveta__item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 10px 12px; border: 0; border-radius: 12px; background: none;
+  color: var(--texto); font: 600 15px var(--fonte); text-align: left; text-decoration: none; cursor: pointer; }
+.gaveta__item:hover, .gaveta__item:focus-visible { background: var(--superficie-2); text-decoration: none; }
+.gaveta__item.ativo { background: var(--destaque-suave); color: var(--destaque-texto); }
+.gaveta__item svg { font-size: 19px; color: var(--texto-2); }
+.gaveta__item.ativo svg { color: inherit; }
+.gaveta__selo { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; background: var(--derrota); color: #fff; font-size: 11.5px; }
+@media (prefers-reduced-motion: reduce) { .gaveta__painel, .gaveta__fundo { transition: none; } }
+
+/* Atalho "+N integrantes" ao lado dos jogadores */
+.pilula-integrantes { border-style: dashed; }
+.pilula-integrantes__mais { display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; background: var(--destaque-suave); color: var(--destaque-texto); font-size: 12.5px; font-weight: 700; }
+.pilula-integrantes__mais svg { font-size: 15px; }
+
+/* Mapas: cartão inteiro abre as partidas do mapa; botões para partidas e mapa de calor */
+.mapa-cartao[data-ir] { cursor: pointer; }
+a.mapa-cartao__banner { display: flex; color: inherit; text-decoration: none; }
+a.mapa-cartao__banner:hover { text-decoration: none; }
+.mapa-cartao__acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.mapa-cartao__acoes a { text-decoration: none; }
+.mapa-cartao__acoes svg { font-size: 15px; }
+.vista-mapas { margin-bottom: 14px; }
+.vista-mapas button { display: inline-flex; align-items: center; gap: 6px; }

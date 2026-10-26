@@ -46,9 +46,18 @@ export async function iniciarNuvem() {
   if (codigo) {
     const pk = lerGuardado(K_PKCE);
     guardar(K_PKCE, null);
-    if (!pk?.v) { limparUrl(); return { logado: false, erro: "O login expirou. Tente de novo." }; }
+    if (!pk?.v) {
+      // A volta do Google caiu num navegador/endereço que não guardou o início do login
+      // (ex.: começou no endereço antigo do GitHub Pages). Tenta de novo sozinho, uma vez.
+      limparUrl();
+      let jaTentou = true;
+      try { jaTentou = sessionStorage.getItem("valreport.relogin") === "1"; sessionStorage.setItem("valreport.relogin", "1"); } catch (e) { /* sem armazenamento */ }
+      if (!jaTentou) return { logado: false, erro: null, repetir: true };
+      return { logado: false, erro: "Não foi possível concluir o login neste navegador. Toque em Entrar com Google de novo; se continuar, confira se o navegador não está bloqueando os dados do site." };
+    }
     try {
       definirSessao(await pedirToken("pkce", { auth_code: codigo, code_verifier: pk.v }));
+      try { sessionStorage.removeItem("valreport.relogin"); } catch (e) { /* sem armazenamento */ }
       limparUrl(pk.hash);
     } catch (e) {
       limparUrl();

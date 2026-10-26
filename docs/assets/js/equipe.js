@@ -287,15 +287,17 @@ async function mapasEquipe(f, q) {
     for (const p of lst) { const m = Object.values(p.m).find((x) => x.time === p.nosso) || Object.values(p.m)[0]; ra += m.lados.a[0]; rva += m.lados.a[1]; rd += m.lados.d[0]; rvd += m.lados.d[1]; }
     const melhores = membrosCom().map((e) => ({ e, s: stats(lst.filter((p) => p.m[e.slug] && passaMembro(p.m[e.slug], f)).map((p) => ({ p, m: p.m[e.slug] }))) }))
       .filter((x) => x.s.r >= 20).sort((a, b) => b.s.impr - a.s.impr);
-    return `<article class="mapa-cartao">
-      <div class="mapa-cartao__banner" style="${imgMapaFaixa(mapa) ? `background-image:url('${esc(imgMapaFaixa(mapa))}')` : ""}"><strong>${esc(mapa)}</strong>${selo(`${v}V · ${d}D`, v >= d ? "vitoria" : "derrota")}</div>
+    const partidas = `#/equipe/partidas${filtrosQuery({ ...f, mapa })}`;
+    return `<article class="mapa-cartao" data-ir="${esc(partidas)}">
+      <a class="mapa-cartao__banner" href="${esc(partidas)}" title="Ver as partidas da equipe em ${esc(mapa)}" style="${imgMapaFaixa(mapa) ? `background-image:url('${esc(imgMapaFaixa(mapa))}')` : ""}"><strong>${esc(mapa)}</strong>${selo(`${v}V · ${d}D`, v >= d ? "vitoria" : "derrota")}</a>
       <div class="mapa-cartao__corpo">
         ${notaMapa(mapa)?.texto ? `<a class="selo selo--destaque" style="justify-self:start" href="#/equipe/mapas${filtrosQuery(f)}${filtrosQuery(f) ? "&" : "?"}cm=${encodeURIComponent(mapa)}">${icone("nota")} plano da IGL</a>` : ""}
         <div class="lado-barra"><span>Vitórias</span>${barra(div(v, v + d), v >= d ? "vitoria" : "derrota")}<span>${pct(div(v, v + d))}</span></div>
         <div class="lado-barra"><span>Ataque</span>${barra(div(rva, ra))}<span>${pct(div(rva, ra))} <small class="suave">${ra}r</small></span></div>
         <div class="lado-barra"><span>Defesa</span>${barra(div(rvd, rd))}<span>${pct(div(rvd, rd))} <small class="suave">${rd}r</small></span></div>
         ${melhores[0] ? `<p class="pequeno">Destaque: <strong>${esc(melhores[0].e.apelido)}</strong> (${sinal(melhores[0].s.impr, 1, "%")} por round)</p>` : `<p class="suave pequeno">Destaque aparece com 20+ rounds no mapa.</p>`}
-        <a class="pequeno" href="#/equipe/mapas${filtrosQuery(f)}${filtrosQuery(f) ? "&" : "?"}cm=${encodeURIComponent(mapa)}">Ver mapa de calor da equipe →</a>
+        <div class="mapa-cartao__acoes"><a class="botao-secundario botao-mini" href="${esc(partidas)}">${icone("seta")} ${lst.length} partida${lst.length === 1 ? "" : "s"}</a>
+          <a class="botao-secundario botao-mini" href="#/equipe/mapas${filtrosQuery(f)}${filtrosQuery(f) ? "&" : "?"}cm=${encodeURIComponent(mapa)}&foco=calor">${icone("fogo")} Mapa de calor</a></div>
       </div></article>`;
   }).join("");
   // Calor da equipe no mapa escolhido
@@ -313,13 +315,16 @@ async function mapasEquipe(f, q) {
   }
   const top = [...regioes].sort((a, b) => b[1].n - a[1].n).slice(0, 6);
   const html = `<div class="grade-mapas">${cartoes}</div>
-    ${secao(`Mapa de calor da equipe · ${mapa}`, `<div class="grade-mapa"><div class="cartao">${moldeMapa(mapa)}</div><div class="pilha">
+    <div id="calor-equipe">${secao(`Mapa de calor da equipe · ${mapa}`, `<div class="grade-mapa"><div class="cartao">${moldeMapa(mapa)}</div><div class="pilha">
       ${blocoNota("mapa", mapa, notaMapa(mapa)?.texto, { titulo: `Plano da IGL · ${mapa}` })}
       ${cartao("Mapa", `<div class="chips">${mapas.map((m) => `<button class="chip" style="cursor:pointer;${m === mapa ? "border-color:var(--destaque);color:var(--destaque-texto)" : ""}" type="button" data-param="cm" data-valor="${esc(m)}" aria-pressed="${m === mapa}">${esc(m)}</button>`).join("")}</div>
         ${segmentoTipoRound(tr)}<p class="suave pequeno" style="margin-top:8px">${evs.filter((x) => x.tipo === 0).length} mortes e ${evs.filter((x) => x.tipo === 1).length} abates${tr === "todos" ? "" : ` em rounds de ${esc(TIPOS[tr].toLowerCase())}`}.</p>`)}
       ${cartao("Onde a equipe mais morre", top.length ? top.map(([r, x]) => { const [quem, k] = [...x.quem].sort((a, b) => b[1] - a[1])[0]; return `<div style="padding:5px 0"><div style="display:flex;justify-content:space-between;font-size:13.5px"><strong>${esc(r)}</strong><span>${x.n}× <span class="suave">(mais: ${esc(quem)} ${k})</span></span></div>${barra(x.n / top[0][1].n, "derrota")}</div>`; }).join("") : `<p class="suave pequeno">Sem nomes de regiões para este mapa ainda.</p>`)}
-    </div></div>`)}`;
-  return { html, depois: (el) => desenharCalor(el, mapa, evs, { mostrar: "ambos" }) };
+    </div></div>`)}</div>`;
+  return { html, depois: (el) => {
+    desenharCalor(el, mapa, evs, { mostrar: "ambos" });
+    if (q.get("foco") === "calor") el.querySelector("#calor-equipe")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } };
 }
 
 export async function viewEquipe(aba, f, q) {

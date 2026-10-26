@@ -268,14 +268,14 @@ function abaMembros(d, lider) {
       acoes.push(`<button class="botao-secundario botao-mini" type="button" data-acao="lideranca">Passar a liderança</button>`);
     }
     if (podeExpulsar) acoes.push(`<button class="botao-perigo botao-mini" type="button" data-acao="expulsar">Remover</button>`);
-    return `<li class="membro" data-usuario="${esc(m.usuario_id || "")}" data-apelido="${esc(m.apelido)}"${/^#[0-9a-f]{6}$/i.test(m.cor || "") ? ` style="--cor-perfil:${m.cor}"` : ""}>
-      <span class="membro__avatar">${imagem(imgCard(m.riot_card), "", "", m.apelido)}</span>
-      <div class="membro__texto"><strong>${esc(m.apelido)}${m.eu ? ` <span class="suave">(você)</span>` : ""}</strong>
+    return `<li class="integrante" data-usuario="${esc(m.usuario_id || "")}" data-apelido="${esc(m.apelido)}"${/^#[0-9a-f]{6}$/i.test(m.cor || "") ? ` style="--cor-perfil:${m.cor}"` : ""}>
+      <span class="integrante__avatar">${imagem(imgCard(m.riot_card), "", "", m.apelido)}</span>
+      <div class="integrante__texto"><strong>${esc(m.apelido)}${m.eu ? ` <span class="suave">(você)</span>` : ""}</strong>
         <span><span class="selo">${esc(nomeCargo(m.cargo))}</span>${m.protegido ? ` <span class="selo selo--alerta" title="16 ou 17 anos">modo protegido</span>` : ""} ${riot}</span></div>
-      ${acoes.length ? `<div class="membro__acoes">${acoes.join("")}</div>` : ""}</li>`;
+      ${acoes.length ? `<div class="integrante__acoes">${acoes.join("")}</div>` : ""}</li>`;
   };
   return `<p class="vagas"><span><strong>${d.vagas.jogadores}/7</strong> jogadores (liderança inclusa)</span><span><strong>${d.vagas.extras}/8</strong> treinadores e convidados</span></p>
-    <ul class="membros">${d.membros.map(linha).join("")}</ul>
+    <ul class="integrantes">${d.membros.map(linha).join("")}</ul>
     ${d.ocultos ? `<p class="suave pequeno">+${d.ocultos} membro${d.ocultos === 1 ? "" : "s"} no modo protegido (só a equipe vê).</p>` : ""}
     ${lider && d.status === "aprovada" ? `<p class="suave pequeno">Cargos: até 2 co-líderes e 2 treinadores. Co-líderes criam convites, confirmam Riot IDs e removem jogadores, treinadores e convidados. Convidados não veem as notas da IGL.</p>` : ""}`;
 }
@@ -327,10 +327,10 @@ function ligarTime(el, d) {
     if (!aprovar && motivo === null) return;
     acao(b, () => rpc("admin_revisar_equipe", { p_equipe: d.id, p_aprovar: aprovar, p_motivo: motivo }));
   }));
-  el.querySelector(".membros")?.addEventListener("click", (ev) => {
+  el.querySelector(".integrantes")?.addEventListener("click", (ev) => {
     const b = ev.target.closest("button[data-acao]");
     if (!b) return;
-    const li = b.closest(".membro"), alvo = li.dataset.usuario, apelido = li.dataset.apelido;
+    const li = b.closest(".integrante"), alvo = li.dataset.usuario, apelido = li.dataset.apelido;
     if (b.dataset.acao === "confirmar") {
       if (!confirm(`Confirmar que ${b.dataset.riot} é a conta de ${apelido}? Só confirme se você tem certeza de que é dessa pessoa.`)) return;
       acao(b, () => funcao("riot", { acao: "lider_verificar", usuario_id: alvo, riot_id: b.dataset.riot }));
@@ -342,10 +342,10 @@ function ligarTime(el, d) {
       acao(b, () => rpc("expulsar_membro", { p_equipe: d.id, p_usuario: alvo }));
     }
   });
-  el.querySelector(".membros")?.addEventListener("change", (ev) => {
+  el.querySelector(".integrantes")?.addEventListener("change", (ev) => {
     const s = ev.target.closest("select[data-acao=cargo]");
     if (!s) return;
-    acao(s, () => rpc("definir_cargo", { p_equipe: d.id, p_usuario: s.closest(".membro").dataset.usuario, p_cargo: s.value }));
+    acao(s, () => rpc("definir_cargo", { p_equipe: d.id, p_usuario: s.closest(".integrante").dataset.usuario, p_cargo: s.value }));
   });
   const fn = el.querySelector("#form-novo-convite");
   fn?.addEventListener("submit", (ev) => {

@@ -1138,7 +1138,7 @@ def card_formacao(df, cfg, ctx, dia):
 # ----------------------------------------------------------------------------
 
 def endereco_site(cfg):
-    """thayttg.github.io/ValReport, sem o https:// (para caber no cabeçalho)."""
+    """valreport.vercel.app, sem o https:// (para caber no cabeçalho)."""
     return gr.url_site(cfg).replace("https://", "").replace("http://", "").rstrip("/")
 
 

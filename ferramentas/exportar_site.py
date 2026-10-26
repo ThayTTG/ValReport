@@ -39,7 +39,7 @@ EQUIPE_PADRAO = "juventus-academy"
 ARQ_MAPAS = PASTA / "dados" / "cache" / "mapas" / "mapas.json"
 ARQ_NOTAS = PASTA / "notas" / "notas.json"
 PASTA_ELO = PASTA / "dados" / "elo"
-URL_PADRAO = "https://thayttg.github.io/ValReport/"
+URL_PADRAO = "https://valreport.vercel.app/"
 CODIGO_TIPO = {"pistol": 0, "eco": 1, "force": 2, "armado": 3, "anti-eco": 4}
 VERSAO_DADOS = 1
 TIERS_UUID = "03621f52-342b-cf4e-4f86-9350a49c6d04"  # tabela de elos atual da valorant-api
@@ -462,7 +462,7 @@ def elo_json(autorizados, slug):
 
 def atualizar_previa(site):
     """Coloca o endereço público nas tags de prévia (Discord, WhatsApp...) do docs/index.html."""
-    url = (site.get("url_publica") or URL_PADRAO).rstrip("/") + "/"
+    url = gr.url_site({"site": site})
     arq = PASTA_SITE / "index.html"
     try:
         with open(arq, encoding="utf-8", newline="") as f:  # newline="": mantém as quebras de linha como estão

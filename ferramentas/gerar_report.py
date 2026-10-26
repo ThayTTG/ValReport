@@ -878,17 +878,17 @@ def resumo_semana(ctx, cfg, rids, fim, dias=7):
     }
 
 
-SITE_PADRAO = "https://thayttg.github.io/ValReport/"
+SITE_PADRAO = "https://valreport.vercel.app/"
 
 
 def url_site(cfg):
-    """Endereço público do site: "site" -> "url_publica", ou o GitHub Pages do "repositorio", ou o padrão do projeto."""
-    import re
+    """Endereço do site: "site" -> "url_publica" ou o padrão (Vercel).
+    O endereço antigo do GitHub Pages é ignorado: o site agora mora na Vercel."""
     site = cfg.get("site") or {}
-    if site.get("url_publica"):
-        return site["url_publica"].rstrip("/") + "/"
-    m = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$", site.get("repositorio") or "")
-    return f"https://{m.group(1).lower()}.github.io/{m.group(2)}/" if m else SITE_PADRAO
+    url = (site.get("url_publica") or "").strip()
+    if url and "github.io" not in url:
+        return url.rstrip("/") + "/"
+    return SITE_PADRAO
 
 
 def fim_da_semana_fechada(agora):

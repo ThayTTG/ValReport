@@ -58,7 +58,7 @@
     "publicar_automatico": false,
     "repositorio": "https://github.com/ThayTTG/ValReport",
     "publicar_notas": true,
-    "url_publica": "https://thayttg.github.io/ValReport/"
+    "url_publica": "https://valreport.vercel.app/"
   },
   "coletar_elo": true,
   "coleta_rapida": true

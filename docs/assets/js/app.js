@@ -1,11 +1,12 @@
 // ValReport · NokyLabs — rotas, tema, filtros e eventos
 
-import { esc, imagem, imgCard, imgAgente, definirMeta, dataHora, vazio, larguraGrafico } from "./util.js";
+import { esc, icone, imagem, imgCard, imgAgente, definirMeta, dataHora, vazio, larguraGrafico } from "./util.js";
 import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache, detectarEditor, metaFresca } from "./dados.js";
 import { iniciarNuvem, rpc, entrar, usuario } from "./nuvem.js";
 import { viewBoasVindas, viewCadastro, viewSemEquipe, viewConta, viewPainel } from "./conta.js";
 import { viewMeuPerfil, viewPerfilPublico, ligarBusca } from "./perfil.js";
 import { viewMinhasEquipes, viewTime, viewConvite, guardarConvitePendente } from "./equipes.js";
+import { ligarGaveta } from "./gaveta.js";
 import { alternarOrdem, trocarMiniAba, alternarMinimizado } from "./componentes.js";
 import { coroaSobre, abrirRevelacao, talvezRevelar } from "./coroa.js";
 import { viewJogador } from "./jogador.js";
@@ -14,6 +15,9 @@ import { viewEquipe } from "./equipe.js";
 import { viewSobre } from "./sobre.js";
 import { viewHoje } from "./hoje.js";
 import { animar, trocarTema, ligarBrilho } from "./animar.js";
+
+// O endereço antigo (GitHub Pages) leva para o site novo, na mesma página
+if (location.hostname.endsWith("github.io")) location.replace(`https://valreport.vercel.app/${location.hash}`);
 
 const main = document.getElementById("conteudo");
 
@@ -128,6 +132,9 @@ main.addEventListener("change", (ev) => {
   irPara(q);
 });
 main.addEventListener("click", (ev) => {
+  // Cartões clicáveis por inteiro (ex.: um mapa abre as partidas nele), sem atrapalhar os botões de dentro
+  const ir = ev.target.closest("[data-ir]");
+  if (ir && !ev.target.closest("a, button, select, input, textarea, label")) { location.hash = ir.dataset.ir; return; }
   const th = ev.target.closest("th[data-ordenar]");
   if (th) {
     alternarOrdem(th.closest("table").dataset.tabela, th.dataset.ordenar);
@@ -263,6 +270,20 @@ function preencherTopo() {
     `<a class="pilula-jogador" data-slug="${esc(e.slug)}" href="#/j/${esc(e.slug)}"><span class="foto-coroa">${imagem(imgCard(e.card) || imgAgente(e.agente), "", "", e.apelido)}${coroaSobre(e.slug, "coroa--mini")}</span>${esc(e.apelido)}</a>`).join("");
   document.getElementById("gerado-em").textContent = `Dados atualizados em ${dataHora(B.meta.gerado_em)} · ${B.meta.contagem.partidas} partidas · o site confere se há novidades a cada 20 minutos`;
   ajustarTopo();
+  pilulaIntegrantes();
+}
+
+/** Depois dos jogadores, um atalho para os outros integrantes (treinadores e convidados) e a página da equipe */
+let extrasEquipe = null;
+async function pilulaIntegrantes() {
+  const slug = B.equipeAtual?.slug, lista = document.getElementById("lista-jogadores");
+  if (!slug || !lista) return;
+  if (extrasEquipe == null) {
+    try { extrasEquipe = (await rpc("equipe_detalhes", { p_slug: slug }))?.vagas?.extras ?? 0; } catch (e) { extrasEquipe = 0; }
+  }
+  lista.querySelector(".pilula-integrantes")?.remove();
+  lista.insertAdjacentHTML("beforeend", `<a class="pilula-jogador pilula-integrantes" href="#/time/${esc(slug)}" title="Todos os integrantes da equipe">
+    <span class="pilula-integrantes__mais">${extrasEquipe ? `+${extrasEquipe}` : icone("equipe")}</span>${extrasEquipe ? `integrante${extrasEquipe === 1 ? "" : "s"}` : "Integrantes"}</a>`);
 }
 
 async function conferirDados(manual = false) {
@@ -345,7 +366,7 @@ async function mostrarPendencias() {
 function trocaDeEquipe() {
   const lista = B.conta?.equipes || [];
   if (lista.length < 2) return;
-  // Um seletor no topo (computador) e outro numa linha própria (celular, onde o topo não tem espaço)
+  // No computador, um seletor no topo; no celular, a troca fica no menu lateral
   const criar = (id) => {
     const sel = document.createElement("select");
     sel.className = "troca-equipe";
@@ -360,10 +381,6 @@ function trocaDeEquipe() {
     return sel;
   };
   document.querySelector(".marca")?.after(criar("troca-equipe"));
-  const linha = document.createElement("div");
-  linha.className = "topo__equipe";
-  linha.append(criar("troca-equipe-celular"));
-  document.querySelector(".topo__linha")?.after(linha);
 }
 
 /** Botão redondo da conta: o card verificado, ou a inicial do apelido */
@@ -386,6 +403,7 @@ async function iniciar() {
   B.editor = await detectarEditor();
   if (!B.editor) {
     const login = await iniciarNuvem();
+    if (login.repetir) { entrar(); return; }
     erroLogin = login.erro;
     if (!login.logado) {
       tela = "publico";
@@ -433,5 +451,6 @@ async function iniciar() {
   talvezRevelar();
 }
 window.addEventListener("valreport:recarregar", () => location.reload());
+ligarGaveta(() => tela);
 document.getElementById("entrar-topo")?.addEventListener("click", () => entrar());
 iniciar();

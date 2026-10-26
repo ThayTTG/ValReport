@@ -17,7 +17,7 @@ const cartao = (titulo, corpo, extra = "") => cartaoMin(chaveCartao(titulo), tit
 const ultimoElo = (slug) => (B.elo[slug] || []).filter((h) => h.tier != null).at(-1);
 
 export const ABAS_JOGADOR = [["geral", "Geral"], ["partidas", "Partidas"], ["agentes", "Agentes"], ["mapas", "Mapas"],
-  ["armas", "Armas"], ["performance", "Performance"], ["calor", "Mapa de calor"]];
+  ["armas", "Armas"], ["performance", "Performance"]];   // o mapa de calor agora fica dentro de Mapas
 
 export function cabecalhoJogador(e) {
   const av = (B.avaliacao[e.slug] || [])[0];
@@ -160,14 +160,28 @@ function agentes(itens) {
 }
 
 // ---------- Mapas ----------
-function mapas(itens) {
+/** Alternância dentro da aba Mapas: a visão geral dos mapas ou o mapa de calor */
+function vistaMapas(atual) {
+  return `<div class="segmentos vista-mapas" role="group" aria-label="Ver">${[["geral", `${icone("alvo")} Visão geral`], ["calor", `${icone("fogo")} Mapa de calor`]].map(([k, t]) =>
+    `<button type="button" data-param="vista" data-valor="${k}" aria-pressed="${k === atual}">${t}</button>`).join("")}</div>`;
+}
+/** Endereço do mapa de calor de um mapa, mantendo os filtros */
+function linkCalor(slug, f, mapa) {
+  const q = new URLSearchParams(filtrosQuery(f).slice(1));
+  q.set("vista", "calor");
+  q.set("cm", mapa);
+  return `#/j/${encodeURIComponent(slug)}/mapas?${q}`;
+}
+
+function mapas(itens, slug, f) {
   const grupos = agrupar(itens, (it) => it.p.mapa).sort((a, b) => b.itens.length - a.itens.length);
   if (!grupos.length) return vazio("Nenhum mapa com estes filtros");
   return secao("Mapas", `<div class="grade-mapas">${grupos.map(({ chave, s: g, itens: l }) => {
     const [ra, rva] = g.lados.a, [rd, rvd] = g.lados.d;
     const ag = agrupar(l, (it) => it.m.ag).sort((a, b) => b.itens.length - a.itens.length)[0];
-    return `<article class="mapa-cartao">
-      <div class="mapa-cartao__banner" style="${imgMapaFaixa(chave) ? `background-image:url('${esc(imgMapaFaixa(chave))}')` : ""}"><strong>${esc(chave)}</strong>${selo(`${g.v}V · ${g.d}D`, g.win >= 0.5 ? "vitoria" : "derrota")}</div>
+    const partidas = `#/j/${encodeURIComponent(slug)}/partidas${filtrosQuery({ ...f, mapa: chave })}`;
+    return `<article class="mapa-cartao" data-ir="${esc(partidas)}">
+      <a class="mapa-cartao__banner" href="${esc(partidas)}" title="Ver as partidas em ${esc(chave)}" style="${imgMapaFaixa(chave) ? `background-image:url('${esc(imgMapaFaixa(chave))}')` : ""}"><strong>${esc(chave)}</strong>${selo(`${g.v}V · ${g.d}D`, g.win >= 0.5 ? "vitoria" : "derrota")}</a>
       <div class="mapa-cartao__corpo">
         <div class="lado-barra"><span>Vitórias</span>${barra(g.win, g.win >= 0.5 ? "vitoria" : "derrota")}<span>${pct(g.win)}</span></div>
         <div class="lado-barra"><span>Ataque</span>${barra(div(rva, ra))}<span>${pct(div(rva, ra))} <small class="suave">${ra}r</small></span></div>
@@ -176,6 +190,8 @@ function mapas(itens) {
           ${tile("K/D", num(g.kd, 2))}${tile("ADR", num(g.adr))}${tile("HS%", pct(g.hsp))}${tile("Impacto", sinal(g.impr, 1, "%"), "", classeSinal(g.impr, 1))}
         </div>
         ${ag ? `<div class="celula-ag" style="min-width:0">${imagem(imgAgente(ag.chave), ag.chave)}<div><strong>${esc(ag.chave)}</strong><small>agente mais jogado aqui · ${ag.itens.length} partida${ag.itens.length === 1 ? "" : "s"}</small></div></div>` : ""}
+        <div class="mapa-cartao__acoes"><a class="botao-secundario botao-mini" href="${esc(partidas)}">${icone("seta")} ${l.length} partida${l.length === 1 ? "" : "s"}</a>
+          <a class="botao-secundario botao-mini" href="${esc(linkCalor(slug, f, chave))}">${icone("fogo")} Mapa de calor</a></div>
       </div></article>`;
   }).join("")}</div>`) + resumosMapas(itens);
 }
@@ -475,6 +491,7 @@ async function calor(e, itens, q) {
 export async function viewJogador(slug, aba, f, q) {
   const e = B.porSlug.get(slug);
   if (!e) return { html: vazio("Jogador não encontrado", `<p>Volte para a <a href="#/equipe">equipe</a>.</p>`) };
+  if (aba === "calor") { aba = "mapas"; q.set("vista", "calor"); }   // endereço antigo da aba de calor
   aba = ABAS_JOGADOR.some(([id]) => id === aba) ? aba : "geral";
   const itens = itensDe(slug, f);
   const s = stats(itens);
@@ -486,10 +503,10 @@ export async function viewJogador(slug, aba, f, q) {
   else if (aba === "partidas") corpo = `${forma(itens, 20)}${listaPorDia(itens.slice(0, Number(q.get("n") || 40)))}
       ${itens.length > Number(q.get("n") || 40) ? `<p style="text-align:center;margin-top:14px"><button class="limpar" type="button" data-param="n" data-valor="${Number(q.get("n") || 40) + 40}">Mostrar mais partidas</button></p>` : ""}`;
   else if (aba === "agentes") corpo = agentes(itens);
-  else if (aba === "mapas") corpo = mapas(itens);
+  else if (aba === "mapas" && q.get("vista") === "calor") { ({ html: corpo, depois } = await calor(e, itens, q)); corpo = vistaMapas("calor") + corpo; }
+  else if (aba === "mapas") corpo = vistaMapas("geral") + mapas(itens, slug, f);
   else if (aba === "armas") corpo = armas(itens);
   else if (aba === "performance") corpo = performance(e, itens, s, q);
-  else if (aba === "calor") ({ html: corpo, depois } = await calor(e, itens, q));
   return {
     titulo: `${e.apelido} · ${ABAS_JOGADOR.find(([id]) => id === aba)[1]}`,
     html: `${cabecalhoJogador(e)}${abas(`#/j/${slug}`, aba, ABAS_JOGADOR, qs)}${barraFiltros(f, slug)}
