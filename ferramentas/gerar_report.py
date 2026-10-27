@@ -103,6 +103,12 @@ def config_padrao(cfg):
     c.setdefault("observar_impacto_pct", -20)
     c.setdefault("max_rounds_no_resumo", 5)
     c.setdefault("min_partidas_grupo", 3)
+    if not c.get("_elenco_site"):
+        try:
+            import elenco_site  # membros da equipe no site (etapa 3b); sem a chave secreta, fica como no config.json
+            c = elenco_site.aplicar(c)
+        except Exception as e:  # noqa: BLE001 — o report nunca para por causa do site
+            print(f"Elenco do site não aplicado ({e}).")
     return c
 
 
@@ -202,6 +208,11 @@ def carregar_contexto(dia, cfg):
             j = av.localizar(a, rid)
             if j:
                 puuid_de.setdefault(rid, j["puuid"])
+    try:  # guarda o puuid de cada Riot ID: reconhece depois quem trocou de nick (etapa 3b)
+        import elenco_site
+        elenco_site.lembrar_puuids(puuid_de)
+    except Exception:  # noqa: BLE001
+        pass
     refs = av.calcular_referencias(list(analises.values()), set(puuid_de.values()), cfg)
     return {"dia": dia, "fim": fim, "ini_janela": ini_janela, "modelo": modelo, "analises": analises,
             "puuid_de": puuid_de, "refs": refs, "equipe": equipe, "brutas": {}}

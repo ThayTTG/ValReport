@@ -5,7 +5,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://media.valorant-api.com; font-src 'self'; connect-src 'self' https://qmstulzsoizdrhqwcrbu.supabase.co https://valorant-api.com https://media.valorant-api.com; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://media.valorant-api.com https://qmstulzsoizdrhqwcrbu.supabase.co; font-src 'self'; connect-src 'self' https://qmstulzsoizdrhqwcrbu.supabase.co https://valorant-api.com https://media.valorant-api.com; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
         },
         {
           "key": "X-Content-Type-Options",

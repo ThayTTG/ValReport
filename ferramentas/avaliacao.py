@@ -562,7 +562,13 @@ def analisar_partida_completa(partida, modelo=None, cfg=None):
     }
 
 
+PUUIDS = {}  # riot_id em minúsculas -> puuid (vem do elenco do site; acha a pessoa mesmo em partidas com o nick antigo)
+
+
 def localizar(analise, riot_id):
+    pu = PUUIDS.get(riot_id.lower())
+    if pu and pu in analise["jogadores"]:
+        return analise["jogadores"][pu]
     nome, _, tag = riot_id.partition("#")
     for j in analise["jogadores"].values():
         if (j["nome"].lower(), j["tag"].lower()) == (nome.lower(), tag.lower()):

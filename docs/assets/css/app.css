@@ -1142,3 +1142,31 @@ a.mapa-cartao__banner:hover { text-decoration: none; }
 .mapa-cartao__acoes svg { font-size: 15px; }
 .vista-mapas { margin-bottom: 14px; }
 .vista-mapas button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---------- Etapa 3b: Premier e imagem enviada ---------- */
+.selo--premier { background: color-mix(in srgb, var(--destaque) 16%, var(--superficie-3)); color: var(--texto); }
+.selo--premier svg { color: var(--destaque); }
+.premier-form__linha { display: grid; grid-template-columns: minmax(0, 1fr) 96px minmax(0, 150px); gap: 10px; }
+.premier-form input:not([type=radio]), .premier-form select { width: 100%; min-height: 44px; font: 500 15px var(--fonte); color: var(--texto); background: var(--superficie-2); border: 1px solid var(--borda); border-radius: 10px; padding: 8px 10px; }
+.premier-previa { display: grid; gap: 12px; padding: 14px; border-radius: var(--raio-p); border: 1px solid var(--borda); background: var(--superficie-2); }
+.premier-previa[hidden] { display: none; }
+.premier-previa__topo { display: flex; align-items: center; gap: 10px; }
+.premier-previa__topo > svg { font-size: 26px; color: var(--destaque); flex: none; }
+.premier-previa__topo div { display: grid; gap: 2px; min-width: 0; }
+.premier-previa__topo strong { font: 700 18px var(--fonte-titulo); overflow-wrap: anywhere; }
+.premier-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.premier-lista li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--superficie); border: 1px solid var(--borda); font-size: 14px; min-width: 0; }
+.premier-lista li > span:first-child { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.premier-lista li > .selo { flex: none; }
+.premier-elenco .cartao__titulo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.premier-elenco .premier-lista { margin-bottom: 10px; }
+.time-cabeca__premier { margin: 0; }
+.imagem-equipe__linha { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+.imagem-equipe__linha > .pilha-form { flex: 1 1 240px; min-width: 0; }
+.botao-arquivo { position: relative; overflow: hidden; cursor: pointer; }
+.botao-arquivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.botao-arquivo:focus-within { outline: 2px solid var(--destaque); outline-offset: 2px; }
+@media (max-width: 520px) {
+  .premier-form__linha { grid-template-columns: minmax(0, 1fr) 96px; }
+  .premier-form__linha .campo:last-child { grid-column: 1 / -1; }
+}

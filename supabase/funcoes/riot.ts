@@ -1,6 +1,7 @@
 // ValReport · função "riot" (Supabase Edge Function)
 // Confirma o Riot ID de uma pessoa: a administradora (ou a liderança da equipe dela) confirma que a conta é dela,
 // e a função busca na API o puuid, o card e o nível. Também atualiza o card/nível e desliga o Riot ID.
+// Etapa 3b: confere equipes Premier pelo elenco da API (criar, vincular uma equipe existente e atualizar o elenco).
 // (O desafio do card foi retirado: a API só muda o card depois de uma partida, então ele não provava nada.)
 // Como colar: Supabase → Edge Functions → Deploy a new function → Via Editor → nome "riot" → apague o exemplo,
 // cole este arquivo inteiro → Deploy. Segredos (Edge Functions → Secrets): HENRIKDEV_API_KEY e VALREPORT_SECRET_KEY.
@@ -10,6 +11,8 @@ const CHAVE = Deno.env.get("VALREPORT_SECRET_KEY") ?? Deno.env.get("SUPABASE_SER
 const HENRIK = Deno.env.get("HENRIKDEV_API_KEY") ?? "";
 const HENRIK_URL = (Deno.env.get("HENRIKDEV_URL") ?? "https://api.henrikdev.xyz").replace(/\/$/, "");
 const ESPERA_ATUALIZAR_MIN = 10;
+const ESPERA_ELENCO_MIN = 5;
+const REGIOES = ["br", "latam", "na", "eu", "ap", "kr"];
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -43,6 +46,11 @@ async function banco(caminho: string, metodo = "GET", corpo?: unknown, prefer?: 
     let j: { message?: string; code?: string } = {};
     try { j = JSON.parse(texto); } catch { /* sem corpo */ }
     if (j.code === "23505") throw new Problema("riot_em_uso", "Esse Riot ID já está ligado a outra conta. Fale com a administradora.", 409);
+    // Avisos escritos pelas próprias funções do banco ("codigo: mensagem") podem ir para a tela
+    const aviso = j.code === "P0001" ? /^([a-z_]+): (.+)$/s.exec(j.message ?? "") : null;
+    if (aviso) throw new Problema(aviso[1], aviso[2], 409);
+    if (j.code === "P0001" && j.message) throw new Problema("regra", j.message, 409);
+    if (j.code === "42501" && j.message && !/permission denied/i.test(j.message)) throw new Problema("sem_permissao", j.message, 403);
     console.error("banco", r.status, j.message ?? texto.slice(0, 300));   // o detalhe fica só no registro da função
     throw new Problema("banco", "O banco não aceitou a mudança agora. Tente de novo; se continuar, avise a administradora.", 500);
   }
@@ -156,6 +164,119 @@ async function liderVerificar(usuario: string, alvo: string, riot: string) {
   return { verificado: true, ...(await gravarVerificado(alvo, c, null)) };
 }
 
+// ---------- Premier ----------
+type Premier = {
+  id: string; nome: string; tag: string;
+  info: Record<string, unknown>;
+  elenco: { puuid: string; nome: string | null; tag: string | null }[];
+};
+
+async function lerPremier(caminho: string): Promise<Premier> {
+  if (!HENRIK) throw new Problema("config", "A chave da HenrikDev não está configurada na função.", 500);
+  const r = await fetch(`${HENRIK_URL}${caminho}`, { headers: { Authorization: HENRIK } });
+  if (r.status === 404) throw new Problema("nao_encontrado", "Não encontramos essa equipe no Premier desta temporada. Confira o nome, a tag e a região.", 404);
+  if (r.status === 409) throw new Problema("regiao", "Existe mais de uma equipe com esse nome. Escolha a região certa e tente de novo.", 409);
+  if (r.status === 429) throw new Problema("api_ocupada", "A API do VALORANT está ocupada. Tente de novo em alguns segundos.", 429);
+  if (!r.ok) throw new Problema("api", `A API do Premier não respondeu agora (erro ${r.status}). Tente de novo daqui a pouco.`, 502);
+  const d = (await r.json())?.data ?? {};
+  if (!/^[0-9a-f-]{36}$/.test(d.id ?? "") || !Array.isArray(d.member)) {
+    throw new Problema("api", "A API não trouxe o elenco dessa equipe. Tente de novo daqui a pouco.", 502);
+  }
+  const p = d.placement ?? {}, st = d.stats ?? {};
+  return {
+    id: d.id, nome: String(d.name ?? "").slice(0, 32), tag: String(d.tag ?? "").slice(0, 8),
+    info: {
+      conferencia: p.conference ?? null, divisao: p.division ?? null, pontos: p.points ?? null, posicao: p.place ?? null,
+      vitorias: st.wins ?? null, derrotas: st.losses ?? null, partidas: st.matches ?? null, inscrita: d.enrolled ?? null,
+    },
+    elenco: (d.member as { puuid?: string; name?: string | null; tag?: string | null }[])
+      .filter((m) => /^[0-9a-f-]{36}$/.test(m?.puuid ?? ""))
+      .map((m) => ({ puuid: m.puuid as string, nome: m.name ?? null, tag: m.tag ?? null })),
+  };
+}
+
+function premierPorNome(nome: string, tag: string, regiao: string) {
+  nome = (nome ?? "").trim();
+  tag = (tag ?? "").trim().replace(/^#/, "");
+  if (!/^[^#<>{}]{2,24}$/.test(nome) || !/^[A-Za-z0-9]{1,6}$/.test(tag)) {
+    throw new Problema("formato", "Escreva o nome e a tag da equipe como aparecem no Premier (ex.: Juventus ACDM e JUVI).");
+  }
+  const reg = REGIOES.includes(regiao) ? regiao : "br";
+  return lerPremier(`/valorant/v1/premier/${encodeURIComponent(nome)}/${encodeURIComponent(tag)}?affinity=${reg}`);
+}
+
+async function meuPuuid(usuario: string) {
+  const p = await um(`perfis?id=eq.${usuario}&select=riot_puuid,riot_verificado_em`) as
+    { riot_puuid: string | null; riot_verificado_em: string | null } | null;
+  if (!p) throw new Problema("sem_perfil", "Complete o cadastro primeiro.", 400);
+  if (!p.riot_puuid || !p.riot_verificado_em) {
+    throw new Problema("sem_riot", "Verifique o seu Riot ID primeiro: só o elenco do Premier pode trazer a equipe.", 400);
+  }
+  return p.riot_puuid;
+}
+const ehAdminDe = async (usuario: string) => Boolean(await um(`administradores?usuario_id=eq.${usuario}&select=usuario_id`));
+const rpc = (nome: string, corpo: unknown) => banco(`rpc/${nome}`, "POST", corpo);
+const naoNoElenco = () => new Problema("fora_do_elenco", "O seu Riot ID não está no elenco dessa equipe no Premier. Só quem está no elenco pode trazê-la para o ValReport.", 403);
+
+// Freio simples para a prévia não gastar a cota da API (por instância da função): 8 consultas por minuto por pessoa
+const consultas = new Map<string, number[]>();
+function frear(usuario: string) {
+  const agora = Date.now(), lista = (consultas.get(usuario) ?? []).filter((t) => agora - t < 60_000);
+  if (lista.length >= 8) throw new Problema("cedo", "Muitas consultas seguidas. Espere um minutinho e tente de novo.", 429);
+  lista.push(agora);
+  consultas.set(usuario, lista);
+}
+
+// Prévia: nome, conferência e o elenco (marcando quem já tem conta verificada). Não devolve os puuids.
+async function premierConferir(usuario: string, nome: string, tag: string, regiao: string) {
+  frear(usuario);
+  const eu = await meuPuuid(usuario);
+  const t = await premierPorNome(nome, tag, regiao);
+  const puuids = t.elenco.map((m) => m.puuid);
+  const comConta = puuids.length
+    ? (await banco(`perfis?riot_puuid=in.(${puuids.join(",")})&riot_verificado_em=not.is.null&select=riot_puuid`)) as { riot_puuid: string }[]
+    : [];
+  const existe = await um(`equipes?premier_id=eq.${t.id}&select=slug,nome`) as { slug: string; nome: string } | null;
+  return {
+    nome: t.nome, tag: t.tag, info: t.info, estou_no_elenco: puuids.includes(eu),
+    ja_existe: existe ? { nome: existe.nome } : null,
+    elenco: t.elenco.map((m) => ({ nome: m.nome, tag: m.tag, eu: m.puuid === eu, tem_conta: comConta.some((c) => c.riot_puuid === m.puuid) })),
+  };
+}
+
+async function premierCriar(usuario: string, nome: string, tag: string, regiao: string, visibilidade: string) {
+  const eu = await meuPuuid(usuario);
+  const t = await premierPorNome(nome, tag, regiao);
+  if (!t.elenco.some((m) => m.puuid === eu)) throw naoNoElenco();
+  return await rpc("premier_criar", { p_usuario: usuario, p_dados: t, p_visibilidade: visibilidade === "publica" ? "publica" : "privada" });
+}
+
+async function premierVincular(usuario: string, equipe: string, nome: string, tag: string, regiao: string) {
+  if (!/^[0-9a-f-]{36}$/.test(equipe ?? "")) throw new Problema("formato", "Equipe inválida.");
+  const admin = await ehAdminDe(usuario);
+  const eu = admin ? null : await meuPuuid(usuario);
+  const t = await premierPorNome(nome, tag, regiao);
+  if (eu && !t.elenco.some((m) => m.puuid === eu)) throw naoNoElenco();
+  return await rpc("premier_vincular", { p_usuario: usuario, p_equipe: equipe, p_dados: t });
+}
+
+async function premierSincronizar(usuario: string, equipe: string) {
+  if (!/^[0-9a-f-]{36}$/.test(equipe ?? "")) throw new Problema("formato", "Equipe inválida.");
+  const e = await um(`equipes?id=eq.${equipe}&tipo=eq.premier&select=premier_id,premier_sincronizado_em`) as
+    { premier_id: string; premier_sincronizado_em: string | null } | null;
+  if (!e) throw new Problema("nao_premier", "Essa equipe não é Premier.", 404);
+  const admin = await ehAdminDe(usuario);
+  if (!admin && !(await um(`membros?equipe_id=eq.${equipe}&usuario_id=eq.${usuario}&cargo=in.(lider,colider)&select=cargo`))) {
+    throw new Problema("sem_permissao", "Só a liderança da equipe atualiza o elenco.", 403);
+  }
+  const desde = e.premier_sincronizado_em ? (Date.now() - new Date(e.premier_sincronizado_em).getTime()) / 60_000 : Infinity;
+  if (!admin && desde < ESPERA_ELENCO_MIN) {
+    throw new Problema("cedo", `O elenco foi atualizado agora há pouco. Dá para atualizar de novo em ${Math.ceil(ESPERA_ELENCO_MIN - desde)} min.`, 429);
+  }
+  const t = await lerPremier(`/valorant/v1/premier/${e.premier_id}`);
+  return await rpc("premier_aplicar", { p_equipe: equipe, p_dados: t });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (req.method !== "POST") return resposta({ erro: "metodo", mensagem: "Use POST." }, 405);
@@ -168,6 +289,13 @@ Deno.serve(async (req: Request) => {
       case "desvincular": return resposta(await desvincular(usuario));
       case "admin_verificar": return resposta(await adminVerificar(usuario, String(corpo.usuario_id ?? ""), String(corpo.riot_id ?? "")));
       case "lider_verificar": return resposta(await liderVerificar(usuario, String(corpo.usuario_id ?? ""), String(corpo.riot_id ?? "")));
+      case "premier_conferir":
+        return resposta(await premierConferir(usuario, String(corpo.nome ?? ""), String(corpo.tag ?? ""), String(corpo.regiao ?? "br")));
+      case "premier_criar":
+        return resposta(await premierCriar(usuario, String(corpo.nome ?? ""), String(corpo.tag ?? ""), String(corpo.regiao ?? "br"), String(corpo.visibilidade ?? "")));
+      case "premier_vincular":
+        return resposta(await premierVincular(usuario, String(corpo.equipe_id ?? ""), String(corpo.nome ?? ""), String(corpo.tag ?? ""), String(corpo.regiao ?? "br")));
+      case "premier_sincronizar": return resposta(await premierSincronizar(usuario, String(corpo.equipe_id ?? "")));
       default: throw new Problema("acao", "Ação desconhecida.");
     }
   } catch (e) {

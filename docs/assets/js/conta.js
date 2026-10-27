@@ -4,7 +4,7 @@ import { esc, icone, dataHora } from "./util.js";
 import { B } from "./dados.js";
 import { entrar, sair, usuario, rpc, inserir, atualizar, funcao, ErroNuvem } from "./nuvem.js";
 import { EQUIPE_PADRAO, VERSAO_TERMOS } from "./config.js";
-import { blocoAprovacoes, ligarAprovacoes } from "./equipes.js";
+import { blocoAprovacoes, blocoImagensRecentes, ligarAprovacoes } from "./equipes.js";
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const CARGOS = [["lider", "Líder"], ["colider", "Co-líder"], ["treinador", "Treinador"], ["jogador", "Jogador"], ["convidado", "Convidado"]];
@@ -220,7 +220,7 @@ export async function viewPainel() {
   if (!B.conta?.admin) return { titulo: "Painel", html: `<div class="vazio"><strong>Somente a administradora acessa o painel.</strong></div>` };
   let lista = [];
   let riots = new Map();
-  const aprovacoes = await blocoAprovacoes();
+  const [aprovacoes, imagens] = await Promise.all([blocoAprovacoes(), blocoImagensRecentes()]);
   try {
     lista = await rpc("admin_listar_usuarios");
     riots = new Map((await rpc("admin_pedidos_riot").catch(() => [])).map((r) => [r.id, r]));
@@ -250,6 +250,7 @@ export async function viewPainel() {
     html: `<section class="secao">
       <h1>Painel da administradora</h1>
       ${aprovacoes}
+      ${imagens}
       <h2 class="painel-sub">Pessoas e a Juventus Academy</h2>
       <p class="suave">Quem já entrou com Google aparece aqui. Adicione as pessoas à <strong>Juventus Academy</strong> com o cargo certo e o Riot ID confirmado. Convidados veem as partidas, mas não as notas da IGL.</p>
       <p class="aviso aviso--erro painel-erro" hidden role="alert"></p>

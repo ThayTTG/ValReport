@@ -185,14 +185,15 @@ Os cards são desenhados pelo `ferramentas\cards.py` (Pillow, fonte Inter da pas
 
 ## Site (ValReport)
 
-Depois do report e do Discord, o `ferramentas\exportar_site.py` gera os dados do site em `docs\data\`. O site é estático: o GitHub Pages só serve os arquivos da pasta `docs\`.
+Depois do report e do Discord, o `ferramentas\exportar_site.py` gera os dados do site em `dados\site\` e envia para o Supabase (só a equipe vê). O site fica em https://valreport.vercel.app.
 
-- **Quem aparece:** só quem estiver em `"site" → "jogadores_autorizados"` no `config.json`. Sem essa parte, só a primeira pessoa da lista de jogadores aparece. Todo o resto vira "Aliado/Adversário", sem nome.
+- **Quem aparece:** quem joga na equipe do site (líder, co-líderes e jogadores com o Riot ID verificado) e quem está em `"site" → "jogadores_autorizados"` no `config.json`. Todo o resto vira "Aliado/Adversário", sem nome.
+- **Elenco pelo site (etapa 3b):** o report, a coleta e o Discord usam os membros da equipe no site. Quem está no `config.json` e ainda não entrou no site continua. O apelido do `config.json` continua valendo; quem não tem usa o do site. Cada pessoa do site é achada pelo puuid, então trocar de nick não quebra o histórico. Para desligar: `"site": {"elenco_do_site": false}`.
 - **Ver no PC:** `py -m http.server 8000 -d docs` e abra http://localhost:8000.
 - **Publicar:** siga o `guias\PUBLICAR.md` uma vez. Depois disso, `Atalhos\publicar_site.bat` publica com dois cliques, ou ponha `"publicar_automatico": true` para publicar sozinho.
 - **Atualização a cada 20 min:** o `Atalhos\instalar_agendamento.ps1` cria também a tarefa "NokyLabs - Atualizar site VALORANT", que roda escondida e só publica quando acha partida nova. O que ela achar fica em `dados/pendentes.json` e entra no report das 21h normalmente. Para pausar, use `"coleta_rapida": false` no `config.json`. O site também confere sozinho a cada 20 min e tem o botão de atualizar no topo.
 - **Créditos e transparência:** `CREDITOS.md` e a página Sobre do site.
-- **Notas da IGL:** dois cliques em `Atalhos\editar_notas.bat`. Abre o site no seu PC com campos para escrever: na partida (aba *Notas da IGL* e no *Placar*), em cada round (aba *Rounds*) e no plano de cada mapa (*Equipe → Mapas*). Salve com o botão ou Ctrl+Enter. As notas vão para o site na próxima publicação. O site é público, então não cite pelo nome quem não autorizou aparecer. Para não publicar notas: `"site": {"publicar_notas": false}`.
+- **Notas da IGL:** dois cliques em `Atalhos\editar_notas.bat`. Abre o site no seu PC com campos para escrever: na partida (aba *Notas da IGL* e no *Placar*), em cada round (aba *Rounds*) e no plano de cada mapa (*Equipe → Mapas*). Salve com o botão ou Ctrl+Enter. As notas vão para o site na próxima publicação. Os convidados não veem as notas; mesmo assim, não cite pelo nome quem é de fora da equipe. Para não publicar notas: `"site": {"publicar_notas": false}`.
 - **Elo:** o coletor guarda o histórico de RR de cada jogador em `dados\elo\` (gráfico na aba *Performance*). Para desligar: `"coletar_elo": false`.
 - **Resumo da semana:** aos domingos, o card `semana.png` (MVP, cada um contra a semana anterior e rounds para rever) vai junto da mensagem da equipe no Discord. No site, fica na aba *Equipe → Semana*.
 - **Prévia do link e app:** ao compartilhar o link, aparece a imagem `docs\assets\img\og.png`. Se o endereço do site mudar, ponha `"url_publica"` em `"site"`. No celular, o site pode ser instalado como app.

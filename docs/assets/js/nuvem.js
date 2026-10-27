@@ -130,3 +130,29 @@ export async function lerDado(equipeId, caminho) {
   if (!linhas?.length) throw new ErroNuvem("404", `${caminho}: não encontrado`, 404);
   return linhas[0].conteudo;
 }
+
+// ---------- Arquivos (Supabase Storage) ----------
+/** Endereço público de um arquivo de um balde público (ex.: a imagem enviada da equipe) */
+export const urlPublica = (balde, caminho) => `${SUPABASE_URL}/storage/v1/object/public/${balde}/${caminho}`;
+
+async function arquivo(metodo, balde, caminho, blob) {
+  const t = await token();
+  if (!t) throw new ErroNuvem("sem_sessao", "Sua sessão terminou. Entre de novo.", 401);
+  const cab = { apikey: SUPABASE_CHAVE, Authorization: `Bearer ${t}` };
+  if (blob) Object.assign(cab, { "Content-Type": blob.type, "x-upsert": "true", "cache-control": "max-age=31536000" });
+  let r;
+  try {
+    r = await fetch(`${SUPABASE_URL}/storage/v1/object/${balde}/${caminho}`, { method: metodo, headers: cab, body: blob || undefined });
+  } catch (e) { throw new ErroNuvem("rede", "Sem conexão com o servidor agora. Tente de novo.", 0); }
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    const st = Number(j.statusCode) || r.status;
+    const msg = st === 413 ? "A imagem ficou grande demais. Tente outra." : st === 415 ? "Esse tipo de arquivo não é aceito. Use PNG, JPEG ou WebP."
+      : st === 403 || st === 401 || /row-level security/i.test(j.message || "") ? "Só a liderança da equipe pode mudar a imagem."
+      : st === 404 && metodo === "DELETE" ? null : `O envio não deu certo agora (erro ${st}). Tente de novo.`;
+    if (msg) throw new ErroNuvem(j.error || String(st), msg, st);
+  }
+  return true;
+}
+export const enviarArquivo = (balde, caminho, blob) => arquivo("POST", balde, caminho, blob);
+export const apagarArquivo = (balde, caminho) => arquivo("DELETE", balde, caminho);

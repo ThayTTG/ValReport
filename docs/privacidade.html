@@ -31,6 +31,8 @@
       <li><strong>O que você escolhe mostrar:</strong> bio, agentes e funções preferidas e cor de destaque, que você pode mudar ou apagar a qualquer momento.</li>
       <li><strong>Do VALORANT:</strong> o seu Riot ID (nome#tag), o identificador da conta, o card e o nível, buscados pela HenrikDev API depois que a administradora ou a liderança da sua equipe confirmam que a conta é sua.</li>
       <li><strong>Da equipe:</strong> as equipes de que você participa, o seu cargo, os convites criados e as notas e estratégias que a equipe escrever.</li>
+      <li><strong>Equipes Premier:</strong> o nome, a tag, a divisão e o elenco da equipe no Premier (nomes e identificadores das contas), que o jogo já mostra publicamente e que conferimos pela HenrikDev API para saber quem pode jogar pela equipe.</li>
+      <li><strong>Imagem da equipe:</strong> se a liderança enviar uma, ela é reduzida e regravada no navegador (o que apaga dados escondidos da foto, como local e câmera) e guardada no Supabase.</li>
       <li><strong>Do jogo:</strong> estatísticas das partidas (abates, rounds, agentes, mapas, posições), obtidas pela HenrikDev API a partir dos dados públicos do VALORANT.</li>
       <li><strong>Registros técnicos:</strong> os provedores de hospedagem e de banco de dados mantêm registros de acesso (como endereço IP e horário) por segurança, por tempo limitado.</li>
     </ul>
@@ -51,6 +53,7 @@
       <li><strong>Convidados</strong> veem as partidas e as análises, mas não as notas, as estratégias e as conversas.</li>
       <li><strong>Colegas de equipe</strong> veem o seu apelido, o seu cargo e o seu Riot ID confirmado. Seu mês e ano de nascimento e o e-mail do responsável não aparecem para ninguém além de você.</li>
       <li><strong>Pessoas logadas no ValReport</strong> encontram pela busca o perfil de quem tem o Riot ID confirmado (apelido, bio, agentes, funções, card e nível) e veem as equipes marcadas como públicas. Quem tem 16 ou 17 anos fica fora da busca e das páginas públicas para quem não é da equipe.</li>
+      <li><strong>Imagens de equipe</strong> aparecem para quem vê a equipe e ficam num endereço público, como os cards do jogo. Não envie fotos de pessoas sem a permissão delas; a administradora pode remover qualquer imagem.</li>
       <li><strong>A administradora</strong> vê a lista de contas (e-mail, apelido, faixa de idade, equipe e pedidos de verificação) e as equipes que esperam aprovação, para liberar acessos e cuidar da segurança.</li>
     </ul>
     <p>Essas regras ficam no próprio banco de dados: mesmo que alguém altere o site no navegador, o banco não entrega o que a pessoa não pode ver.</p>

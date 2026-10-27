@@ -1,8 +1,9 @@
-// Equipes: minhas equipes, criar equipe, página da equipe (membros, cargos, convites, ajustes) e aceitar convite
+// Equipes: minhas equipes, criar equipe, página da equipe (membros, cargos, convites, ajustes) e aceitar convite.
+// Etapa 3b: equipe Premier (conferida pelo elenco do jogo), imagem enviada e moderação das imagens no painel.
 
 import { esc, icone, imagem, imgCard, dataHora } from "./util.js";
 import { B } from "./dados.js";
-import { rpc, funcao } from "./nuvem.js";
+import { rpc, funcao, urlPublica, enviarArquivo, apagarArquivo } from "./nuvem.js";
 import { nomeCargo } from "./conta.js";
 
 const NOMES_CARGO_PLURAL = { lider: "Liderança", colider: "Co-liderança", treinador: "Treinadores", jogador: "Jogadores", convidado: "Convidados" };
@@ -17,13 +18,15 @@ const recarregar = () => window.dispatchEvent(new CustomEvent("valreport:recarre
 const irPara = (hash) => { location.hash = hash; recarregar(); };
 
 export function imagemEquipe(e, classe = "equipe-img") {
-  const src = e.imagem_url || (e.imagem_card ? imgCard(e.imagem_card, "smallart") : null);
+  const src = e.imagem_url ? urlPublica("equipes", e.imagem_url) : e.imagem_card ? imgCard(e.imagem_card, "smallart") : null;
   return imagem(src, "", classe, e.nome);
 }
 const urlConvite = (codigo) => `${location.origin}${location.pathname}#/convite/${codigo}`;
 const seloStatus = (e) => e.status === "pendente" ? `<span class="selo selo--alerta">${icone("relogio")} aguardando aprovação</span>`
   : e.status === "recusada" ? `<span class="selo selo--derrota">recusada</span>` : "";
-const seloTipo = (e) => `<span class="selo">${e.tipo === "premier" ? "Premier" : "Própria"} · ${e.visibilidade === "publica" ? "pública" : "privada"}</span>`;
+const seloTipo = (e) => `<span class="selo${e.tipo === "premier" ? " selo--premier" : ""}">${e.tipo === "premier" ? `${icone("escudo")} Premier` : "Própria"} · ${e.visibilidade === "publica" ? "pública" : "privada"}</span>`;
+const REGIOES = [["br", "Brasil"], ["latam", "América Latina"], ["na", "América do Norte"], ["eu", "Europa"], ["ap", "Ásia-Pacífico"], ["kr", "Coreia"]];
+const nomeConferencia = (c) => String(c || "").toLowerCase().split("_").map((x) => x.charAt(0).toUpperCase() + x.slice(1)).join(" ");
 
 function mensagem(el, texto, erro = false) {
   if (!el) return;
@@ -52,7 +55,7 @@ function listaCards() {
 }
 
 /** Campo de escolha de card: mostra o escolhido e abre uma galeria com busca */
-function campoCard(nome, atual) {
+function campoCard(nome, atual, dica = "Depois de criada, a liderança também pode enviar uma imagem própria em Ajustes; ela aparece no lugar do card.") {
   return `<div class="campo campo-card" data-campo-card="${esc(nome)}">
     <span>Imagem da equipe</span>
     <div class="campo-card__linha">
@@ -61,7 +64,7 @@ function campoCard(nome, atual) {
       <button class="botao-secundario botao-mini" type="button" data-abrir-galeria>Escolher um card do jogo</button>
       <button class="botao-secundario botao-mini" type="button" data-limpar-card${atual ? "" : " hidden"}>Tirar</button>
     </div>
-    <small>Enviar uma imagem própria chega na próxima atualização.</small>
+    <small>${dica}</small>
     <div class="galeria" hidden>
       <input type="search" placeholder="Procurar card pelo nome (ex.: Jett, Champions, Premier)" aria-label="Procurar card">
       <div class="galeria__grade" role="listbox" aria-label="Cards"></div>
@@ -113,6 +116,155 @@ const camposVisibilidade = (atual = "privada") => `<fieldset class="campo"><lege
       <span><strong>Pública</strong>: qualquer pessoa logada vê o nome e os membros (quem tem 16 ou 17 anos fica de fora).</span></label>
     <small>Partidas, estratégias e conversas são sempre só da equipe.</small></fieldset>`;
 
+// ---------- Premier: conferir o elenco no jogo, criar ou vincular ----------
+/** modo "criar" (Minhas equipes, com opção de vincular as equipes próprias que a pessoa lidera) ou "vincular" (Ajustes) */
+function blocoPremier(modo, equipe = null) {
+  return `<form class="premier-form pilha-form" data-premier-form="${modo}"${equipe ? ` data-equipe="${esc(equipe.id)}" data-nome-equipe="${esc(equipe.nome)}"` : ""}>
+      <div class="premier-form__linha">
+        <label class="campo"><span>Nome no Premier</span><input name="nome" maxlength="24" required placeholder="Ex.: Juventus ACDM" autocomplete="off"></label>
+        <label class="campo campo--tag"><span>Tag</span><input name="tag" maxlength="6" required placeholder="JUVI" autocomplete="off"></label>
+        <label class="campo"><span>Região</span><select name="regiao">${REGIOES.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>
+      </div>
+      <p class="form-msg" role="status" hidden></p>
+      <div class="lp-acoes"><button class="botao-secundario" type="submit">${icone("busca")} Conferir no Premier</button></div>
+      <div class="premier-previa" hidden></div>
+    </form>`;
+}
+
+function elencoHtml(elenco, comConta) {
+  return `<ul class="premier-lista">${elenco.map((m) => `<li><span>${esc(m.nome || "?")}<span class="suave">#${esc(m.tag || "?")}</span></span>
+      ${m.eu ? `<span class="selo selo--destaque">você</span>` : (comConta(m) ? `<span class="selo selo--vitoria">${icone("verificado")} no ValReport</span>` : `<span class="selo">ainda não entrou</span>`)}</li>`).join("")}</ul>`;
+}
+
+function ligarPremier(el, lideradas = []) {
+  el.querySelectorAll("[data-premier-form]").forEach((f) => {
+    const msg = f.querySelector(".form-msg"), previa = f.querySelector(".premier-previa"), conferir = f.querySelector("[type=submit]");
+    let pedido = null;
+    f.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      conferir.disabled = true;
+      mensagem(msg, "Procurando a equipe no Premier…");
+      previa.hidden = true;
+      try {
+        pedido = { nome: f.nome.value.trim(), tag: f.tag.value.trim().replace(/^#/, ""), regiao: f.regiao.value };
+        const r = await funcao("riot", { acao: "premier_conferir", ...pedido });
+        mensagem(msg, "");
+        const info = r.info || {};
+        const detalhes = [info.divisao ? `Divisão ${info.divisao}` : "", info.conferencia ? nomeConferencia(info.conferencia) : "",
+          info.partidas != null ? `${info.vitorias ?? 0}V ${info.derrotas ?? 0}D` : ""].filter(Boolean).join(" · ");
+        let acoes = "";
+        if (r.ja_existe) {
+          acoes = `<p class="aviso">${icone("info")}<span>Essa equipe já está no ValReport como <strong>${esc(r.ja_existe.nome)}</strong>. Peça um convite para a liderança dela.</span></p>`;
+        } else if (!r.estou_no_elenco && !(f.dataset.premierForm === "vincular" && B.conta?.admin)) {
+          acoes = `<p class="aviso aviso--erro">${icone("info")}<span>O seu Riot ID verificado não aparece neste elenco. Só quem está no elenco do jogo pode trazer a equipe para o ValReport.</span></p>`;
+        } else if (f.dataset.premierForm === "vincular") {
+          acoes = `<p class="aviso">${icone("info")}<span><strong>${esc(f.dataset.nomeEquipe)}</strong> vira uma equipe Premier e mantém partidas, convites e membros.
+              Quem não estiver neste elenco (com o Riot ID verificado) passa a convidado; a liderança promove depois, quando a pessoa verificar o Riot ID.</span></p>
+            <div class="lp-acoes"><button class="botao-primario" type="button" data-premier-vincular="${esc(f.dataset.equipe)}" data-nome="${esc(f.dataset.nomeEquipe)}">Vincular ao Premier</button></div>`;
+        } else {
+          acoes = `${camposVisibilidade()}
+            <div class="lp-acoes"><button class="botao-primario" type="button" data-premier-criar>Criar equipe Premier</button></div>
+            ${lideradas.length ? `<p class="suave pequeno">Ou transforme uma equipe sua em Premier, mantendo as partidas:</p>
+              <div class="lp-acoes">${lideradas.map((e) => `<button class="botao-secundario" type="button" data-premier-vincular="${esc(e.id)}" data-nome="${esc(e.nome)}">Vincular ${esc(e.nome)}</button>`).join("")}</div>` : ""}`;
+        }
+        previa.innerHTML = `<div class="premier-previa__topo">${icone("escudo")}<div><strong>${esc(r.nome)}<span class="suave">#${esc(r.tag)}</span></strong>
+            ${detalhes ? `<small class="suave">${esc(detalhes)}</small>` : ""}</div></div>
+          ${elencoHtml(r.elenco || [], (m) => m.tem_conta)}
+          <div class="pilha-form">${acoes}</div><p class="form-msg premier-previa__msg" role="status" hidden></p>`;
+        previa.hidden = false;
+      } catch (e) { mensagem(msg, textoErro(e), true); }
+      conferir.disabled = false;
+    });
+    previa.addEventListener("click", async (ev) => {
+      const b = ev.target.closest("[data-premier-criar], [data-premier-vincular]");
+      if (!b || !pedido) return;
+      const m2 = previa.querySelector(".premier-previa__msg");
+      if (b.dataset.premierVincular && !confirm(`Vincular ${b.dataset.nome} ao Premier? Quem não estiver no elenco passa a convidado.`)) return;
+      b.disabled = true;
+      try {
+        if (b.dataset.premierVincular) {
+          const r = await funcao("riot", { acao: "premier_vincular", equipe_id: b.dataset.premierVincular, ...pedido });
+          irPara(`#/time/${r.slug}`);
+        } else {
+          const vis = previa.querySelector("[name=visibilidade]:checked")?.value || "privada";
+          const r = await funcao("riot", { acao: "premier_criar", ...pedido, visibilidade: vis });
+          irPara(`#/time/${r.slug}`);
+        }
+      } catch (e) { mensagem(m2, textoErro(e), true); b.disabled = false; }
+    });
+  });
+}
+
+// ---------- Imagem enviada ----------
+const LADO_IMAGEM = 512, LIMITE_IMAGEM = 512 * 1024;
+const paraBlob = (canvas, tipo, q) => new Promise((ok) => canvas.toBlob(ok, tipo, q));
+
+/** Corta no centro em quadrado, reduz para 512×512 e regrava (WebP ou JPEG). Regravar tira os dados escondidos da foto. */
+async function prepararImagem(arq) {
+  if (!/^image\/(png|jpeg|webp|gif)$/.test(arq.type)) throw new Error("Escolha uma imagem PNG, JPEG ou WebP.");
+  if (arq.size > 20 * 1024 * 1024) throw new Error("Essa imagem é grande demais (até 20 MB antes de reduzir).");
+  let bmp;
+  try { bmp = await createImageBitmap(arq); } catch (e) { throw new Error("Não consegui abrir essa imagem. Tente outra."); }
+  const lado = Math.min(bmp.width, bmp.height);
+  if (lado < 64) throw new Error("A imagem é pequena demais (mínimo 64×64).");
+  const saida = Math.min(LADO_IMAGEM, lado);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = saida;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bmp, (bmp.width - lado) / 2, (bmp.height - lado) / 2, lado, lado, 0, 0, saida, saida);
+  bmp.close?.();
+  for (const q of [0.86, 0.72, 0.55]) {
+    let b = await paraBlob(canvas, "image/webp", q);
+    if (!b || b.type !== "image/webp") b = await paraBlob(canvas, "image/jpeg", q);   // navegadores sem WebP
+    if (b && b.size <= LIMITE_IMAGEM) return b;
+  }
+  throw new Error("Não consegui deixar a imagem abaixo de 512 KB. Tente outra.");
+}
+
+function blocoImagem(d) {
+  return `<section class="cartao secao imagem-equipe"><div class="cartao__titulo"><h3>${icone("imagem")} Imagem enviada</h3></div>
+      <div class="imagem-equipe__linha">${imagemEquipe(d, "equipe-img equipe-img--grande")}
+        <div class="pilha-form">
+          <p class="suave pequeno">Uma foto ou logo da equipe. O site corta em quadrado, reduz para 512×512 e apaga os dados escondidos da foto antes de enviar.
+            Ela aparece no lugar do card do jogo para quem vê a equipe, e a administradora pode removê-la.</p>
+          <div class="lp-acoes">
+            <label class="botao-secundario botao-mini botao-arquivo">${icone("enviar")} ${d.imagem_url ? "Trocar imagem" : "Enviar imagem"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" data-imagem-arquivo></label>
+            ${d.imagem_url ? `<button class="botao-perigo botao-mini" type="button" data-imagem-tirar>Tirar imagem enviada</button>` : ""}
+          </div>
+          <p class="form-msg" role="status" hidden></p></div></div></section>`;
+}
+
+function ligarImagem(el, d) {
+  const bloco = el.querySelector(".imagem-equipe");
+  if (!bloco) return;
+  const msg = bloco.querySelector(".form-msg"), entrada = bloco.querySelector("[data-imagem-arquivo]");
+  entrada.addEventListener("change", async () => {
+    const arq = entrada.files?.[0];
+    if (!arq) return;
+    entrada.disabled = true;
+    try {
+      mensagem(msg, "Preparando a imagem…");
+      const blob = await prepararImagem(arq);
+      mensagem(msg, "Enviando…");
+      await enviarArquivo("equipes", `${d.id}/imagem`, blob);
+      await rpc("definir_imagem_equipe", { p_equipe: d.id });
+      recarregar();
+    } catch (e) { mensagem(msg, textoErro(e), true); entrada.disabled = false; entrada.value = ""; }
+  });
+  bloco.querySelector("[data-imagem-tirar]")?.addEventListener("click", async (ev) => {
+    if (!confirm("Tirar a imagem enviada? A equipe volta a usar o card do jogo.")) return;
+    ev.currentTarget.disabled = true;
+    try { await removerImagem(d.id); recarregar(); } catch (e) { mensagem(msg, textoErro(e), true); ev.currentTarget.disabled = false; }
+  });
+}
+
+async function removerImagem(equipeId) {
+  await rpc("remover_imagem_equipe", { p_equipe: equipeId });
+  await apagarArquivo("equipes", `${equipeId}/imagem`);
+}
+
 // ---------- Minhas equipes ----------
 export async function viewMinhasEquipes() {
   let lista = [];
@@ -122,11 +274,14 @@ export async function viewMinhasEquipes() {
   const temPropria = lista.some((e) => e.tipo === "propria" && e.status !== "recusada");
   const temPendente = lista.some((e) => e.status === "pendente");
   const podeCriar = B.conta.admin || (!temPropria && !temPendente);
+  const temPremier = lista.some((e) => e.tipo === "premier" && e.status !== "recusada");
+  const verificado = Boolean(B.conta?.perfil?.riot_verificado_em);
+  const lideradas = lista.filter((e) => e.tipo === "propria" && e.status === "aprovada" && (e.cargo === "lider" || B.conta.admin));
   const cartoes = lista.map((e) => `<a class="equipe-cartao" href="#/time/${esc(e.slug)}">
       ${imagemEquipe(e)}
       <span class="equipe-cartao__texto"><strong>${esc(e.nome)}</strong>
         <span class="equipe-cartao__selos">${seloTipo(e)}<span class="selo selo--destaque">${esc(nomeCargo(e.cargo))}</span>${seloStatus(e)}</span>
-        <small>${e.membros} membro${e.membros === 1 ? "" : "s"}${e.status === "recusada" && e.motivo_recusa ? ` · Motivo: ${esc(e.motivo_recusa)}` : ""}</small></span>
+        <small>${e.premier ? `${esc(e.premier)} · ` : ""}${e.membros} membro${e.membros === 1 ? "" : "s"}${e.status === "recusada" && e.motivo_recusa ? ` · Motivo: ${esc(e.motivo_recusa)}` : ""}</small></span>
       ${icone("seta")}</a>`).join("");
   return {
     titulo: "Minhas equipes",
@@ -144,7 +299,13 @@ export async function viewMinhasEquipes() {
               <p class="suave pequeno">${B.conta.admin ? "Como administradora, a sua equipe já nasce aprovada." : "A equipe fica aguardando a aprovação da administradora. Enquanto isso, só você está nela."}</p>
               <div class="lp-acoes"><button class="botao-primario" type="submit">Criar equipe</button></div></form>`
             : `<p class="suave pequeno">${temPendente ? "Você já tem uma equipe esperando aprovação." : "Você já está numa equipe própria. Para criar outra, saia dela antes."}</p>`}
-          <p class="suave pequeno" style="margin-top:12px">Equipes Premier (conferidas pelo elenco do jogo) chegam na próxima atualização.</p></section>
+</section>
+        <section class="cartao cartao--premier"><div class="cartao__titulo"><h3>${icone("escudo")} Equipe Premier</h3></div>
+          ${temPremier && !B.conta.admin ? `<p class="suave pequeno">Você já está numa equipe Premier.</p>`
+            : !verificado ? `<p class="suave pequeno">Para trazer a sua equipe do Premier, verifique o seu Riot ID primeiro: o site confere no jogo se você está no elenco.</p>
+              <div class="lp-acoes"><a class="botao-secundario" href="#/perfil">Verificar meu Riot ID</a></div>`
+            : `<p class="suave pequeno">Digite o nome e a tag da equipe como aparecem no Premier. Se o seu Riot ID estiver no elenco, a equipe entra na hora, sem esperar aprovação.</p>
+              ${blocoPremier("criar")}`}</section>
         <section class="cartao"><div class="cartao__titulo"><h3>${icone("externo")} Tenho um convite</h3></div>
           <form id="form-convite" class="pilha-form">
             <label class="campo"><span>Link ou código do convite</span><input name="codigo" required placeholder="Cole aqui o link que a equipe mandou" autocomplete="off"></label>
@@ -153,6 +314,7 @@ export async function viewMinhasEquipes() {
       </div></section>`,
     depois: (el) => {
       ligarCampoCard(el);
+      ligarPremier(el, lideradas);
       const f = el.querySelector("#form-criar-equipe");
       f?.addEventListener("submit", async (ev) => {
         ev.preventDefault();
@@ -230,7 +392,8 @@ export async function viewTime(slug, aba = "membros") {
   const cabeca = `<header class="time-cabeca">
       ${imagemEquipe(d, "equipe-img equipe-img--grande")}
       <div class="time-cabeca__texto"><h1>${esc(d.nome)}</h1>
-        <p class="equipe-cartao__selos">${seloTipo(d)}${seloStatus(d)}${d.meu_cargo ? `<span class="selo selo--destaque">Você: ${esc(nomeCargo(d.meu_cargo))}</span>` : ""}</p></div>
+        <p class="equipe-cartao__selos">${seloTipo(d)}${seloStatus(d)}${d.meu_cargo ? `<span class="selo selo--destaque">Você: ${esc(nomeCargo(d.meu_cargo))}</span>` : ""}</p>
+        ${d.premier ? `<p class="suave pequeno time-cabeca__premier">${esc(d.premier.nome)}#${esc(d.premier.tag)}${d.premier.info?.divisao ? ` · Divisão ${esc(d.premier.info.divisao)}` : ""}${d.premier.info?.conferencia ? ` · ${esc(nomeConferencia(d.premier.info.conferencia))}` : ""}</p>` : ""}</div>
       <div class="time-cabeca__acoes">${temEstatisticas ? `<button class="botao-secundario" type="button" data-ver-estatisticas="${esc(d.slug)}">${icone("raio")} Estatísticas</button>` : ""}</div>
     </header>
     ${d.status === "pendente" ? `<p class="aviso secao">${icone("relogio")}<span>Esta equipe está esperando a aprovação da administradora. Convites e cargos liberam depois.</span></p>
@@ -253,7 +416,20 @@ export async function viewTime(slug, aba = "membros") {
   };
 }
 
+function blocoElenco(d) {
+  const p = d.premier;
+  if (!p || !Array.isArray(p.elenco)) return "";
+  const liderFora = d.membros.some((m) => m.cargo === "lider" && m.no_elenco === false);
+  return `<section class="cartao secao premier-elenco"><div class="cartao__titulo"><h3>${icone("escudo")} Elenco no Premier</h3>
+      ${d.lideranca ? `<button class="botao-secundario botao-mini" type="button" data-premier-sincronizar>${icone("atualizar")} Atualizar elenco</button>` : ""}</div>
+    ${liderFora && d.lideranca ? `<p class="aviso">${icone("info")}<span>A liderança atual não está no elenco do Premier. Quando alguém do elenco entrar no site, passe a liderança para essa pessoa.</span></p>` : ""}
+    ${elencoHtml(p.elenco, (m) => m.no_site)}
+    <p class="suave pequeno">Só quem está neste elenco, com o Riot ID verificado, pode ser líder, co-líder ou jogador. ${p.sincronizado_em ? `Elenco conferido em ${esc(dataHora(p.sincronizado_em))}.` : ""}
+      O elenco também é conferido todo dia pela coleta.</p></section>`;
+}
+
 function abaMembros(d, lider) {
+  const premier = d.tipo === "premier";
   const linha = (m) => {
     const podeExpulsar = d.sou_membro !== undefined && m.usuario_id && !m.eu && m.cargo !== "lider"
       && (lider || (d.meu_cargo === "colider" && ["jogador", "treinador", "convidado"].includes(m.cargo)));
@@ -264,17 +440,18 @@ function abaMembros(d, lider) {
       acoes.push(`<button class="botao-primario botao-mini" type="button" data-acao="confirmar" data-riot="${esc(m.riot_id_pedido)}" title="Confirme que essa conta é mesmo dessa pessoa">Confirmar Riot ID</button>`);
     }
     if (lider && m.usuario_id && m.cargo !== "lider" && d.status === "aprovada") {
-      acoes.push(`<select data-acao="cargo" aria-label="Cargo de ${esc(m.apelido)}">${CARGOS_EDITAVEIS.map((c) => `<option value="${c}"${c === m.cargo ? " selected" : ""}>${esc(nomeCargo(c))}</option>`).join("")}</select>`);
-      acoes.push(`<button class="botao-secundario botao-mini" type="button" data-acao="lideranca">Passar a liderança</button>`);
+      const fora = premier && !m.no_elenco;   // fora do elenco do Premier: só treinador ou convidado
+      acoes.push(`<select data-acao="cargo" aria-label="Cargo de ${esc(m.apelido)}">${CARGOS_EDITAVEIS.map((c) => `<option value="${c}"${c === m.cargo ? " selected" : ""}${fora && ["colider", "jogador"].includes(c) ? " disabled" : ""}>${esc(nomeCargo(c))}${fora && ["colider", "jogador"].includes(c) ? " (só elenco)" : ""}</option>`).join("")}</select>`);
+      if (!fora) acoes.push(`<button class="botao-secundario botao-mini" type="button" data-acao="lideranca">Passar a liderança</button>`);
     }
     if (podeExpulsar) acoes.push(`<button class="botao-perigo botao-mini" type="button" data-acao="expulsar">Remover</button>`);
     return `<li class="integrante" data-usuario="${esc(m.usuario_id || "")}" data-apelido="${esc(m.apelido)}"${/^#[0-9a-f]{6}$/i.test(m.cor || "") ? ` style="--cor-perfil:${m.cor}"` : ""}>
       <span class="integrante__avatar">${imagem(imgCard(m.riot_card), "", "", m.apelido)}</span>
       <div class="integrante__texto"><strong>${esc(m.apelido)}${m.eu ? ` <span class="suave">(você)</span>` : ""}</strong>
-        <span><span class="selo">${esc(nomeCargo(m.cargo))}</span>${m.protegido ? ` <span class="selo selo--alerta" title="16 ou 17 anos">modo protegido</span>` : ""} ${riot}</span></div>
+        <span><span class="selo">${esc(nomeCargo(m.cargo))}</span>${m.no_elenco ? ` <span class="selo selo--premier" title="Está no elenco do Premier">${icone("escudo")} elenco</span>` : ""}${m.protegido ? ` <span class="selo selo--alerta" title="16 ou 17 anos">modo protegido</span>` : ""} ${riot}</span></div>
       ${acoes.length ? `<div class="integrante__acoes">${acoes.join("")}</div>` : ""}</li>`;
   };
-  return `<p class="vagas"><span><strong>${d.vagas.jogadores}/7</strong> jogadores (liderança inclusa)</span><span><strong>${d.vagas.extras}/8</strong> treinadores e convidados</span></p>
+  return `${blocoElenco(d)}<p class="vagas${d.premier ? " secao" : ""}"><span><strong>${d.vagas.jogadores}/7</strong> jogadores (liderança inclusa)</span><span><strong>${d.vagas.extras}/8</strong> treinadores e convidados</span></p>
     <ul class="integrantes">${d.membros.map(linha).join("")}</ul>
     ${d.ocultos ? `<p class="suave pequeno">+${d.ocultos} membro${d.ocultos === 1 ? "" : "s"} no modo protegido (só a equipe vê).</p>` : ""}
     ${lider && d.status === "aprovada" ? `<p class="suave pequeno">Cargos: até 2 co-líderes e 2 treinadores. Co-líderes criam convites, confirmam Riot IDs e removem jogadores, treinadores e convidados. Convidados não veem as notas da IGL.</p>` : ""}`;
@@ -303,8 +480,12 @@ function abaAjustes(d, lider) {
       <div class="cartao__titulo"><h3>Dados da equipe</h3></div>
       <label class="campo"><span>Nome</span><input name="nome" value="${esc(d.nome)}" maxlength="40" required></label>
       ${camposVisibilidade(d.visibilidade)}
-      ${campoCard("imagem_card", d.imagem_card)}
+      ${campoCard("imagem_card", d.imagem_card, d.imagem_url ? "A imagem enviada (abaixo) aparece no lugar do card enquanto estiver lá." : "Ou envie uma imagem própria logo abaixo.")}
       <div class="lp-acoes"><button class="botao-primario" type="submit">Salvar</button></div></form>` : ""}
+    ${d.lideranca && d.status === "aprovada" ? blocoImagem(d) : ""}
+    ${lider && d.tipo === "propria" && d.status === "aprovada" ? `<section class="cartao secao"><div class="cartao__titulo"><h3>${icone("escudo")} Vincular ao Premier</h3></div>
+      <p class="suave pequeno">Se esta equipe joga o Premier, ligue-a ao elenco do jogo: ela vira uma equipe Premier e mantém partidas, convites e membros.</p>
+      ${blocoPremier("vincular", d)}</section>` : ""}
     ${d.sou_membro ? `<section class="cartao secao"><div class="cartao__titulo"><h3>Sair da equipe</h3></div>
       <p class="suave pequeno">${d.meu_cargo === "lider" ? (d.membros.length > 1 ? "Para sair, passe a liderança para outra pessoa em Membros." : "Você é a única pessoa da equipe: ao sair, a equipe é encerrada.") : "Você deixa de ver as partidas e as conversas da equipe."}</p>
       <div class="lp-acoes"><button class="botao-perigo" type="button" data-sair-equipe${d.meu_cargo === "lider" && d.membros.length > 1 ? " disabled" : ""}>${d.membros.length === 1 ? "Encerrar a equipe" : "Sair da equipe"}</button></div></section>` : ""}`;
@@ -312,6 +493,8 @@ function abaAjustes(d, lider) {
 
 function ligarTime(el, d) {
   ligarCampoCard(el);
+  ligarPremier(el);
+  ligarImagem(el, d);
   const msg = el.querySelector(".form-msg");
   const acao = async (b, fn) => {
     b.disabled = true;
@@ -327,6 +510,12 @@ function ligarTime(el, d) {
     if (!aprovar && motivo === null) return;
     acao(b, () => rpc("admin_revisar_equipe", { p_equipe: d.id, p_aprovar: aprovar, p_motivo: motivo }));
   }));
+  el.querySelector("[data-premier-sincronizar]")?.addEventListener("click", (ev) => {
+    acao(ev.currentTarget, async () => {
+      const r = await funcao("riot", { acao: "premier_sincronizar", equipe_id: d.id });
+      if (r?.viraram_convidados) alert(`${r.viraram_convidados} pessoa${r.viraram_convidados === 1 ? "" : "s"} saiu do elenco do Premier e passou a convidado.`);
+    });
+  });
   el.querySelector(".integrantes")?.addEventListener("click", (ev) => {
     const b = ev.target.closest("button[data-acao]");
     if (!b) return;
@@ -389,7 +578,26 @@ export async function blocoAprovacoes() {
       <div class="lp-acoes"><button class="botao-primario botao-mini" type="button" data-aprovar="sim">Aprovar</button>
         <button class="botao-perigo botao-mini" type="button" data-aprovar="nao">Recusar</button></div></li>`).join("")}</ul></section>`;
 }
+export async function blocoImagensRecentes() {
+  let lista = [];
+  try { lista = await rpc("admin_imagens_recentes"); } catch (e) { return ""; }
+  return `<section class="cartao secao imagens-recentes"><div class="cartao__titulo"><h3>${icone("imagem")} Imagens enviadas (últimos 14 dias)</h3></div>
+    ${lista.length ? `<ul class="lista-limpa">${lista.map((e) => `<li class="aprovacao" data-equipe="${esc(e.id)}">
+      ${imagemEquipe(e, "equipe-img equipe-img--grande")}
+      <div><strong><a href="#/time/${esc(e.slug)}">${esc(e.nome)}</a></strong>
+        <small class="suave" style="display:block">Enviada${e.enviada_por ? ` por ${esc(e.enviada_por)}` : ""} em ${esc(dataHora(e.enviada_em))}</small></div>
+      <div class="lp-acoes"><button class="botao-perigo botao-mini" type="button" data-remover-imagem>Remover</button></div></li>`).join("")}</ul>`
+      : `<p class="suave pequeno">Nenhuma imagem nova.</p>`}</section>`;
+}
+
 export function ligarAprovacoes(el) {
+  el.querySelector(".imagens-recentes")?.addEventListener("click", async (ev) => {
+    const b = ev.target.closest("[data-remover-imagem]");
+    if (!b || !confirm("Remover esta imagem? A equipe volta a usar o card do jogo.")) return;
+    b.disabled = true;
+    try { await removerImagem(b.closest("[data-equipe]").dataset.equipe); recarregar(); }
+    catch (e) { alert(textoErro(e)); b.disabled = false; }
+  });
   el.querySelector(".aprovacoes")?.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-aprovar]");
     if (!b) return;

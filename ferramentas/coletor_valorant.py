@@ -48,6 +48,8 @@ ARQ_PENDENTES = DADOS / "pendentes.json"
 ARQ_TRAVA = DADOS / "coleta.trava"
 
 URL_PARTIDAS = "https://api.henrikdev.xyz/valorant/v4/matches/{regiao}/{plataforma}/{nome}/{tag}"
+URL_PARTIDAS_PUUID = "https://api.henrikdev.xyz/valorant/v4/by-puuid/matches/{regiao}/{plataforma}/{puuid}"
+URL_ELO_PUUID = "https://api.henrikdev.xyz/valorant/v2/by-puuid/mmr-history/{regiao}/{plataforma}/{puuid}"
 URL_ELO_V2 = "https://api.henrikdev.xyz/valorant/v2/mmr-history/{regiao}/{plataforma}/{nome}/{tag}"
 URL_ELO_V1 = "https://api.henrikdev.xyz/valorant/v1/mmr-history/{regiao}/{nome}/{tag}"
 VERSAO_ESTADO = 3
@@ -137,12 +139,17 @@ def fila_incluida(partida, incluidas):
 # ----------------------------------------------------------------------------
 
 def buscar_pagina(chave, regiao, plataforma, nome, tag, start, size=10):
-    url = URL_PARTIDAS.format(
-        regiao=regiao,
-        plataforma=plataforma,
-        nome=urllib.parse.quote(nome, safe=""),
-        tag=urllib.parse.quote(tag, safe=""),
-    ) + "?" + urllib.parse.urlencode({"size": size, "start": start})
+    pu = av.PUUIDS.get(f"{nome}#{tag}".lower())   # quem está no site é buscado pelo puuid (troca de nick não atrapalha)
+    if pu:
+        url = URL_PARTIDAS_PUUID.format(regiao=regiao, plataforma=plataforma, puuid=urllib.parse.quote(pu, safe=""))
+    else:
+        url = URL_PARTIDAS.format(
+            regiao=regiao,
+            plataforma=plataforma,
+            nome=urllib.parse.quote(nome, safe=""),
+            tag=urllib.parse.quote(tag, safe=""),
+        )
+    url += "?" + urllib.parse.urlencode({"size": size, "start": start})
 
     req = urllib.request.Request(url, headers={
         "Authorization": chave,
@@ -211,7 +218,10 @@ def coletar_elo(chave, cfg, riot_id):
     q = dict(regiao=cfg.get("regiao", "br"), plataforma=cfg.get("plataforma", "pc"),
              nome=urllib.parse.quote(nome, safe=""), tag=urllib.parse.quote(tag, safe=""))
     entradas = None
-    for url in (URL_ELO_V2.format(**q), URL_ELO_V1.format(**q)):
+    pu = av.PUUIDS.get(riot_id.lower())
+    urls = ([URL_ELO_PUUID.format(regiao=q["regiao"], plataforma=q["plataforma"], puuid=urllib.parse.quote(pu, safe=""))] if pu else []) \
+        + [URL_ELO_V2.format(**q), URL_ELO_V1.format(**q)]
+    for url in urls:
         try:
             corpo = _get_json(url, chave)
             dados = corpo.get("data")
@@ -418,6 +428,7 @@ def main():
         log("ERRO: config.json não encontrado ao lado do script.")
         sys.exit(1)
     incluidas = [f.lower() for f in cfg.get("filas_incluidas", ["competitive", "premier", "custom"])]
+    cfg = com_elenco_do_site(cfg)
 
     if not travar(esperar_s=10 * 60):
         log("Outra coleta ficou travada por muito tempo; seguindo mesmo assim.")
@@ -425,6 +436,16 @@ def main():
         _main_travado(chave, cfg, incluidas)
     finally:
         destravar()
+
+
+def com_elenco_do_site(cfg):
+    """Junta os membros da equipe no site (etapa 3b) com a lista do config.json."""
+    try:
+        import elenco_site
+        return elenco_site.aplicar(cfg)
+    except Exception as e:  # noqa: BLE001 — a coleta nunca para por causa do site
+        log(f"Elenco do site não aplicado ({e}); usando só o config.json.")
+        return cfg
 
 
 def juntar_pendentes(resumo):
@@ -507,6 +528,14 @@ def _main_travado(chave, cfg, incluidas):
         ARQ_PENDENTES.unlink()
     log(f"Resumo salvo em dados/resumos/{hoje.isoformat()}.json")
 
+    try:  # elenco das equipes Premier do site, uma vez por dia (quem saiu do elenco no jogo vira convidado)
+        import elenco_site
+        n = elenco_site.sincronizar_premier(os.environ.get("HENRIKDEV_API_KEY", "").strip(), cfg)
+        if n:
+            log(f"Elenco Premier conferido em {n} equipe(s).")
+    except Exception as e:  # noqa: BLE001
+        log(f"Elenco Premier não conferido ({e}).")
+
     try:
         import gerar_report
         destino = gerar_report.gerar(hoje.isoformat(), cfg)
@@ -539,6 +568,7 @@ def rapido():
         if not travar(esperar_s=0):
             print("Outra coleta está rodando agora; fica para a próxima.")
             return
+        cfg = com_elenco_do_site(cfg)
         try:
             houve_algo = _rapido_travado(chave, cfg)
         finally:

@@ -19,7 +19,9 @@ Tudo o que o ValReport usa até aqui, o que cada coisa faz no projeto e sob qual
 | [Inter](https://rsms.me/inter/), de Rasmus Andersson | Fonte do site e dos cards | SIL Open Font License 1.1 ([texto](fontes/OFL.txt)) |
 | [fontTools](https://github.com/fonttools/fonttools) | Recorte e conversão da Inter para WOFF (uma vez) | MIT |
 | [Discord](https://discord.com) (webhooks) | Entrega dos reports | Serviço da Discord Inc. |
-| [GitHub](https://github.com) e [GitHub Pages](https://pages.github.com) | Código e hospedagem do site | Serviço da GitHub Inc. |
+| [GitHub](https://github.com) | Código do site | Serviço da GitHub Inc. |
+| [Vercel](https://vercel.com) | Hospedagem do site | Serviço da Vercel Inc. |
+| [Supabase](https://supabase.com) | Login, banco de dados e imagens das equipes | Serviço da Supabase Inc. |
 | [Playwright](https://playwright.dev) | Testes do site em celular e computador; também gerou a imagem de prévia (`og.png`) e os ícones do app | Apache 2.0 (Microsoft) |
 | Agendador de Tarefas e PowerShell | Report diário às 21h | Componentes do Windows (Microsoft) |
 | [Claude](https://www.anthropic.com/claude) (Anthropic) | Assistente de IA usado para escrever e revisar o código, a metodologia e os textos, a partir das ideias e decisões da NokyLabs | Ferramenta de desenvolvimento |

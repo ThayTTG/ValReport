@@ -33,7 +33,7 @@ export function viewSobre() {
     titulo: "Sobre, créditos e transparência",
     html: `<div class="prosa">
     <h1>Sobre o ValReport</h1>
-    <p style="margin-top:10px">O ValReport é a versão web do report diário da nossa equipe, feito pela <strong>NokyLabs</strong>. Ele mostra as partidas de quem faz parte da equipe <em>e autorizou aparecer</em>, com as estatísticas que a comunidade já conhece dos trackers e uma camada de análise tática própria: impacto por round, índice justo por função, trades, posicionamento, formações e sinergia.</p>
+    <p style="margin-top:10px">O ValReport é a versão web do report diário da nossa equipe, feito pela <strong>NokyLabs</strong>. Ele mostra as partidas de quem faz parte da equipe no site <em>e verificou o Riot ID</em>, com as estatísticas que a comunidade já conhece dos trackers e uma camada de análise tática própria: impacto por round, índice justo por função, trades, posicionamento, formações e sinergia.</p>
     <div class="indice-sobre">${[["transparencia", "Transparência"], ["privacidade", "Privacidade"], ["metodologia", "Como calculamos"], ["limitacoes", "Limitações"], ["instalar", "Instalar no celular"], ["creditos", "Créditos"], ["legal", "Aviso legal"]].map(([id, t]) => `<button class="chip" type="button" data-rolar="${id}" style="cursor:pointer">${t}</button>`).join("")}</div>
 
     <h2 id="transparencia">Transparência: de onde vêm os números</h2>
@@ -50,7 +50,7 @@ export function viewSobre() {
 
     <h2 id="privacidade">Privacidade</h2>
     <ul>
-      <li><strong>Pelo nome, só quem autorizou.</strong> Cada pessoa da equipe precisa estar na lista de autorizados para aparecer. Hoje são ${m.equipe.length}${m.ocultos ? `, e ${m.ocultos} ainda não ${m.ocultos === 1 ? "está" : "estão"} na lista` : ""}.</li>
+      <li><strong>Pelo nome, só quem é da equipe.</strong> Aparece pelo nome quem joga na equipe aqui no site, com o Riot ID verificado (ao entrar, a pessoa concorda), e quem a IGL autorizou antes do site ter contas. Hoje são ${m.equipe.length}${m.ocultos ? `, e ${m.ocultos} ainda não ${m.ocultos === 1 ? "autorizou" : "autorizaram"}` : ""}.</li>
       <li><strong>Todo o resto é anônimo.</strong> Aliados aleatórios, adversários e membros que não autorizaram aparecem como “Aliado 2” ou “Adversário 4”, sem nome, Riot ID, card ou nível. Agente, elo e números da partida continuam, porque sem eles o placar não faz sentido. A API pede que dados só sejam mostrados com consentimento e proíbe revelar nomes ocultos. Por isso anonimizamos todo mundo de fora.</li>
       <li><strong>Riot ID</strong> só aparece depois de confirmado pela administradora ou pela liderança da equipe. Ele é visto pela equipe e por quem está logado e abre o perfil da pessoa (exceto quem tem 16 ou 17 anos, que só a equipe vê).</li>
       <li><strong>Nada sensível vai para o site:</strong> nenhuma chave de API, webhook ou senha.</li>
