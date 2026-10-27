@@ -249,6 +249,7 @@ export async function viewPainel() {
     titulo: "Painel",
     html: `<section class="secao">
       <h1>Painel da administradora</h1>
+      <a class="cartao painel-atalho secao" href="#/painel/sync">${icone("atualizar")}<span><strong>Sync</strong><small class="suave">O que ficou faltando nos dados (partidas, elo, cards) e os pedidos para o PC refazer.</small></span>${icone("seta")}</a>
       ${aprovacoes}
       ${imagens}
       <h2 class="painel-sub">Pessoas e a Juventus Academy</h2>

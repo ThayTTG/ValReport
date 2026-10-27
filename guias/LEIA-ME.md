@@ -18,6 +18,7 @@ com análise tática por partida, avaliação justa por função e análise de d
 | `ferramentas\coletor_valorant.py` | Busca as partidas novas, guarda e chama o gerador |
 | `ferramentas\avaliacao.py` | O "cérebro": chance de vitória, impacto, trades, distâncias, avaliação por função |
 | `ferramentas\catalogo.py` | Nomes e ícones das habilidades (da valorant-api, guardados por 7 dias em `dados\cache`): dá nome aos abates de habilidade que a API manda sem nome, como a Caçador de Cabeças e a Tour de Force do Chamber |
+| `ferramentas\sync.py` | Página **Sync** do Painel: no fim de cada coleta, atende os pedidos de "buscar de novo" (partida, elo, card, tudo, reenviar ao site) e manda ao site o que ficou faltando e o sinal de vida do PC. `py ferramentas\sync.py` mostra o diagnóstico aqui mesmo |
 | `ferramentas\armazem.py` | Guarda as partidas compactadas e o modelo de chance de vitória |
 | `ferramentas\gerar_report.py` | Escreve os reports (`py ferramentas\gerar_report.py 2026-10-23` refaz um dia) |
 | `config.json` | Jogadores, apelidos, filas e ajustes finos |

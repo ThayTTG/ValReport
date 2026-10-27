@@ -19,6 +19,8 @@ Coleta rápida (py coletor_valorant.py --rapido, a cada 20 min pelo Agendador):
   Não gera report nem manda nada ao Discord: o que ela achar entra no próximo report das 21h
   (fica guardado em dados/pendentes.json até lá).
 
+As duas coletas terminam atendendo os pedidos da página "Sync" do site (ver sync.py).
+
 A chave da API é lida da variável de ambiente HENRIKDEV_API_KEY (nunca fica no código).
 Só usa a biblioteca padrão do Python, então não precisa instalar nada.
 """
@@ -47,11 +49,12 @@ ARQ_LOG = DADOS / "coletor.log"
 ARQ_PENDENTES = DADOS / "pendentes.json"
 ARQ_TRAVA = DADOS / "coleta.trava"
 
-URL_PARTIDAS = "https://api.henrikdev.xyz/valorant/v4/matches/{regiao}/{plataforma}/{nome}/{tag}"
-URL_PARTIDAS_PUUID = "https://api.henrikdev.xyz/valorant/v4/by-puuid/matches/{regiao}/{plataforma}/{puuid}"
-URL_ELO_PUUID = "https://api.henrikdev.xyz/valorant/v2/by-puuid/mmr-history/{regiao}/{plataforma}/{puuid}"
-URL_ELO_V2 = "https://api.henrikdev.xyz/valorant/v2/mmr-history/{regiao}/{plataforma}/{nome}/{tag}"
-URL_ELO_V1 = "https://api.henrikdev.xyz/valorant/v1/mmr-history/{regiao}/{nome}/{tag}"
+HENRIK = os.environ.get("HENRIKDEV_URL", "https://api.henrikdev.xyz").rstrip("/")   # (testes usam uma API de mentira)
+URL_PARTIDAS = HENRIK + "/valorant/v4/matches/{regiao}/{plataforma}/{nome}/{tag}"
+URL_PARTIDAS_PUUID = HENRIK + "/valorant/v4/by-puuid/matches/{regiao}/{plataforma}/{puuid}"
+URL_ELO_PUUID = HENRIK + "/valorant/v2/by-puuid/mmr-history/{regiao}/{plataforma}/{puuid}"
+URL_ELO_V2 = HENRIK + "/valorant/v2/mmr-history/{regiao}/{plataforma}/{nome}/{tag}"
+URL_ELO_V1 = HENRIK + "/valorant/v1/mmr-history/{regiao}/{nome}/{tag}"
 VERSAO_ESTADO = 3
 g = av.g
 
@@ -379,6 +382,9 @@ def processar_jogador(chave, cfg, estado, riot_id, incluidas):
                 motivo = f"{nome_fila} [{qid}]"
             elif not partida.get("rounds"):
                 motivo = f"{nome_fila} [{qid}, sem dados de rounds]"
+                # a página Sync do site mostra estas e deixa buscar de novo (às vezes a API completa depois)
+                estado.setdefault("sem_dados", {})[mid] = {"t": g(partida, "metadata", "started_at"), "fila": nome_fila,
+                                                           "mapa": g(partida, "metadata", "map", "name"), "jogador": riot_id}
             elif not av.partida_valida(partida):
                 motivo = f"{nome_fila} [{av.motivo_invalida(partida)}]"
             if motivo:
@@ -389,6 +395,7 @@ def processar_jogador(chave, cfg, estado, riot_id, incluidas):
                 continue
 
             armazem.salvar_partida(partida)
+            (estado.get("sem_dados") or {}).pop(mid, None)
             lidas.append(mid)
             if mid in ignoradas:
                 ignoradas.remove(mid)
@@ -434,8 +441,19 @@ def main():
         log("Outra coleta ficou travada por muito tempo; seguindo mesmo assim.")
     try:
         _main_travado(chave, cfg, incluidas)
+        rodar_sync(chave, cfg)
     finally:
         destravar()
+
+
+def rodar_sync(chave, cfg):
+    """Pedidos da página Sync do site e o estado do PC (ver sync.py). Nunca derruba a coleta."""
+    try:
+        import sync
+        return sync.rodar(chave, cfg, log)
+    except Exception as e:  # noqa: BLE001
+        log(f"Sync: ERRO {e}")
+        return True
 
 
 def com_elenco_do_site(cfg):
@@ -571,6 +589,7 @@ def rapido():
         cfg = com_elenco_do_site(cfg)
         try:
             houve_algo = _rapido_travado(chave, cfg)
+            houve_algo = rodar_sync(chave, cfg) or houve_algo
         finally:
             destravar()
     except Exception as e:  # noqa: BLE001

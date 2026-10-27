@@ -45,7 +45,8 @@ function montar() {
     secoes.push([
       item("equipe", "Minhas equipes", { href: "#/equipes", atual: em("/equipes") }),
       item("busca", "Procurar jogador", { acao: "buscar" }),
-      c.admin ? item("escudo", "Painel da administradora", { href: "#/painel", atual: em("/painel"), extra: B.pendencias?.equipes_pendentes ? `<b class="gaveta__selo">${B.pendencias.equipes_pendentes}</b>` : "" }) : "",
+      c.admin ? item("escudo", "Painel da administradora", { href: "#/painel", atual: em("/painel") && !em("/painel/sync"), extra: B.pendencias?.equipes_pendentes ? `<b class="gaveta__selo">${B.pendencias.equipes_pendentes}</b>` : "" }) : "",
+      c.admin ? item("atualizar", "Sync dos dados", { href: "#/painel/sync", atual: em("/painel/sync") }) : "",
     ].join(""));
   }
   secoes.push([

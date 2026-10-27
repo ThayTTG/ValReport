@@ -731,6 +731,13 @@ def exportar(cfg=None, verificar=False):
     atualizar_previa(site)
     tamanho += gravar(PASTA_DATA / "formacoes.json", formacoes_json(ctx, cfg, autorizados, slug))
 
+    # Quem ainda não tem partida guardada usa o card que o Sync buscou (dados/cache/contas.json)
+    contas = gr.ler_json(PASTA / "dados" / "cache" / "contas.json", {}) or {}
+    for rid in autorizados:
+        info, conta = membros_info.get(slug[rid]), contas.get(rid.lower()) or {}
+        if info is not None and conta:
+            info["card"] = info["card"] or conta.get("card")
+            info["lvl"] = info["lvl"] or conta.get("nivel")
     equipe = []
     for rid in autorizados:
         info = membros_info[slug[rid]]
@@ -739,6 +746,7 @@ def exportar(cfg=None, verificar=False):
         item = {k: v for k, v in info.items() if k not in ("funcoes", "agentes")}
         item.update(funcao=funcao, agente=agente)
         equipe.append(item)
+
     meta = {
         "versao": VERSAO_DADOS, "gerado_em": datetime.now(av.FUSO_BR).isoformat(timespec="seconds"),
         "projeto": {"nome": "ValReport", "marca": "NokyLabs",

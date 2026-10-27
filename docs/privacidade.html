@@ -35,6 +35,7 @@
       <li><strong>Imagem da equipe:</strong> se a liderança enviar uma, ela é reduzida e regravada no navegador (o que apaga dados escondidos da foto, como local e câmera) e guardada no Supabase.</li>
       <li><strong>Táticas da equipe:</strong> as estratégias que a liderança e os treinadores montam (textos, desenhos no mapa, prints, apresentações, PDFs e clipes curtos), com quem criou e quem publicou cada versão. Prints e páginas de PDF também são regravados no navegador antes de enviar, sem os dados escondidos da foto.</li>
       <li><strong>Do jogo:</strong> estatísticas das partidas (abates, rounds, agentes, mapas, posições), obtidas pela HenrikDev API a partir dos dados públicos do VALORANT.</li>
+      <li><strong>Estado da coleta:</strong> o PC que coleta as partidas manda, a cada coleta, um resumo do que ficou faltando (partidas incompletas, elo ou card que não chegaram, erros recentes da coleta), com o apelido e o Riot ID de quem é da equipe, e guarda os pedidos de "buscar de novo" feitos pela administradora (os 200 mais recentes).</li>
       <li><strong>Registros técnicos:</strong> os provedores de hospedagem e de banco de dados mantêm registros de acesso (como endereço IP e horário) por segurança, por tempo limitado.</li>
     </ul>
     <p>Não usamos anúncios, não vendemos dados e não montamos perfis para publicidade.</p>
@@ -56,7 +57,7 @@
       <li><strong>Pessoas logadas no ValReport</strong> encontram pela busca o perfil de quem tem o Riot ID confirmado (apelido, bio, agentes, funções, card e nível) e veem as equipes marcadas como públicas. Quem tem 16 ou 17 anos fica fora da busca e das páginas públicas para quem não é da equipe.</li>
       <li><strong>Táticas</strong> aparecem só para o líder, os co-líderes, os treinadores e os jogadores da equipe; só a liderança e os treinadores criam e editam. Os arquivos delas ficam num espaço privado e abrem por endereços que expiram em 1 hora.</li>
       <li><strong>Imagens de equipe</strong> aparecem para quem vê a equipe e ficam num endereço público, como os cards do jogo. Não envie fotos de pessoas sem a permissão delas; a administradora pode remover qualquer imagem.</li>
-      <li><strong>A administradora</strong> vê a lista de contas (e-mail, apelido, faixa de idade, equipe e pedidos de verificação) e as equipes que esperam aprovação, para liberar acessos e cuidar da segurança.</li>
+      <li><strong>A administradora</strong> vê a lista de contas (e-mail, apelido, faixa de idade, equipe e pedidos de verificação) e as equipes que esperam aprovação, para liberar acessos e cuidar da segurança. Só ela vê o estado da coleta e os pedidos de sincronização.</li>
     </ul>
     <p>Essas regras ficam no próprio banco de dados: mesmo que alguém altere o site no navegador, o banco não entrega o que a pessoa não pode ver.</p>
 
