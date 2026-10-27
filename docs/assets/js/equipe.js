@@ -1,16 +1,19 @@
-// Abas da equipe: Visão geral, Partidas, Formações, Sinergia, Comparar e Mapas
+// Abas da equipe: Visão geral, Partidas, Formações, Sinergia, Comparar, Mapas, Destaques e Táticas
 
 import { esc, num, pct, sinal, div, imagem, imgAgente, imgCard, imgRank, imgMapaFaixa, nomeTier, nomeFila, hora, diaLongo, chaveDia, relativo, dataHora,
-  tile, destaque, vazio, cartao, secao, barra, selo, classeSinal, classeNivel, icone, dataCurta, TIPOS } from "./util.js";
+  tile, destaque, vazio, cartao, secao, barra, selo, classeSinal, classeNivel, icone, dataCurta, TIPOS, md } from "./util.js";
 import { B, itensDe, stats, partidasDaEquipe, passaPartida, passaMembro, resultadoEquipe, placarEquipe, calor as carregarCalor, agrupar, notaMapa } from "./dados.js";
 import { barraFiltros, tabela, forma, celulaAgente, blocoNota, segmentoTipoRound, lerTipoRound, TIPO_COD, delta } from "./componentes.js";
 import { calcularRecordes, gradeRecordes, podioRecordes, contarDonos, cartaoMvp } from "./recordes.js";
 import { temCoroa, coroaSobre } from "./coroa.js";
 import { moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { abas, filtrosQuery } from "./jogador.js";
+import { viewTaticas, podeVerTaticas, contarTaticasPorMapa } from "./taticas.js";
 
 export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
-  ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Destaques"]];
+  ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Destaques"], ["taticas", "Táticas"]];
+/** As abas que esta pessoa vê: Táticas só para a equipe (convidados não) */
+const abasEquipe = () => ABAS_EQUIPE.filter(([a]) => a !== "taticas" || podeVerTaticas());
 const membrosCom = () => B.equipe.filter((e) => e.partidas > 0);
 
 function cabecalhoEquipe(f) {
@@ -272,9 +275,20 @@ function recordesEquipe(f) {
 }
 
 // ---------- Mapas da equipe ----------
+/** Os planos de mapa agora moram nas Táticas: o cartão leva para lá (o plano antigo continua visível, recolhido) */
+function cartaoTaticasMapa(mapa, n, plano) {
+  const link = `#/equipe/taticas?tm=${encodeURIComponent(mapa)}`;
+  return cartao(`Táticas · ${mapa}`, `<p class="pequeno">${n
+      ? `A equipe tem <strong>${n} estratégia${n === 1 ? "" : "s"}</strong> para ${esc(mapa)}, com desenhos no mapa, vídeos e apresentações.`
+      : `Ainda não há estratégias para ${esc(mapa)}. Os planos de mapa agora ficam nas Táticas, com desenhos no mapa, vídeos e apresentações.`}</p>
+    <p class="lp-acoes" style="margin-top:10px"><a class="botao-secundario botao-mini" href="${link}">${icone("mapa")} ${n ? "Ver as táticas" : "Abrir as Táticas"}</a></p>
+    ${plano ? `<details class="tat-dicas" style="margin-top:10px"><summary>Plano antigo das Notas da IGL</summary><div class="nota__texto">${md(plano)}</div></details>` : ""}`);
+}
+
 async function mapasEquipe(f, q) {
   const ps = partidasDaEquipe(f);
   if (!ps.length) return { html: vazio("Nenhuma partida com estes filtros") };
+  const taticas = podeVerTaticas() ? await contarTaticasPorMapa() : null;
   const porMapa = new Map();
   for (const p of ps) {
     if (!porMapa.has(p.mapa)) porMapa.set(p.mapa, []);
@@ -291,7 +305,8 @@ async function mapasEquipe(f, q) {
     return `<article class="mapa-cartao" data-ir="${esc(partidas)}">
       <a class="mapa-cartao__banner" href="${esc(partidas)}" title="Ver as partidas da equipe em ${esc(mapa)}" style="${imgMapaFaixa(mapa) ? `background-image:url('${esc(imgMapaFaixa(mapa))}')` : ""}"><strong>${esc(mapa)}</strong>${selo(`${v}V · ${d}D`, v >= d ? "vitoria" : "derrota")}</a>
       <div class="mapa-cartao__corpo">
-        ${notaMapa(mapa)?.texto ? `<a class="selo selo--destaque" style="justify-self:start" href="#/equipe/mapas${filtrosQuery(f)}${filtrosQuery(f) ? "&" : "?"}cm=${encodeURIComponent(mapa)}">${icone("nota")} plano da IGL</a>` : ""}
+        ${taticas?.get(mapa) ? `<a class="selo selo--destaque" style="justify-self:start" href="#/equipe/taticas?tm=${encodeURIComponent(mapa)}">${icone("mapa")} ${taticas.get(mapa)} tática${taticas.get(mapa) === 1 ? "" : "s"}</a>`
+          : notaMapa(mapa)?.texto && !taticas ? `<a class="selo selo--destaque" style="justify-self:start" href="#/equipe/mapas${filtrosQuery(f)}${filtrosQuery(f) ? "&" : "?"}cm=${encodeURIComponent(mapa)}">${icone("nota")} plano da IGL</a>` : ""}
         <div class="lado-barra"><span>Vitórias</span>${barra(div(v, v + d), v >= d ? "vitoria" : "derrota")}<span>${pct(div(v, v + d))}</span></div>
         <div class="lado-barra"><span>Ataque</span>${barra(div(rva, ra))}<span>${pct(div(rva, ra))} <small class="suave">${ra}r</small></span></div>
         <div class="lado-barra"><span>Defesa</span>${barra(div(rvd, rd))}<span>${pct(div(rvd, rd))} <small class="suave">${rd}r</small></span></div>
@@ -316,7 +331,7 @@ async function mapasEquipe(f, q) {
   const top = [...regioes].sort((a, b) => b[1].n - a[1].n).slice(0, 6);
   const html = `<div class="grade-mapas">${cartoes}</div>
     <div id="calor-equipe">${secao(`Mapa de calor da equipe · ${mapa}`, `<div class="grade-mapa"><div class="cartao">${moldeMapa(mapa)}</div><div class="pilha">
-      ${blocoNota("mapa", mapa, notaMapa(mapa)?.texto, { titulo: `Plano da IGL · ${mapa}` })}
+      ${taticas ? cartaoTaticasMapa(mapa, taticas.get(mapa) || 0, notaMapa(mapa)?.texto) : blocoNota("mapa", mapa, notaMapa(mapa)?.texto, { titulo: `Plano da IGL · ${mapa}` })}
       ${cartao("Mapa", `<div class="chips">${mapas.map((m) => `<button class="chip" style="cursor:pointer;${m === mapa ? "border-color:var(--destaque);color:var(--destaque-texto)" : ""}" type="button" data-param="cm" data-valor="${esc(m)}" aria-pressed="${m === mapa}">${esc(m)}</button>`).join("")}</div>
         ${segmentoTipoRound(tr)}<p class="suave pequeno" style="margin-top:8px">${evs.filter((x) => x.tipo === 0).length} mortes e ${evs.filter((x) => x.tipo === 1).length} abates${tr === "todos" ? "" : ` em rounds de ${esc(TIPOS[tr].toLowerCase())}`}.</p>`)}
       ${cartao("Onde a equipe mais morre", top.length ? top.map(([r, x]) => { const [quem, k] = [...x.quem].sort((a, b) => b[1] - a[1])[0]; return `<div style="padding:5px 0"><div style="display:flex;justify-content:space-between;font-size:13.5px"><strong>${esc(r)}</strong><span>${x.n}× <span class="suave">(mais: ${esc(quem)} ${k})</span></span></div>${barra(x.n / top[0][1].n, "derrota")}</div>`; }).join("") : `<p class="suave pequeno">Sem nomes de regiões para este mapa ainda.</p>`)}
@@ -327,8 +342,26 @@ async function mapasEquipe(f, q) {
   } };
 }
 
-export async function viewEquipe(aba, f, q) {
-  aba = ABAS_EQUIPE.some(([a]) => a === aba) ? aba : "visao";
+/** Topo simples para quando a equipe ainda não tem estatísticas (as Táticas funcionam mesmo assim) */
+function cabecalhoSimples() {
+  return `<header class="cabecalho"><div class="cabecalho__corpo" style="padding-top:22px">
+      <div class="cabecalho__info"><h1>${esc(B.equipeAtual?.nome || "Equipe")}</h1>
+        <div class="sub"><span>As estatísticas aparecem quando a coleta começar a buscar as partidas da equipe.</span></div></div>
+      <div class="cabecalho__lado">${B.equipeAtual?.slug ? `<a class="botao-secundario botao-mini" href="#/time/${esc(B.equipeAtual.slug)}">Membros e convites</a>` : ""}</div>
+    </div></header>`;
+}
+
+export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
+  const lista = semDados ? ABAS_EQUIPE.filter(([a]) => a === "taticas") : abasEquipe();
+  aba = lista.some(([a]) => a === aba) ? aba : "visao";
+  if (aba === "taticas") {
+    const t = await viewTaticas(q);
+    return {
+      titulo: "Equipe · Táticas",
+      html: `${semDados ? cabecalhoSimples() : cabecalhoEquipe(f)}${abas("#/equipe", aba, lista, semDados ? "" : filtrosQuery(f))}<div class="secao">${t.html}</div>`,
+      depois: t.depois,
+    };
+  }
   const qs = filtrosQuery(f);
   let corpo = "", depois = null;
   const semFiltros = ["formacoes", "semana"].includes(aba);
@@ -343,7 +376,7 @@ export async function viewEquipe(aba, f, q) {
   else if (aba === "mapas") ({ html: corpo, depois } = await mapasEquipe(f, q));
   return {
     titulo: `Equipe · ${ABAS_EQUIPE.find(([a]) => a === aba)[1]}`,
-    html: `${cabecalhoEquipe(f)}${abas("#/equipe", aba, ABAS_EQUIPE, qs)}${semFiltros ? "" : barraFiltros(f, null, { mostrar: ["fila", "temporada", "periodo", "mapa"] })}<div class="secao">${corpo}</div>`,
+    html: `${cabecalhoEquipe(f)}${abas("#/equipe", aba, lista, qs)}${semFiltros ? "" : barraFiltros(f, null, { mostrar: ["fila", "temporada", "periodo", "mapa"] })}<div class="secao">${corpo}</div>`,
     depois,
   };
 }

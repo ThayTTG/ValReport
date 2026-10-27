@@ -3,6 +3,7 @@
 import { esc, icone, imagem, imgCard } from "./util.js";
 import { B } from "./dados.js";
 import { usuario, sair } from "./nuvem.js";
+import { podeVerTaticas } from "./taticas.js";
 
 export const CELULAR = matchMedia("(max-width: 700px)");
 let obterTela = () => "app";
@@ -28,9 +29,16 @@ function montar() {
   if (tela === "app") {
     secoes.push([
       item("inicio", "Início", { href: "#/", atual: em("/") }),
-      item("equipe", "Equipe", { href: "#/equipe", atual: em("/equipe") }),
+      item("equipe", "Equipe", { href: "#/equipe", atual: em("/equipe") && !em("/equipe/taticas") }),
+      podeVerTaticas() ? item("mapa", "Táticas", { href: "#/equipe/taticas", atual: em("/equipe/taticas") || em("/tatica/") }) : "",
       B.equipeAtual?.slug ? item("escudo", "Membros e convites", { href: `#/time/${B.equipeAtual.slug}`, atual: em(`/time/${B.equipeAtual.slug}`) }) : "",
       item("info", "Sobre e créditos", { href: "#/sobre", atual: em("/sobre") }),
+    ].join(""));
+  }
+  if (tela === "sem-dados" && podeVerTaticas()) {
+    secoes.push([
+      item("mapa", "Táticas", { href: "#/equipe/taticas", atual: em("/equipe/taticas") || em("/tatica/") }),
+      B.equipeAtual?.slug ? item("escudo", "Membros e convites", { href: `#/time/${B.equipeAtual.slug}`, atual: em(`/time/${B.equipeAtual.slug}`) }) : "",
     ].join(""));
   }
   if (p.apelido) {

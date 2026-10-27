@@ -12,6 +12,7 @@ import { coroaSobre, abrirRevelacao, talvezRevelar } from "./coroa.js";
 import { viewJogador } from "./jogador.js";
 import { viewPartida } from "./partida.js";
 import { viewEquipe } from "./equipe.js";
+import { viewTatica, podeVerTaticas } from "./taticas.js";
 import { viewSobre } from "./sobre.js";
 import { viewHoje } from "./hoje.js";
 import { animar, trocarTema, ligarBrilho } from "./animar.js";
@@ -56,7 +57,7 @@ function irPara(q, caminho = lerRota().caminho) {
 function chaveRota(partes) {
   if (!partes.length) return ["inicio", ""];
   if (partes[0] === "equipe") return ["equipe", partes[1] || "visao"];
-  if (partes[0] === "j" || partes[0] === "p") return [`${partes[0]}/${partes[1]}`, partes[2] || ""];
+  if (partes[0] === "j" || partes[0] === "p" || partes[0] === "tatica") return [`${partes[0]}/${partes[1]}`, partes[2] || ""];
   return [partes.join("/"), ""];
 }
 
@@ -80,6 +81,8 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
     else if (B.conta && partes[0] === "time" && partes[1]) v = await viewTime(decodeURIComponent(partes[1]), partes[2] || "membros");
     else if (B.conta && partes[0] === "convite" && partes[1]) v = await viewConvite(partes[1]);
     else if (tela === "sem-equipe") v = viewSemEquipe();
+    else if (partes[0] === "tatica" && partes[1]) v = await viewTatica(decodeURIComponent(partes[1]), partes[2] || "", q);
+    else if (tela === "sem-dados" && partes[0] === "equipe" && partes[1] === "taticas") v = await viewEquipe("taticas", f, q, { semDados: true });
     else if (tela === "sem-dados") v = { titulo: "Sem dados", html: avisoSemDados };
     else if (!partes.length) v = viewHoje(q);
     else if (partes[0] === "equipe") v = await viewEquipe(partes[1] || "visao", f, q);
@@ -105,7 +108,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
 }
 
 function marcarNavegacao(partes) {
-  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : ["equipe", "equipes", "time"].includes(partes[0]) ? "equipe" : ["conta", "painel", "perfil"].includes(partes[0]) ? "conta" : "";
+  const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : ["equipe", "equipes", "time", "tatica"].includes(partes[0]) ? "equipe" : ["conta", "painel", "perfil"].includes(partes[0]) ? "conta" : "";
   document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("ativo", a.dataset.nav === sec));
   const slug = partes[0] === "j" ? partes[1] : null;
   document.querySelectorAll(".pilula-jogador").forEach((a) => {
@@ -434,7 +437,7 @@ async function iniciar() {
       ? `<p>Rode <code>py ferramentas\\exportar_site.py</code> no PC da equipe.</p><p class="pequeno suave">${esc(erro.message)}</p>`
       : `<p>As estatísticas da ${esc(B.equipeAtual?.nome || "equipe")} ainda não chegaram. Elas aparecem quando a coleta da administradora começar a buscar as partidas da equipe.</p>
          <p class="lp-acoes" style="justify-content:center"><a class="botao-primario" href="#/time/${esc(B.equipeAtual?.slug || "")}">Membros e convites</a>
-           <a class="botao-secundario" href="#/equipes">Minhas equipes</a><a class="botao-secundario" href="#/perfil">Meu perfil</a></p>`);
+           ${podeVerTaticas() ? `<a class="botao-secundario" href="#/equipe/taticas">Táticas</a>` : ""}<a class="botao-secundario" href="#/equipes">Minhas equipes</a><a class="botao-secundario" href="#/perfil">Meu perfil</a></p>`);
     tela = "sem-dados";
     await renderizar();
     return;

@@ -148,7 +148,7 @@ async function arquivo(metodo, balde, caminho, blob) {
     const j = await r.json().catch(() => ({}));
     const st = Number(j.statusCode) || r.status;
     const msg = st === 413 ? "A imagem ficou grande demais. Tente outra." : st === 415 ? "Esse tipo de arquivo não é aceito. Use PNG, JPEG ou WebP."
-      : st === 403 || st === 401 || /row-level security/i.test(j.message || "") ? "Só a liderança da equipe pode mudar a imagem."
+      : st === 403 || st === 401 || /row-level security/i.test(j.message || "") ? "Sem permissão para enviar esse arquivo (só a liderança pode)."
       : st === 404 && metodo === "DELETE" ? null : `O envio não deu certo agora (erro ${st}). Tente de novo.`;
     if (msg) throw new ErroNuvem(j.error || String(st), msg, st);
   }
@@ -156,3 +156,67 @@ async function arquivo(metodo, balde, caminho, blob) {
 }
 export const enviarArquivo = (balde, caminho, blob) => arquivo("POST", balde, caminho, blob);
 export const apagarArquivo = (balde, caminho) => arquivo("DELETE", balde, caminho);
+
+// ---------- Arquivos de baldes privados (táticas): endereços temporários, lista e remoção ----------
+const assinados = new Map();   // "balde/caminho" -> { url, ate }
+
+/** Endereços temporários (assinados) para abrir arquivos de um balde privado. → { caminho: url | null } */
+export async function assinar(balde, caminhos, segundos = 3600) {
+  const agora = Date.now();
+  const unicos = [...new Set((caminhos || []).filter(Boolean))];
+  const faltam = unicos.filter((c) => !((assinados.get(`${balde}/${c}`)?.ate || 0) > agora + 120000));
+  if (faltam.length) {
+    const t = await token();
+    if (!t) throw new ErroNuvem("sem_sessao", "Sua sessão terminou. Entre de novo.", 401);
+    for (let i = 0; i < faltam.length; i += 100) {
+      const lote = faltam.slice(i, i + 100);
+      let r;
+      try {
+        r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${balde}`, {
+          method: "POST", headers: { apikey: SUPABASE_CHAVE, Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ expiresIn: segundos, paths: lote }),
+        });
+      } catch (e) { throw new ErroNuvem("rede", "Sem conexão com o servidor agora. Tente de novo.", 0); }
+      const j = await r.json().catch(() => []);
+      if (!r.ok || !Array.isArray(j)) throw new ErroNuvem(String(r.status), "Não foi possível abrir os arquivos agora.", r.status);
+      for (const x of j) {
+        if (x?.signedURL && typeof x.signedURL === "string" && x.signedURL.startsWith("/")) {
+          assinados.set(`${balde}/${x.path}`, { url: `${SUPABASE_URL}/storage/v1${x.signedURL}`, ate: agora + segundos * 1000 });
+        }
+      }
+    }
+  }
+  return Object.fromEntries(unicos.map((c) => [c, assinados.get(`${balde}/${c}`)?.url || null]));
+}
+
+/** Nomes dos arquivos dentro de uma pasta (um nível) de um balde */
+export async function listarArquivos(balde, pasta) {
+  const t = await token();
+  if (!t) throw new ErroNuvem("sem_sessao", "Sua sessão terminou. Entre de novo.", 401);
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${balde}`, {
+    method: "POST", headers: { apikey: SUPABASE_CHAVE, Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefix: pasta.replace(/\/?$/, "/"), limit: 1000, offset: 0 }),
+  });
+  const j = await r.json().catch(() => []);
+  if (!r.ok || !Array.isArray(j)) throw new ErroNuvem(String(r.status), "Não foi possível listar os arquivos.", r.status);
+  return j.filter((x) => x?.name && x.id).map((x) => ({ nome: x.name, bytes: Number(x.metadata?.size) || 0 }));
+}
+
+/** Apaga vários arquivos de um balde (caminhos completos) */
+export async function apagarArquivos(balde, caminhos) {
+  const lista = [...new Set((caminhos || []).filter(Boolean))];
+  if (!lista.length) return 0;
+  const t = await token();
+  if (!t) throw new ErroNuvem("sem_sessao", "Sua sessão terminou. Entre de novo.", 401);
+  let n = 0;
+  for (let i = 0; i < lista.length; i += 100) {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${balde}`, {
+      method: "DELETE", headers: { apikey: SUPABASE_CHAVE, Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ prefixes: lista.slice(i, i + 100) }),
+    });
+    const j = await r.json().catch(() => []);
+    if (r.ok && Array.isArray(j)) n += j.length;
+  }
+  lista.forEach((c) => assinados.delete(`${balde}/${c}`));
+  return n;
+}

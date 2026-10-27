@@ -7,7 +7,7 @@ Tudo o que o ValReport usa até aqui, o que cada coisa faz no projeto e sob qual
 | Projeto | O que usamos | Licença / regras |
 | :--- | :--- | :--- |
 | [HenrikDev · Unofficial VALORANT API](https://github.com/Henrik-3/unofficial-valorant-api) | Histórico e detalhes das partidas (v4): placar, rounds, abates com posição, economia. Histórico de elo (mmr-history) para o gráfico de RR. | API não oficial, sem vínculo com a Riot. Regras do projeto: consentimento dos jogadores; proibidos "grandes projetos de análise", checadores de loja e revelar nomes ocultos. O autor pede crédito e uma estrela no repositório. |
-| [valorant-api.com](https://valorant-api.com) | Ícones de agentes, armas e elos, cards de jogador, imagens e minimapas dos mapas, coordenadas para projetar posições e nomes de regiões (callouts). | Projeto da comunidade, não oficial. As imagens pertencem à Riot Games. |
+| [valorant-api.com](https://valorant-api.com) | Ícones de agentes, habilidades, armas e elos, cards de jogador, imagens e minimapas dos mapas (inclusive no mapa tático das Táticas), coordenadas para projetar posições e nomes de regiões (callouts). | Projeto da comunidade, não oficial. As imagens pertencem à Riot Games. |
 | [Riot Games](https://www.riotgames.com/en/legal) | O jogo VALORANT e todos os seus assets. | Uso sob a política "Legal Jibber Jabber" para projetos de fãs, sem fins lucrativos e sem usar logos da Riot. |
 
 ## Código e ferramentas
@@ -21,7 +21,8 @@ Tudo o que o ValReport usa até aqui, o que cada coisa faz no projeto e sob qual
 | [Discord](https://discord.com) (webhooks) | Entrega dos reports | Serviço da Discord Inc. |
 | [GitHub](https://github.com) | Código do site | Serviço da GitHub Inc. |
 | [Vercel](https://vercel.com) | Hospedagem do site | Serviço da Vercel Inc. |
-| [Supabase](https://supabase.com) | Login, banco de dados e imagens das equipes | Serviço da Supabase Inc. |
+| [Supabase](https://supabase.com) | Login, banco de dados, imagens das equipes e arquivos das Táticas (espaço privado) | Serviço da Supabase Inc. |
+| [PDF.js](https://mozilla.github.io/pdf.js/) 4.10.38 | Transforma, no navegador, cada página de um PDF das Táticas numa imagem. Fica em `docs/assets/vendor/pdfjs/` com a licença junto | Apache 2.0 (Mozilla) |
 | [Playwright](https://playwright.dev) | Testes do site em celular e computador; também gerou a imagem de prévia (`og.png`) e os ícones do app | Apache 2.0 (Microsoft) |
 | Agendador de Tarefas e PowerShell | Report diário às 21h | Componentes do Windows (Microsoft) |
 | [Claude](https://www.anthropic.com/claude) (Anthropic) | Assistente de IA usado para escrever e revisar o código, a metodologia e os textos, a partir das ideias e decisões da NokyLabs | Ferramenta de desenvolvimento |
