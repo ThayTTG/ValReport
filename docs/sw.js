@@ -2,11 +2,11 @@
 // Estratégia: o site vem sempre da rede primeiro (nunca mostra versão velha quando há internet);
 // sem internet, usa a última cópia guardada. Os dados da equipe (Supabase, com login) nunca são guardados aqui. Imagens do valorant-api.com ficam guardadas (não mudam).
 
-const VERSAO = "valreport-v13";
+const VERSAO = "valreport-v14";
 const SITE = `${VERSAO}-site`, IMAGENS = `${VERSAO}-imagens`;
 const ESSENCIAL = ["./", "index.html", "assets/css/app.css", "assets/js/app.js", "assets/js/util.js", "assets/js/dados.js",
   "assets/js/componentes.js", "assets/js/graficos.js", "assets/js/jogador.js", "assets/js/partida.js", "assets/js/equipe.js",
-  "assets/js/sobre.js", "assets/js/recordes.js", "assets/js/animar.js", "assets/js/hoje.js", "assets/js/coroa.js", "assets/js/config.js", "assets/js/nuvem.js", "assets/js/conta.js", "assets/js/perfil.js", "assets/js/equipes.js", "assets/js/tema.js", "assets/js/gaveta.js", "assets/js/taticas.js", "assets/js/mapa-tatico.js", "assets/js/valapi.js", "assets/fonts/inter-400.woff", "assets/fonts/inter-600.woff",
+  "assets/js/sobre.js", "assets/js/recordes.js", "assets/js/animar.js", "assets/js/hoje.js", "assets/js/coroa.js", "assets/js/config.js", "assets/js/nuvem.js", "assets/js/conta.js", "assets/js/perfil.js", "assets/js/equipes.js", "assets/js/tema.js", "assets/js/gaveta.js", "assets/js/taticas.js", "assets/js/mapa-tatico.js", "assets/js/valapi.js", "assets/js/comentarios.js", "assets/fonts/inter-400.woff", "assets/fonts/inter-600.woff",
   "assets/img/logo.svg", "manifest.webmanifest"];
 const LIMITE_IMAGENS = 400;
 

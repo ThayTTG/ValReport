@@ -1526,3 +1526,36 @@ button.chip { cursor: pointer; }
 @media (max-width: 1000px) { .tat-eslide__corpo { grid-template-columns: 1fr; } }
 .tat-emapa__painel .tat-fonte .segmentos { flex-wrap: nowrap; }
 .tat-emapa__painel .tat-longo { display: none; }   /* no painel estreito do mapa: "Link · Round · Clipe" */
+
+/* ---------- Comentários das partidas e dos rounds ---------- */
+.comentarios .cartao__titulo h3 { display: inline-flex; align-items: center; gap: 6px; }
+.comentarios__lista { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 12px; }
+.comentarios__vazio { margin-bottom: 12px; }
+.comentario { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.comentario__avatar { flex: none; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; background: var(--superficie-3);
+  box-shadow: 0 0 0 2px var(--superficie), 0 0 0 3.5px var(--cor-perfil, var(--borda)); }
+.comentario__avatar img, .comentario__avatar .avatar-vazio { width: 100%; height: 100%; object-fit: cover; display: grid; place-items: center; font-size: 13px; }
+.comentario__corpo { flex: 1; min-width: 0; padding: 8px 12px 10px; border-radius: 4px 14px 14px 14px; background: var(--superficie-2); }
+.comentario__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13.5px; }
+.comentario__topo strong { color: var(--texto); }
+.comentario__topo time { color: var(--suave); font-size: 12.5px; }
+.comentario__texto { margin-top: 4px; font-size: 14.5px; color: var(--texto-2); overflow-wrap: anywhere; }
+.comentario__texto p + p, .comentario__texto ul { margin-top: 6px; }
+.comentario__texto ul { margin-bottom: 0; padding-left: 20px; }
+.comentario__acoes { display: flex; gap: 2px; margin: 4px 0 -4px -8px; }
+.comentario__acoes .limpar { font-size: 12.5px; padding: 4px 8px; }
+.comentario__apagar { color: var(--derrota); }
+.comentarios__novo, .comentario__edicao { display: grid; gap: 8px; }
+.comentario__edicao { margin-top: 6px; }
+.comentarios__novo textarea, .comentario__edicao textarea { width: 100%; min-height: 64px; resize: vertical; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--borda);
+  background: var(--superficie); color: var(--texto); font: 500 14.5px/1.5 var(--fonte); }
+.comentarios__novo textarea:focus, .comentario__edicao textarea:focus { outline: none; border-color: var(--destaque); box-shadow: 0 0 0 3px color-mix(in srgb, var(--destaque) 25%, transparent); }
+.comentarios__rodape { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.comentarios__rodape > span { margin-right: auto; }
+.com-atalho { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--raio-p); border: 1px solid var(--borda); background: var(--superficie); color: var(--texto); }
+.com-atalho:hover { border-color: var(--destaque); text-decoration: none; }
+.com-atalho > span { flex: 1; color: var(--texto-2); }
+.com-atalho svg { color: var(--destaque); }
+.com-pendentes { align-items: center; flex-wrap: wrap; }
+.com-pendentes > span { flex: 1 1 260px; }
+@media (max-width: 520px) { .comentarios__rodape > span { display: none; } }

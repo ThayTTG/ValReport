@@ -5,8 +5,12 @@ import { B, detalhe, notaPartida, notaRound } from "./dados.js";
 import { tabela, blocoNota } from "./componentes.js";
 import { moldeMapa, svgRound } from "./graficos.js";
 import { abas } from "./jogador.js";
+import { podeVerComentarios, lerComentarios, htmlComentarios, ligarComentarios, roundTemComentario, totalComentarios, htmlNotasPendentes, ligarNotasPendentes } from "./comentarios.js";
 
 const ABAS = [["placar", "Placar"], ["rounds", "Rounds"], ["mapa", "Mapa 2D"], ["leitura", "Leitura da equipe"], ["notas", "Notas da IGL"]];
+/** No site, "Notas da IGL" virou "Comentários" (toda a equipe comenta; convidados não veem a aba). No editor do PC, continua igual. */
+const abasPartida = () => (B.editor ? ABAS : ABAS.filter(([a]) => a !== "notas").concat(podeVerComentarios() ? [["notas", "Comentários"]] : []));
+const marcaRound = (id, n) => (B.editor ? Boolean(notaRound(id, n)) : roundTemComentario(id, n));
 const ICONE_FIM = { Elimination: "caveira", Detonate: "spike", Defuse: "escudo", "": "relogio" };
 
 function cabecalho(d, p) {
@@ -50,7 +54,7 @@ function placar(d) {
 function linhaRounds(d, rSel, rota) {
   return `<div class="linha-rounds" role="group" aria-label="Rounds">${d.rounds.map((r, i) => {
     const nosso = r.venc === d.nosso;
-    return `<a class="round-cel ${nosso ? "nosso" : "deles"} ${notaRound(d.id, r.n) ? "tem-nota" : ""} ${r.n === 13 || (r.n > 24 && r.n % 2 === 1) ? "meio-tempo" : ""}" style="--i:${i}" data-n="${r.n}" href="${rota}?r=${r.n}" aria-pressed="${r.n === rSel}" title="Round ${r.n}: ${nosso ? "vitória" : "derrota"} · ${esc(FIM_ROUND[r.fim] || r.fim)}">${icone(ICONE_FIM[r.fim] || "caveira")}<span>${r.n}</span></a>`;
+    return `<a class="round-cel ${nosso ? "nosso" : "deles"} ${marcaRound(d.id, r.n) ? "tem-nota" : ""} ${r.n === 13 || (r.n > 24 && r.n % 2 === 1) ? "meio-tempo" : ""}" style="--i:${i}" data-n="${r.n}" href="${rota}?r=${r.n}" aria-pressed="${r.n === rSel}" title="Round ${r.n}: ${nosso ? "vitória" : "derrota"} · ${esc(FIM_ROUND[r.fim] || r.fim)}">${icone(ICONE_FIM[r.fim] || "caveira")}<span>${r.n}</span></a>`;
   }).join("")}</div>
   <p class="suave pequeno">Verde = round da equipe · vermelho = do adversário · a linha separa os tempos.</p>`;
 }
@@ -69,7 +73,7 @@ function killfeed(d, r) {
   }).join("")}</div>`;
 }
 
-function detalheRound(d, r) {
+function detalheRound(d, r, com) {
   const nosso = r.venc === d.nosso;
   const ladoNosso = r.atk === d.nosso ? "no ataque" : "na defesa";
   const outro = Object.keys(d.placar).find((t) => t !== d.nosso);
@@ -88,8 +92,8 @@ function detalheRound(d, r) {
       ${membros.length ? `<div class="leitura" style="margin-top:12px">${membros.map(([slug, [imp, resumo, dica]]) => `<div class="leitura__item">
           <span class="imp ${classeSinal(imp, 1)}">${sinal(imp, 0, "%")}</span>
           <div><p><strong>${esc(B.porSlug.get(slug)?.apelido || slug)}:</strong> ${esc(resumo)}</p><p>${esc(dica)}</p></div></div>`).join("")}</div>` : ""}
-      ${blocoNota("round", d.id, notaRound(d.id, r.n), { n: r.n, titulo: `Nota da IGL · round ${r.n}` })}`)}
-    ${cartao("Abates", killfeed(d, r))}
+      ${B.editor ? blocoNota("round", d.id, notaRound(d.id, r.n), { n: r.n, titulo: `Nota da IGL · round ${r.n}` }) : ""}`)}
+    ${com ? `<div class="pilha">${cartao("Abates", killfeed(d, r))}${htmlComentarios(com, d.id, r.n)}</div>` : cartao("Abates", killfeed(d, r))}
   </div>`;
 }
 
@@ -118,20 +122,42 @@ export async function viewPartida(id, aba, q) {
   const p = B.porId.get(id);
   let d;
   try { d = await detalhe(id); } catch (e) { return { html: vazio("Partida não encontrada", `<p>Ela pode ter saído do período exportado. <a href="#/">Voltar</a></p>`) }; }
-  aba = ABAS.some(([a]) => a === aba) ? aba : "placar";
+  const lista = abasPartida();
+  aba = lista.some(([a]) => a === aba) ? aba : "placar";
   const rota = `#/p/${id}/${aba}`;
   const rSel = Math.min(d.rounds.length, Math.max(1, Number(q.get("r") || 1)));
   const r = d.rounds.find((x) => x.n === rSel) || d.rounds[0];
   let corpo = "";
   const nota = notaPartida(id);
-  if (aba === "placar") corpo = (nota?.texto || B.editor ? `<div class="secao">${blocoNota("partida", id, nota?.texto)}</div>` : "") + placar(d);
+  // Comentários (fora do editor do PC): lidos de uma vez para a partida toda
+  let com = null, erroCom = "";
+  if (!B.editor && podeVerComentarios() && (aba === "notas" || aba === "rounds")) {
+    try { com = await lerComentarios(id); } catch (e) { erroCom = String(e?.message || e).replace(/^[a-z_]+: /, ""); }
+  }
+  const nCom = B.editor ? 0 : totalComentarios(id);
+  if (aba === "placar") {
+    corpo = B.editor ? (`<div class="secao">${blocoNota("partida", id, nota?.texto)}</div>` + placar(d))
+      : (nCom && podeVerComentarios() ? `<a class="com-atalho secao" href="#/p/${esc(id)}/notas">${icone("nota")}<span><strong>${nCom} comentário${nCom === 1 ? "" : "s"}</strong> da equipe nesta partida</span>${icone("seta")}</a>` : "") + placar(d);
+  }
+  else if (aba === "notas" && !B.editor) {
+    const doRound = (com?.comentarios || []).filter((c) => c.round);
+    const porRound = [...new Set(doRound.map((c) => c.round))].sort((a, b) => a - b);
+    corpo = (erroCom ? `<p class="aviso aviso--erro">${esc(erroCom)}</p>` : "")
+      + (await htmlNotasPendentes())
+      + (com ? htmlComentarios(com, id, null, { titulo: "Comentários da partida" }) : "")
+      + (porRound.length ? secao("Comentários dos rounds", `<div class="leitura">${porRound.map((n) => {
+          const cs = doRound.filter((c) => c.round === n);
+          return `<a class="leitura__item com-round" style="color:inherit" href="#/p/${esc(id)}/rounds?r=${n}"><span class="imp">R${n}</span><div>${cs.map((c) => `<p><strong>${esc(c.autor)}:</strong> ${esc(c.texto.length > 220 ? `${c.texto.slice(0, 220)}…` : c.texto)}</p>`).join("")}<p class="suave pequeno">${cs.length} comentário${cs.length === 1 ? "" : "s"} · abrir o round</p></div></a>`;
+        }).join("")}</div>`) : "")
+      + `<p class="suave pequeno" style="margin-top:12px">Para comentar um round, abra a aba Rounds e escolha o round.</p>`;
+  }
   else if (aba === "notas") {
     const rs = Object.entries(nota?.rounds || {}).sort((a, b) => Number(a[0]) - Number(b[0]));
     corpo = blocoNota("partida", id, nota?.texto, { vazio: vazio("Sem nota da IGL nesta partida", "<p>A IGL escreve as notas no editor do PC; elas aparecem aqui depois da publicação.</p>") })
       + (rs.length ? secao("Notas por round", `<div class="leitura">${rs.map(([n, t]) => `<a class="leitura__item" style="color:inherit" href="#/p/${esc(id)}/rounds?r=${esc(n)}"><span class="imp">R${esc(n)}</span><div class="nota__texto">${md(t)}</div></a>`).join("")}</div>`) : "")
       + (B.editor ? `<p class="suave pequeno" style="margin-top:12px">Para anotar um round, abra a aba Rounds e escolha o round.</p>` : "");
   }
-  else if (aba === "rounds") corpo = secao("Linha do tempo", `<div class="cartao">${linhaRounds(d, rSel, rota)}</div>`) + (r ? detalheRound(d, r) : "");
+  else if (aba === "rounds") corpo = secao("Linha do tempo", `<div class="cartao">${linhaRounds(d, rSel, rota)}</div>`) + (erroCom ? `<p class="aviso aviso--erro secao">${esc(erroCom)}</p>` : "") + (r ? detalheRound(d, r, com) : "");
   else if (aba === "mapa") corpo = secao("Abates no mapa", `<div class="cartao">${linhaRounds(d, rSel, rota)}</div>`)
     + `<div class="grade-mapa secao"><div class="cartao">${moldeMapa(d.mapa, svgRound(d.mapa, r, d.jogadores, d.nosso))}</div><div class="pilha">${cartao(`Round ${r.n}`, `<div class="chips"><span class="chip"><span style="width:10px;height:10px;border-radius:50%;background:var(--nosso);display:inline-block"></span>Equipe</span><span class="chip"><span style="width:10px;height:10px;border-radius:50%;background:var(--deles);display:inline-block"></span>Adversário</span></div>
         <p class="suave pequeno" style="margin-top:10px">Círculo = onde estava quem matou · X = onde a pessoa morreu · losango = spike. Passe o dedo/mouse para ver quem foi.</p>`)}${cartao("Abates", killfeed(d, r))}</div></div>`;
@@ -140,6 +166,11 @@ export async function viewPartida(id, aba, q) {
   const depois = (el) => {
     const linha = el.querySelector(".linha-rounds"), cel = linha?.querySelector('[aria-pressed="true"]');
     if (cel && linha.scrollWidth > linha.clientWidth) linha.scrollLeft += cel.getBoundingClientRect().left - linha.getBoundingClientRect().left - (linha.clientWidth - cel.offsetWidth) / 2;
+    // Depois de comentar ou apagar: a marca do round na linha do tempo e o resumo da aba acompanham
+    el.querySelectorAll("[data-comentarios]").forEach((s) => ligarComentarios(s, () => {
+      el.querySelectorAll(".round-cel[data-n]").forEach((c) => c.classList.toggle("tem-nota", roundTemComentario(id, c.dataset.n)));
+    }));
+    ligarNotasPendentes(el, () => window.dispatchEvent(new HashChangeEvent("hashchange")));
   };
-  return { titulo: `${d.mapa} · ${dataHora(d.t)}`, html: `${cabecalho(d, p)}${abas(`#/p/${id}`, aba, ABAS)}<div class="secao">${corpo}</div>`, depois };
+  return { titulo: `${d.mapa} · ${dataHora(d.t)}`, html: `${cabecalho(d, p)}${abas(`#/p/${id}`, aba, lista)}<div class="secao">${corpo}</div>`, depois };
 }

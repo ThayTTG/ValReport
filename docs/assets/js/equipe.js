@@ -58,7 +58,7 @@ function linhaEquipe(p) {
     <span class="partida__fundo" style="${imgMapaFaixa(p.mapa) ? `background-image:url('${esc(imgMapaFaixa(p.mapa))}')` : ""}"></span>
     ${imagem(imgAgente(ms[0][1].ag), ms[0][1].ag, "partida__ag")}
     <div class="partida__meio"><div class="partida__titulo"><span>${esc(p.mapa)}</span><span class="placar ${res === "V" ? "bom" : res === "D" ? "ruim" : ""}">${a}–${b}</span></div>
-      <div class="partida__sub"><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span><span>${(() => { const eq = Math.max(...ms.map(([, m]) => m.eq || 1)); return eq > 1 ? `${eq} da equipe no time` : "sem a equipe"; })()}</span></div></div>
+      <div class="partida__sub"><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span><span>${(() => { const eq = Math.max(...ms.map(([, m]) => m.eq || 1)); return eq > 1 ? `${eq} da equipe no time` : "sem a equipe"; })()}</span>${!B.editor && B.comentarios?.[p.id]?.t ? `<span class="selo selo--destaque" title="Comentários da equipe">${icone("nota")} ${B.comentarios[p.id].t}</span>` : ""}</div></div>
     <div class="partida__nums">${ms.map(([slug, m]) => `<div title="${esc(B.porSlug.get(slug)?.apelido)} de ${esc(m.ag)}"><small>${esc(B.porSlug.get(slug)?.apelido || slug)}</small><strong>${m.k}/${m.d}/${m.a}</strong></div>`).join("")}</div></a>`;
 }
 export function listaEquipe(ps) {

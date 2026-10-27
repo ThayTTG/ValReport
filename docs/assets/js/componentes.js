@@ -59,7 +59,7 @@ export function delta(atual, anterior, casas = 1, sufixo = "", { inverso = false
   return `<small class="delta ${bom ? "bom" : "ruim"}" title="Semana anterior: ${num(anterior, casas)}${sufixo}">${d > 0 ? "▲" : "▼"} ${num(Math.abs(d), casas)}${sufixo}</small>`;
 }
 
-export const temNota = (id) => Boolean(B.notas.partidas?.[id]?.texto || Object.keys(B.notas.partidas?.[id]?.rounds || {}).length);
+export const temNota = (id) => (B.editor ? Boolean(B.notas.partidas?.[id]?.texto || Object.keys(B.notas.partidas?.[id]?.rounds || {}).length) : Boolean(B.comentarios?.[id]?.t));
 
 // ---------- Partidas ----------
 export function linhaPartida({ p, m, slug }, { mostrarNome = false } = {}) {
@@ -76,7 +76,7 @@ export function linhaPartida({ p, m, slug }, { mostrarNome = false } = {}) {
     <div class="partida__meio">
       <div class="partida__titulo">${mostrarNome && membro ? `<span>${esc(membro.apelido)}</span><span class="suave">·</span>` : ""}<span>${esc(p.mapa)}</span>
         <span class="placar ${m.res === "V" ? "bom" : m.res === "D" ? "ruim" : ""}">${esc(a)}–${esc(b)}</span></div>
-      <div class="partida__sub"><span>${esc(m.ag)}</span><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span>${m.eq > 1 ? `<span>com ${m.eq - 1} da equipe</span>` : ""}${temNota(p.id) ? `<span class="selo selo--destaque" title="Tem nota da IGL">${icone("nota")} nota</span>` : ""}${posicao}</div>
+      <div class="partida__sub"><span>${esc(m.ag)}</span><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span>${m.eq > 1 ? `<span>com ${m.eq - 1} da equipe</span>` : ""}${temNota(p.id) ? (B.editor ? `<span class="selo selo--destaque" title="Tem nota da IGL">${icone("nota")} nota</span>` : `<span class="selo selo--destaque" title="Tem comentários da equipe">${icone("nota")} ${B.comentarios[p.id].t}</span>`) : ""}${posicao}</div>
       ${com.length ? `<div class="com" title="Jogou com ${esc(com.map((c) => c.apelido).join(", "))}">${com.map((c) => imagem(imgCard(c.card), c.apelido, "", c.apelido)).join("")}</div>` : ""}
     </div>
     <div class="partida__nums">

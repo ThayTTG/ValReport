@@ -13,6 +13,7 @@ import { viewJogador } from "./jogador.js";
 import { viewPartida } from "./partida.js";
 import { viewEquipe } from "./equipe.js";
 import { viewTatica, podeVerTaticas } from "./taticas.js";
+import { carregarContagem } from "./comentarios.js";
 import { viewSobre } from "./sobre.js";
 import { viewHoje } from "./hoje.js";
 import { animar, trocarTema, ligarBrilho } from "./animar.js";
@@ -308,6 +309,7 @@ async function conferirDados(manual = false) {
     const antes = B.meta.contagem.partidas;
     limparCache();
     await carregarBase();
+    await carregarContagem();
     preencherTopo();
     await renderizar(true, "nada");
     const novas = B.meta.contagem.partidas - antes;
@@ -447,6 +449,7 @@ async function iniciar() {
     main.insertAdjacentHTML("beforebegin", `<div class="faixa-editor" role="status">Modo editor das notas da IGL · o que você salvar vai para o site da equipe sozinho (só membros veem; convidados não).</div>`);
   }
   tela = "app";
+  await carregarContagem();
   preencherTopo();
   ultimaConferida = Date.now();
   ligarBrilho(main);

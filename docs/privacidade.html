@@ -30,7 +30,7 @@
       <li><strong>Do seu perfil:</strong> apelido, mês e ano de nascimento (nunca o dia), a versão dos termos aceita e, só para quem tem 16 ou 17 anos, o e-mail de um responsável.</li>
       <li><strong>O que você escolhe mostrar:</strong> bio, agentes e funções preferidas e cor de destaque, que você pode mudar ou apagar a qualquer momento.</li>
       <li><strong>Do VALORANT:</strong> o seu Riot ID (nome#tag), o identificador da conta, o card e o nível, buscados pela HenrikDev API depois que a administradora ou a liderança da sua equipe confirmam que a conta é sua.</li>
-      <li><strong>Da equipe:</strong> as equipes de que você participa, o seu cargo, os convites criados e as notas e estratégias que a equipe escrever.</li>
+      <li><strong>Da equipe:</strong> as equipes de que você participa, o seu cargo, os convites criados, os comentários nas partidas e nos rounds (com o nome de quem escreveu) e as estratégias da equipe.</li>
       <li><strong>Equipes Premier:</strong> o nome, a tag, a divisão e o elenco da equipe no Premier (nomes e identificadores das contas), que o jogo já mostra publicamente e que conferimos pela HenrikDev API para saber quem pode jogar pela equipe.</li>
       <li><strong>Imagem da equipe:</strong> se a liderança enviar uma, ela é reduzida e regravada no navegador (o que apaga dados escondidos da foto, como local e câmera) e guardada no Supabase.</li>
       <li><strong>Táticas da equipe:</strong> as estratégias que a liderança e os treinadores montam (textos, desenhos no mapa, prints, apresentações, PDFs e clipes curtos), com quem criou e quem publicou cada versão. Prints e páginas de PDF também são regravados no navegador antes de enviar, sem os dados escondidos da foto.</li>
@@ -50,8 +50,8 @@
     <h2>4. Quem vê o quê</h2>
     <ul>
       <li><strong>Visitantes sem login</strong> veem só a página inicial. Nenhum dado de partida.</li>
-      <li><strong>Membros da equipe</strong> (líder, co-líderes, treinadores e jogadores) veem as partidas, as análises e as notas da equipe.</li>
-      <li><strong>Convidados</strong> veem as partidas e as análises, mas não as notas, as estratégias e as conversas.</li>
+      <li><strong>Membros da equipe</strong> (líder, co-líderes, treinadores e jogadores) veem as partidas, as análises, os comentários e as táticas da equipe.</li>
+      <li><strong>Convidados</strong> veem as partidas e as análises, mas não os comentários, as táticas e as conversas.</li>
       <li><strong>Colegas de equipe</strong> veem o seu apelido, o seu cargo e o seu Riot ID confirmado. Seu mês e ano de nascimento e o e-mail do responsável não aparecem para ninguém além de você.</li>
       <li><strong>Pessoas logadas no ValReport</strong> encontram pela busca o perfil de quem tem o Riot ID confirmado (apelido, bio, agentes, funções, card e nível) e veem as equipes marcadas como públicas. Quem tem 16 ou 17 anos fica fora da busca e das páginas públicas para quem não é da equipe.</li>
       <li><strong>Táticas</strong> aparecem só para o líder, os co-líderes, os treinadores e os jogadores da equipe; só a liderança e os treinadores criam e editam. Os arquivos delas ficam num espaço privado e abrem por endereços que expiram em 1 hora.</li>
