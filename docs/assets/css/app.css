@@ -369,6 +369,14 @@ main:focus, main:focus-visible { outline: none; }
 :root[data-tema="claro"] .kill .arma { filter: brightness(0) invert(.25); }
 @media (prefers-color-scheme: light) { :root:not([data-tema="escuro"]) .kill .arma { filter: brightness(0) invert(.25); } }
 .kill .arma-txt { font-size: 11px; color: var(--suave); text-align: center; }
+.kill .arma.arma--hab { height: 20px; width: 20px; max-width: 20px; justify-self: center; }
+.habs-abate { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.hab-abate { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--superficie-2); min-width: 0; }
+.hab-abate img { width: 28px; height: 28px; object-fit: contain; flex: none; filter: brightness(0) invert(.8); }
+:root[data-tema="claro"] .hab-abate img { filter: brightness(0) invert(.25); }
+@media (prefers-color-scheme: light) { :root:not([data-tema="escuro"]) .hab-abate img { filter: brightness(0) invert(.25); } }
+.hab-abate__nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hab-abate strong { font-variant-numeric: tabular-nums; }
 .kill .curto { display: none; }
 @media (max-width: 560px) {
   .kill { grid-template-columns: 34px minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; font-size: 12.5px; padding: 6px; }
@@ -1559,3 +1567,52 @@ button.chip { cursor: pointer; }
 .com-pendentes { align-items: center; flex-wrap: wrap; }
 .com-pendentes > span { flex: 1 1 260px; }
 @media (max-width: 520px) { .comentarios__rodape > span { display: none; } }
+
+/* ---------- Contador de habilidades ---------- */
+.habs-partida { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.hab-linha { display: grid; grid-template-columns: minmax(150px, 1fr) auto; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: 1px solid var(--borda); }
+.hab-linha:last-child { border-bottom: 0; }
+.hab-linha--outro-time { border-top: 2px solid var(--borda); margin-top: 10px; padding-top: 12px; }
+.hab-linha__quem { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hab-linha__quem img, .hab-linha__quem .avatar-vazio { width: 32px; height: 32px; border-radius: 8px; flex: none; }
+.hab-linha__quem > span { display: flex; flex-direction: column; min-width: 0; }
+.hab-linha__quem strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hab-linha__quem small { color: var(--suave); font-size: 12px; }
+.hab-linha__usos { display: grid; grid-template-columns: repeat(4, minmax(62px, auto)); gap: 6px; }
+.hab-uso { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 10px; background: var(--superficie-2); border: 1px solid transparent; }
+.hab-uso__icone { position: relative; width: 26px; height: 26px; flex: none; display: grid; place-items: center; }
+.hab-uso__icone img { width: 24px; height: 24px; object-fit: contain; filter: brightness(0) invert(.8); }
+:root[data-tema="claro"] .hab-uso__icone img { filter: brightness(0) invert(.25); }
+@media (prefers-color-scheme: light) { :root:not([data-tema="escuro"]) .hab-uso__icone img { filter: brightness(0) invert(.25); } }
+.hab-uso__icone kbd { position: absolute; right: -6px; bottom: -6px; font-family: inherit; font-size: 9px; font-weight: 700; line-height: 1; padding: 2px 3px; border-radius: 4px; background: var(--superficie-3); color: var(--texto); box-shadow: 0 0 0 1.5px var(--superficie); }
+.hab-uso__n { display: flex; flex-direction: column; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.hab-uso__n small { font-size: 11px; color: var(--suave); }
+.hab-uso--acima { border-color: color-mix(in srgb, var(--vitoria, #3fb68b) 55%, transparent); }
+.hab-uso--abaixo { border-color: color-mix(in srgb, var(--derrota, #e5566b) 55%, transparent); }
+.habs-jogador > .cartao { margin: 0; }
+.habs-jogador { display: grid; align-items: start; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 14px; }
+.hab-agente .celula-ag img, .hab-agente .celula-ag .avatar-vazio { width: 30px; height: 30px; border-radius: 8px; }
+.hab-agente__resumo { margin: 4px 0 10px; }
+.hab-barras { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.hab-barra { display: grid; grid-template-columns: 26px minmax(0, 1.2fr) minmax(70px, 1fr) auto; align-items: center; gap: 10px; }
+.hab-barra__nome { display: flex; flex-direction: column; min-width: 0; }
+.hab-barra__nome strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hab-barra__nome small, .hab-barra__valor small { font-size: 11px; color: var(--suave); }
+.hab-barra__trilho { position: relative; height: 8px; border-radius: 99px; background: var(--superficie-3); }
+.hab-barra__voce { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--destaque, var(--primaria, #b48cff)); }
+.hab-barra.hab-uso--acima .hab-barra__voce { background: var(--vitoria, #3fb68b); }
+.hab-barra.hab-uso--abaixo .hab-barra__voce { background: var(--derrota, #e5566b); }
+.hab-barra__media { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 2px; background: var(--texto); opacity: .75; }
+.hab-barra__valor { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.hab-barra.hab-uso--acima, .hab-barra.hab-uso--abaixo { border: 0; }
+@media (max-width: 560px) {
+  .hab-linha { grid-template-columns: 1fr; gap: 6px; }
+  .hab-linha__usos { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .hab-uso { padding: 4px 6px; gap: 8px; }
+  .hab-uso__icone kbd { right: -5px; bottom: -5px; }
+  .hab-uso__icone { width: 22px; height: 22px; }
+  .hab-uso__icone img { width: 20px; height: 20px; }
+  .hab-barra { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .hab-barra__trilho { grid-column: 2 / 4; grid-row: 2; }
+}
+@media (max-width: 400px) { .hab-uso__n small { display: none; } }

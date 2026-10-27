@@ -30,6 +30,8 @@ import random
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
+import catalogo
+
 FUSO_BR = timezone(timedelta(hours=-3))
 
 FUNCOES_PADRAO = {
@@ -343,6 +345,8 @@ def analisar_partida_completa(partida, modelo=None, cfg=None):
             "stats": p.get("stats") or {},
             "util_total": sum((casts.get(c) or 0) for c in ("grenade", "ability1", "ability2")),
             "ult_total": casts.get("ultimate") or 0,
+            # habilidades usadas na partida, por tecla: C, Q, E, X (a API só manda o total da partida)
+            "casts": [casts.get("grenade") or 0, casts.get("ability1") or 0, casts.get("ability2") or 0, casts.get("ultimate") or 0],
             "resultado": "vitória" if meu.get("won") else ("empate" if vm == vr else "derrota"),
             "placar": f"{vm}-{vr}",
             "rounds": [],
@@ -433,8 +437,8 @@ def analisar_partida_completa(partida, modelo=None, cfg=None):
 
                 if kt != vt and kpu in jogadores:
                     por[kpu]["kills"] += 1
-                    por[kpu]["armas"][g(ev, "weapon", "name") or "Habilidade"] += 1
-                    if (g(ev, "weapon", "type") or "") == "Ability":
+                    por[kpu]["armas"][catalogo.abate(ev, jogadores[kpu]["agente"])[0]] += 1
+                    if catalogo.eh_habilidade(ev):
                         por[kpu]["kills_hab"] += 1
                     if i in trade_feito_idx:
                         por[kpu]["trades"] += 1

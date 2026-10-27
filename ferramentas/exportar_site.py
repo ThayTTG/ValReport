@@ -28,6 +28,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import avaliacao as av
+import catalogo
 import gerar_report as gr
 
 PASTA = Path(__file__).resolve().parent.parent  # pasta principal do projeto (o código fica em ferramentas/)
@@ -55,13 +56,43 @@ MAPAS_CONHECIDOS = {
     "Corrode": (7e-05, -7e-05, 0.526158, 0.5),
 }
 TIPOS = ("pistol", "eco", "force", "armado", "anti-eco")
-NOMES_SEM_ARMA = {"Melee": "Faca", "Bomb": "Spike", "Fall": "Queda", "Ability": "Habilidade"}
 g = av.g
+HABILIDADES_USADAS = {}   # nome da habilidade -> ícone (vai para o meta.json, para o site mostrar no killfeed)
+SLOTS_TECLAS = ("Grenade", "Ability1", "Ability2", "Ultimate")   # C, Q, E, X
+USO_POR_AGENTE = defaultdict(lambda: [0, 0, 0, 0, 0])            # agente -> [C, Q, E, X, rounds] de todo o lobby
 
 
-def nome_arma(k):
-    """Nome da arma do abate; abates sem nome (faca, spike, queda, habilidade) ganham um rótulo."""
-    return g(k, "weapon", "name") or NOMES_SEM_ARMA.get(g(k, "weapon", "type") or "", "Desconhecida")
+def casts_de(p):
+    """[C, Q, E, X] que o jogador usou na partida (a API só manda o total da partida)."""
+    c = p.get("ability_casts") or {}
+    return [int(c.get(k) or 0) for k in ("grenade", "ability1", "ability2", "ultimate")]
+
+
+def habilidades_dos_agentes():
+    """Para o meta.json: nome e ícone das 4 habilidades de cada agente jogado e a média de uso por round no lobby
+    (todas as pessoas, das duas equipes, em todas as partidas exportadas)."""
+    out = {}
+    for ag, (c, q, e, x, n) in sorted(USO_POR_AGENTE.items()):
+        hab = []
+        for slot in SLOTS_TECLAS:
+            info = catalogo._g(catalogo.carregar(), ag, "slots", slot) or {}
+            ic = info.get("icone")
+            hab.append([info.get("pt") or catalogo.RESERVA.get((ag, slot)) or slot,
+                        ic if isinstance(ic, str) and ic.startswith("https://media.valorant-api.com/") else None])
+        out[ag] = {"h": hab, "m": [round(v / n, 3) if n else 0 for v in (c, q, e, x)], "n": n}
+    return out
+
+
+def nome_arma(k, agente=None):
+    """(nome, tipo) do abate: arma pelo nome; habilidades com o nome do jogo (inclusive as que a API manda sem nome,
+    como a Caçador de Cabeças e a Tour de Force do Chamber); faca, spike e queda com um rótulo."""
+    nome, tipo, slot = catalogo.abate(k, agente)
+    if tipo == "A":
+        dono = next((ag for wid, (ag, _) in catalogo.ESPECIAIS.items() if wid == g(k, "weapon", "id")), agente)
+        ic = catalogo.icone(dono, slot) if slot else None
+        if ic:
+            HABILIDADES_USADAS.setdefault(nome, ic)
+    return nome, tipo
 
 
 def r3(x):
@@ -153,7 +184,7 @@ def resumo_membro(a, bruta, j, membros_time, cfg, refs, mvp_partida, mvp_times, 
             continue
         if times.get(g(k, "victim", "puuid")) == meu_time or k.get("round") not in rounds_ok:
             continue
-        nome = nome_arma(k)
+        nome = nome_arma(k, j["agente"])[0]
         armas_k[nome] += 1
         loc_k = next((pl.get("location") for pl in k.get("player_locations") or []
                       if g(pl, "player", "puuid") == pu), None)
@@ -194,6 +225,7 @@ def resumo_membro(a, bruta, j, membros_time, cfg, refs, mvp_partida, mvp_times, 
         "cl": clt, "clv": clv, "cle": r3(sum((r["clutch_esperado"] or 0) for r in recs if r["clutch_tentado"])),
         "pl": sum(r["plant"] for r in recs), "df": sum(r["defuse"] for r in recs), "mk": mk,
         "ut": j["util_total"], "ul": j["ult_total"], "kh": sum(r["kills_hab"] for r in recs),
+        "hb": casts_de(pl),
         "lados": {k: [r3(v) for v in vs] for k, vs in lados.items()},
         "tipos": {k: [r3(v) for v in vs] for k, vs in tipos.items() if vs[0]},
         "armas": armas_out, "dm": dists,
@@ -249,7 +281,12 @@ def detalhe_partida(a, bruta, nosso, slug_de_puuid, cfg, membros_info):
             "imp": round(100 * sum(r["wpa"] for r in recs) / len(recs), 1) if recs else 0,
             "mvp": 1 if mvp_partida == pu else (2 if pu in mvp_times else 0),
             "carga": round(g(p, "economy", "loadout_value", "average", padrao=0) or 0),
+            "hb": casts_de(p),
         })
+        uso = USO_POR_AGENTE[g(p, "agent", "name") or "?"]
+        for i, v in enumerate(casts_de(p)):
+            uso[i] += v
+        uso[4] += a["n_rounds"] or 0
 
     recs_por_slug = {}
     for pu, slug in slug_de_puuid.items():
@@ -257,6 +294,7 @@ def detalhe_partida(a, bruta, nosso, slug_de_puuid, cfg, membros_info):
         if j:
             recs_por_slug[slug] = ({r["n"]: r for r in j["rounds"]}, j["agente"])
 
+    agente_de = {p.get("puuid"): g(p, "agent", "name") for p in bruta.get("players") or []}
     kills_r = defaultdict(list)
     for k in bruta.get("kills") or []:
         kills_r[k.get("round")].append(k)
@@ -274,7 +312,7 @@ def detalhe_partida(a, bruta, nosso, slug_de_puuid, cfg, membros_info):
                        if g(pl, "player", "puuid") == kp), None) or {}
             lv = k.get("location") or {}
             ks.append([k.get("time_in_round_in_ms", 0), idx.get(kp, -1), idx.get(vp, -1),
-                       nome_arma(k), (g(k, "weapon", "type") or "W")[:1],
+                       *nome_arma(k, agente_de.get(kp)),
                        lv.get("x"), lv.get("y"), lk.get("x"), lk.get("y"),
                        [idx[g(x, "puuid")] for x in k.get("assistants") or [] if g(x, "puuid") in idx]])
 
@@ -583,6 +621,8 @@ def mapas_meta(nomes, uuids):
 # ----------------------------------------------------------------------------
 
 def exportar(cfg=None, verificar=False):
+    HABILIDADES_USADAS.clear()
+    USO_POR_AGENTE.clear()
     cfg = gr.config_padrao(cfg or gr.ler_json(PASTA / "config.json", {}))
     site = cfg.get("site") or {}
     todos, autorizados = jogadores_do_site(cfg)
@@ -709,6 +749,8 @@ def exportar(cfg=None, verificar=False):
         "agentes": {n: {"uuid": u, "fn": av.funcao_do_agente(n, cfg)}
                     for n, u in sorted((n, u) for n, u in agentes.items() if n and u)},
         "armas": {n: u for n, u in sorted((n, u) for n, u in armas.items() if n and u)},
+        "habilidades": dict(sorted(HABILIDADES_USADAS.items())),
+        "hab_agentes": habilidades_dos_agentes(),
         "filas": dict(filas), "temporadas": {k: v for k, v in temporadas.items() if k}, "tiers_uuid": TIERS_UUID,
         "regras": {"janela_dias": cfg["janela_dias"], "amostra_minima": cfg["amostra_minima_rounds"],
                    "trade_m": round(cfg.get("distancia_trade", 1500) / 100),

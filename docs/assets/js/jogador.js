@@ -1,13 +1,14 @@
 // Perfil de um jogador: Geral, Partidas, Agentes, Mapas, Armas, Performance e Calor
 
 import {
-  esc, num, pct, sinal, div, imagem, imgAgente, imgCard, imgRank, imgMapaFaixa, imgArma, nomeTier, relativo, dataCurta,
+  esc, num, pct, sinal, div, imagem, imgAgente, imgCard, imgRank, imgMapaFaixa, imgArma, imgHabilidade, nomeTier, relativo, dataCurta,
   tile, destaque, vazio, cartao as cartaoSimples, secao, barra, escala, selo, classeSinal, classeNivel, icone, TIPOS, nomeFila,
 } from "./util.js";
 import { B, itensDe, stats, agrupar, calor as carregarCalor, passaPartida, passaMembro } from "./dados.js";
 import { barraFiltros, listaPorDia, tabela, celulaAgente, forma, vereditoSelo, linhaPartida, segmentoTipoRound, lerTipoRound, TIPO_COD, miniAbas, cartaoMin } from "./componentes.js";
 import { linha, linhaElo, histograma, precisao, moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { calcularRecordes, gradeRecordes } from "./recordes.js";
+import { htmlHabilidadesJogador } from "./habilidades.js";
 import { temCoroa, coroaSobre } from "./coroa.js";
 
 /** Todo cartão do perfil pode ser minimizado (a escolha vale para todos os jogadores, neste aparelho) */
@@ -17,7 +18,7 @@ const cartao = (titulo, corpo, extra = "") => cartaoMin(chaveCartao(titulo), tit
 const ultimoElo = (slug) => (B.elo[slug] || []).filter((h) => h.tier != null).at(-1);
 
 export const ABAS_JOGADOR = [["geral", "Geral"], ["partidas", "Partidas"], ["agentes", "Agentes"], ["mapas", "Mapas"],
-  ["armas", "Armas"], ["performance", "Performance"]];   // o mapa de calor agora fica dentro de Mapas
+  ["armas", "Armas"], ["habilidades", "Habilidades"], ["performance", "Performance"]];   // o mapa de calor agora fica dentro de Mapas
 
 export function cabecalhoJogador(e) {
   const av = (B.avaliacao[e.slug] || [])[0];
@@ -319,7 +320,9 @@ function armas(itens) {
   const linhas = Object.entries(s.armas).map(([n, v]) => ({ n, k: v[0], hs: v[1], bs: v[2], ls: v[3], dano: v[4], r: v[5], dist: div(v[6], v[7]), distSoma: v[6], distN: v[7], maior: v[8] }));
   const total = linhas.reduce((a, l) => a + l.k, 0);
   const armasReais = linhas.filter((l) => B.meta.armas[l.n] && (l.k || l.r));
-  const outros = linhas.filter((l) => !B.meta.armas[l.n] && l.k);
+  const habs = linhas.filter((l) => !B.meta.armas[l.n] && l.k && B.meta.habilidades?.[l.n]);
+  const outros = linhas.filter((l) => !B.meta.armas[l.n] && l.k && !B.meta.habilidades?.[l.n]);
+  const totalHab = habs.reduce((a, l) => a + l.k, 0);
   if (!armasReais.length) return vazio("Nenhuma arma com estes filtros");
   const tab = tabela("armas", armasReais, [
     { k: "n", t: "Arma", v: (l) => l.n, f: (l) => `<div class="celula-ag" style="min-width:170px">${imgArma(l.n) ? `<img src="${esc(imgArma(l.n))}" alt="" style="width:70px;height:26px;object-fit:contain;background:none" loading="lazy" referrerpolicy="no-referrer" data-sefalhar="ocultar">` : ""}<strong>${esc(l.n)}</strong></div>` },
@@ -335,6 +338,10 @@ function armas(itens) {
   const estilo = top.length ? secao("Top 3 armas", `${podioArmas(top, total)}
       <div class="estilo">${icone("alvo")}<div><small>Estilo de jogo</small>${estiloDeJogo(top, armasReais)}</div></div>`, `<span class="suave pequeno">pelos abates · segue os filtros</span>`) : "";
   return estilo + secao("Armas", tab + `<p class="suave pequeno" style="margin-top:10px">Abates por arma são exatos. HS% e dano por arma usam a arma comprada no round (a API não diz qual arma acertou cada tiro), então são aproximados, como em outros trackers.</p>`)
+    + (habs.length ? secao("Abates com habilidade", `<div class="habs-abate">${habs.sort((a, b) => b.k - a.k).map((l) => `<div class="hab-abate">
+        ${imgHabilidade(l.n) ? `<img src="${esc(imgHabilidade(l.n))}" alt="" loading="lazy" referrerpolicy="no-referrer" data-sefalhar="ocultar">` : ""}
+        <span class="hab-abate__nome">${esc(l.n)}</span><strong>${l.k}</strong></div>`).join("")}</div>
+      <p class="suave pequeno" style="margin-top:10px">${totalHab} abate${totalHab === 1 ? "" : "s"} com habilidade (${pct(div(totalHab, total))} do total), inclusive as que a API manda sem nome, como a Caçador de Cabeças e a Tour de Force do Chamber.</p>`, `<span class="suave pequeno">segue os filtros</span>`) : "")
     + (outros.length ? secao("Outros abates", `<div class="chips">${outros.sort((a, b) => b.k - a.k).map((l) => `<span class="chip">${esc(l.n)} <strong>${l.k}</strong></span>`).join("")}</div>`) : "");
 }
 
@@ -506,6 +513,7 @@ export async function viewJogador(slug, aba, f, q) {
   else if (aba === "mapas" && q.get("vista") === "calor") { ({ html: corpo, depois } = await calor(e, itens, q)); corpo = vistaMapas("calor") + corpo; }
   else if (aba === "mapas") corpo = vistaMapas("geral") + mapas(itens, slug, f);
   else if (aba === "armas") corpo = armas(itens);
+  else if (aba === "habilidades") corpo = htmlHabilidadesJogador(agrupar(itens, (it) => it.m.ag)) || vazio("Sem contagem de habilidades", `<p>As partidas destes filtros foram exportadas antes do contador existir. Na próxima publicação pelo PC elas passam a aparecer aqui.</p>`);
   else if (aba === "performance") corpo = performance(e, itens, s, q);
   return {
     titulo: `${e.apelido} · ${ABAS_JOGADOR.find(([id]) => id === aba)[1]}`,

@@ -64,6 +64,8 @@ export const imgMapaSplash = (nome) => { const u = uuidMapa(nome); return u ? `$
 export const imgMinimapa = (nome) => { const u = uuidMapa(nome); return u ? `${CDN}/maps/${u}/displayicon.png` : null; };
 export const imgArma = (nome) => { const u = META?.armas?.[nome]; return u ? `${CDN}/weapons/${u}/displayicon.png` : null; };
 export const imgArmaKill = (nome) => { const u = META?.armas?.[nome]; return u ? `${CDN}/weapons/${u}/killstreamicon.png` : null; };
+/** Ícone de uma habilidade que matou alguém (o PC manda no meta.json só endereços da valorant-api) */
+export const imgHabilidade = (nome) => { const u = META?.habilidades?.[nome]; return typeof u === "string" && u.startsWith(`${CDN}/`) ? u : null; };
 export const imgCard = (uuid, tipo = "smallart") => (uuid ? `${CDN}/playercards/${uuid}/${tipo}.png` : null);
 export const imgRank = (tier) => (tier && META?.tiers_uuid ? `${CDN}/competitivetiers/${META.tiers_uuid}/${tier}/smallicon.png` : null);
 

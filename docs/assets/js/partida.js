@@ -1,10 +1,11 @@
 // Detalhe de uma partida: Placar, Rounds (killfeed + economia + leitura), Mapa 2D e Leitura da equipe
 
-import { md, esc, num, sinal, imagem, imgAgente, imgRank, imgMapaSplash, imgArmaKill, nomeFila, nomeTier, dataHora, duracao, vazio, cartao, secao, selo, icone, classeSinal, TIPOS, FIM_ROUND, CERIMONIAS } from "./util.js";
+import { md, esc, num, sinal, imagem, imgAgente, imgRank, imgMapaSplash, imgArmaKill, imgHabilidade, nomeFila, nomeTier, dataHora, duracao, vazio, cartao, secao, selo, icone, classeSinal, TIPOS, FIM_ROUND, CERIMONIAS } from "./util.js";
 import { B, detalhe, notaPartida, notaRound } from "./dados.js";
 import { tabela, blocoNota } from "./componentes.js";
 import { moldeMapa, svgRound } from "./graficos.js";
 import { abas } from "./jogador.js";
+import { htmlUsoPartida, utilPorRound, temContagem } from "./habilidades.js";
 import { podeVerComentarios, lerComentarios, htmlComentarios, ligarComentarios, roundTemComentario, totalComentarios, htmlNotasPendentes, ligarNotasPendentes } from "./comentarios.js";
 
 const ABAS = [["placar", "Placar"], ["rounds", "Rounds"], ["mapa", "Mapa 2D"], ["leitura", "Leitura da equipe"], ["notas", "Notas da IGL"]];
@@ -32,6 +33,7 @@ function cabecalho(d, p) {
 }
 
 function placar(d) {
+  const nR = d.rounds?.length || 0, temHab = d.jogadores.some((j) => temContagem(j.hb));
   const colunas = (id) => [
     { k: "nome", t: "Jogador", v: (j) => j.nome, f: (j) => `<div class="celula-ag">${imagem(imgAgente(j.ag), j.ag)}<div><strong>${j.slug ? `<a href="#/j/${esc(j.slug)}">${esc(j.nome)}</a>` : esc(j.nome)}${j.mvp === 1 ? ` <span class="selo selo--destaque" title="MVP da partida">${icone("trofeu")} MVP</span>` : j.mvp === 2 ? ` <span class="selo" title="MVP do time">${icone("trofeu")}</span>` : ""}</strong><small>${esc(j.ag)} · ${esc(nomeTier(j.tn))}</small></div>${imagem(imgRank(j.tier), nomeTier(j.tn), "rank-mini", "")}</div>` },
     { k: "acs", t: "ACS", v: (j) => j.acs }, { k: "k", t: "K", v: (j) => j.k }, { k: "d", t: "D", v: (j) => j.d }, { k: "a", t: "A", v: (j) => j.a },
@@ -41,6 +43,7 @@ function placar(d) {
     { k: "fk", t: "FK", v: (j) => j.fk }, { k: "fd", t: "FD", v: (j) => j.fd }, { k: "kast", t: "KAST", v: (j) => j.kast, f: (j) => `${j.kast}%` },
     { k: "imp", t: "Impacto", v: (j) => j.imp, f: (j) => `<strong class="${classeSinal(j.imp, 1)}">${sinal(j.imp, 1, "%")}</strong>` },
     { k: "carga", t: "Carga média", v: (j) => j.carga, f: (j) => num(j.carga) },
+    ...(temHab ? [{ k: "ut", t: "Util./round", v: (j) => utilPorRound(j.hb, nR), f: (j) => `<span title="C, Q e E por round (sem a ultimate)">${num(utilPorRound(j.hb, nR), 1)}</span>` }] : []),
   ];
   const times = [d.nosso, ...Object.keys(d.placar).filter((t) => t !== d.nosso)];
   return times.map((t, i) => {
@@ -48,7 +51,8 @@ function placar(d) {
     const pts = d.placar[t] ?? 0;
     return secao(i === 0 ? "Time da equipe" : "Time adversário", `<div class="cartao">${tabela(`placar-${i}`, js, colunas(i), { padrao: "acs", classeLinha: (j) => (j.slug ? "membro" : "") })}</div>`,
       `<span class="selo ${pts >= (d.placar[times[1 - i]] ?? 0) ? "selo--vitoria" : "selo--derrota"}">${pts} rounds</span>`);
-  }).join("") + `<p class="suave pequeno" style="margin-top:12px">Quem não é da equipe (ou não autorizou aparecer) é mostrado como “Aliado” ou “Adversário”, sem nome. Impacto = quanto a pessoa mudou a chance do time vencer, em média por round.</p>`;
+  }).join("") + (temHab ? secao("Habilidades usadas", htmlUsoPartida(times.flatMap((t) => d.jogadores.filter((j) => j.time === t)).map((j) => ({ ...j, rounds: nR }))),
+      `<span class="suave pequeno">contagem da Riot · cores comparam com a média do agente</span>`) : "") + `<p class="suave pequeno" style="margin-top:12px">Quem não é da equipe (ou não autorizou aparecer) é mostrado como “Aliado” ou “Adversário”, sem nome. Impacto = quanto a pessoa mudou a chance do time vencer, em média por round.</p>`;
 }
 
 function linhaRounds(d, rSel, rota) {
@@ -64,11 +68,11 @@ function killfeed(d, r) {
   return `<div class="killfeed">${r.kills.map(([t, ki, vi, arma, tipo]) => {
     const k = d.jogadores[ki] || { nome: "?", ag: "?" }, v = d.jogadores[vi] || { nome: "?", ag: "?" };
     const ck = k.time === d.nosso ? "nosso-txt" : "deles-txt", cv = v.time === d.nosso ? "nosso-txt" : "deles-txt";
-    const icon = tipo === "W" ? imgArmaKill(arma) : null;
+    const icon = tipo === "W" ? imgArmaKill(arma) : tipo === "A" ? imgHabilidade(arma) : null;
     const nm = (j) => (j.slug ? esc(j.nome) : `<span class="longo">${esc(j.nome)}</span><span class="curto">${esc(j.nome.replace("Adversário", "Adv.").replace("Aliado", "Ali."))}</span>`);
     return `<div class="kill"><time>${Math.floor(t / 60000)}:${String(Math.floor((t % 60000) / 1000)).padStart(2, "0")}</time>
       <span class="quem">${imagem(imgAgente(k.ag), k.ag)}<span class="${ck}">${nm(k)}</span></span>
-      ${icon ? `<img class="arma" src="${esc(icon)}" alt="${esc(arma)}" title="${esc(arma)}" loading="lazy" referrerpolicy="no-referrer" data-sefalhar="texto">` : `<span class="arma-txt">${esc(arma)}</span>`}
+      ${icon ? `<img class="arma${tipo === "A" ? " arma--hab" : ""}" src="${esc(icon)}" alt="${esc(arma)}" title="${esc(arma)}" loading="lazy" referrerpolicy="no-referrer" data-sefalhar="texto">` : `<span class="arma-txt">${esc(arma)}</span>`}
       <span class="quem vitima"><span class="${cv}">${nm(v)}</span>${imagem(imgAgente(v.ag), v.ag)}</span></div>`;
   }).join("")}</div>`;
 }
