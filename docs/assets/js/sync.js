@@ -101,7 +101,7 @@ export async function viewSync() {
   const html = `<section class="secao sync">
       <a class="voltar limpar pequeno" href="#/painel">${icone("voltar")} Painel da administradora</a>
       <div class="sync-topo"><div><h1>Sync</h1>
-        <p class="suave">O que ficou faltando nos dados da ${esc(d.equipe?.nome || "equipe")} e os pedidos para o PC refazer. O PC atende na próxima coleta (de 20 em 20 minutos, enquanto estiver ligado).</p></div>
+        <p class="suave">O que ficou faltando nos dados da ${esc(d.equipe?.nome || "equipe")} e os pedidos para o PC refazer. O PC atende na próxima coleta (de 20 em 20 minutos, enquanto estiver ligado). O checklist do PC fica no <a href="#/painel/diagnostico">Diagnóstico</a>.</p></div>
         <div class="sync-botoes">${abertos.has(chave("tudo")) ? acao(abertos, "tudo", null) : `<button class="botao-primario" type="button" data-sync-pedir="tudo" data-sync-alvo="">${icone("atualizar")} Sincronizar tudo</button>`}
           ${abertos.has(chave("site")) ? "" : `<button class="botao-secundario" type="button" data-sync-pedir="site" data-sync-alvo="">${icone("enviar")} Reenviar ao site</button>`}
           <button class="botao-secundario" type="button" data-sync-recarregar title="Ler de novo">${icone("relogio")} Atualizar</button></div></div>

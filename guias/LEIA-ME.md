@@ -19,11 +19,13 @@ com análise tática por partida, avaliação justa por função e análise de d
 | `ferramentas\avaliacao.py` | O "cérebro": chance de vitória, impacto, trades, distâncias, avaliação por função |
 | `ferramentas\catalogo.py` | Nomes e ícones das habilidades (da valorant-api, guardados por 7 dias em `dados\cache`): dá nome aos abates de habilidade que a API manda sem nome, como a Caçador de Cabeças e a Tour de Force do Chamber |
 | `ferramentas\sync.py` | Página **Sync** do Painel: no fim de cada coleta, atende os pedidos de "buscar de novo" (partida, elo, card, tudo, reenviar ao site) e manda ao site o que ficou faltando e o sinal de vida do PC. `py ferramentas\sync.py` mostra o diagnóstico aqui mesmo |
+| `ferramentas\diagnostico.py` | Confere o PC: Python, config.json, chaves (só "configurada" ou não, o valor nunca aparece), tarefas do Agendador, última coleta, disco, publicação, HenrikDev, Supabase, GitHub e o site no ar. Uma parte vai a cada coleta para o site (Painel > Diagnóstico) |
 | `ferramentas\armazem.py` | Guarda as partidas compactadas e o modelo de chance de vitória |
 | `ferramentas\gerar_report.py` | Escreve os reports (`py ferramentas\gerar_report.py 2026-10-23` refaz um dia) |
 | `config.json` | Jogadores, apelidos, filas e ajustes finos |
 | `Atalhos\rodar_report.bat` | Roda tudo com dois cliques |
 | `Atalhos\instalar_agendamento.ps1` | Agenda o report diário às 21h e a atualização do site a cada 20 min |
+| `Atalhos\diagnostico.bat` | Roda o diagnóstico completo do PC, mostra o que fazer em cada problema e salva em `dados\diagnostico.txt` |
 | `Atalhos\atualizar_agora.bat` | Procura partidas novas agora e atualiza o site (sem report nem Discord) |
 
 ## Atualizando da versão 1

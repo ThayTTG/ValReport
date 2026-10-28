@@ -1,10 +1,12 @@
 // ValReport · NokyLabs — rotas, tema, filtros e eventos
 
+import "./registro.js";   // primeiro: guarda os erros desta sessão para a página Diagnóstico
 import { esc, icone, imagem, imgCard, imgAgente, definirMeta, dataHora, vazio, larguraGrafico } from "./util.js";
 import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache, detectarEditor, metaFresca } from "./dados.js";
 import { iniciarNuvem, rpc, entrar, usuario } from "./nuvem.js";
 import { viewBoasVindas, viewCadastro, viewSemEquipe, viewConta, viewPainel } from "./conta.js";
 import { viewSync } from "./sync.js";
+import { viewDiagnostico } from "./diagnostico.js";
 import { viewMeuPerfil, viewPerfilPublico, ligarBusca } from "./perfil.js";
 import { viewMinhasEquipes, viewTime, viewConvite, guardarConvitePendente } from "./equipes.js";
 import { ligarGaveta } from "./gaveta.js";
@@ -77,6 +79,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
     else if (tela === "cadastro") v = viewCadastro();
     else if (B.conta && partes[0] === "conta") v = viewConta();
     else if (B.conta && partes[0] === "painel" && partes[1] === "sync") v = await viewSync();
+    else if (B.conta && partes[0] === "painel" && partes[1] === "diagnostico") v = await viewDiagnostico();
     else if (B.conta && partes[0] === "painel") v = await viewPainel();
     else if (B.conta && partes[0] === "perfil") v = await viewMeuPerfil();
     else if (B.conta && partes[0] === "u" && partes[1]) v = await viewPerfilPublico(decodeURIComponent(partes[1]));

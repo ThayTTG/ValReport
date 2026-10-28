@@ -1656,3 +1656,11 @@ button.chip { cursor: pointer; }
 }
 .sync-falta-sql { align-items: flex-start; }
 .sync-falta-sql ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+
+/* ---------- Diagnóstico ---------- */
+.painel-atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.painel-atalhos > .cartao { margin: 0; }
+.diag-item > .selo { flex: none; min-width: 74px; justify-content: center; text-align: center; }
+.diag .sync-item { flex-wrap: nowrap; align-items: flex-start; }
+.diag .sync-item__texto small { overflow-wrap: anywhere; }
+@media (max-width: 560px) { .diag-item > .selo { min-width: 0; } }

@@ -248,7 +248,13 @@ def diagnosticar(cfg, estado=None):
                           "motivo": "nenhuma partida guardada" if not m.get("partidas") else "a API não mandou o card"})
 
     reports = sorted((p.name for p in (DADOS / "reports").glob("20*") if p.is_dir()), reverse=True) if (DADOS / "reports").exists() else []
+    try:   # checklist do PC (Python, chaves, tarefas, disco...) para a página Diagnóstico do Painel
+        import diagnostico
+        pc = diagnostico.para_o_site(cfg)
+    except Exception as e:  # noqa: BLE001
+        pc = {"erro": str(e)[:200]}
     return {
+        "pc": pc,
         "versao": VERSAO, "gerado_em": _agora().isoformat(timespec="seconds"),
         "coleta": {
             "rapida_em": rapida.get("em"), "rapida_novidade": rapida.get("novidade"),
