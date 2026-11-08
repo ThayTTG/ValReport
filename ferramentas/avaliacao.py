@@ -380,7 +380,7 @@ def analisar_partida_completa(partida, modelo=None, cfg=None):
         plantada = False
         credito, credito_solo = defaultdict(float), defaultdict(float)
         por = defaultdict(lambda: {"kills": 0, "armas": Counter(), "assist": 0, "trades": 0, "morte": None,
-                                   "kills_solo": 0, "kills_hab": 0, "plant": False, "defuse": False})
+                                   "kills_solo": 0, "kills_hab": 0, "kills_pos_plant": 0, "plant": False, "defuse": False})
         ultimo_vivo = {}
         idx_kill = {id(k): i for i, k in enumerate(ks)}
 
@@ -440,6 +440,8 @@ def analisar_partida_completa(partida, modelo=None, cfg=None):
                     por[kpu]["armas"][catalogo.abate(ev, jogadores[kpu]["agente"])[0]] += 1
                     if catalogo.eh_habilidade(ev):
                         por[kpu]["kills_hab"] += 1
+                    if plantada:
+                        por[kpu]["kills_pos_plant"] += 1
                     if i in trade_feito_idx:
                         por[kpu]["trades"] += 1
                     if dist_k is not None and dist_k > op["dist_isolado"]:
@@ -522,6 +524,10 @@ def analisar_partida_completa(partida, modelo=None, cfg=None):
                 "kills_hab": x["kills_hab"],
                 "first_kill": bool(primeiro) and g(primeiro, "killer", "puuid") == pu,
                 "first_death": bool(primeiro) and g(primeiro, "victim", "puuid") == pu,
+                # segundos até o primeiro duelo do round (só para quem estava nele)
+                "tempo_duelo_s": (round((primeiro.get("time_in_round_in_ms") or 0) / 1000, 1)
+                                  if primeiro and pu in (g(primeiro, "killer", "puuid"), g(primeiro, "victim", "puuid")) else None),
+                "kills_pos_plant": x["kills_pos_plant"],
                 "clutch_vs": clutch,
                 "clutch_tentado": clutch_tentado,
                 "clutch_esperado": clutch_esperado,

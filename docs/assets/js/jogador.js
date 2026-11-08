@@ -9,6 +9,7 @@ import { barraFiltros, listaPorDia, tabela, celulaAgente, forma, vereditoSelo, l
 import { linha, linhaElo, histograma, precisao, moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { calcularRecordes, gradeRecordes } from "./recordes.js";
 import { htmlHabilidadesJogador } from "./habilidades.js";
+import { htmlAtributos } from "./atributos.js";
 import { temCoroa, coroaSobre } from "./coroa.js";
 
 /** Todo cartão do perfil pode ser minimizado (a escolha vale para todos os jogadores, neste aparelho) */
@@ -19,6 +20,8 @@ const ultimoElo = (slug) => (B.elo[slug] || []).filter((h) => h.tier != null).at
 
 export const ABAS_JOGADOR = [["geral", "Geral"], ["partidas", "Partidas"], ["agentes", "Agentes"], ["mapas", "Mapas"],
   ["armas", "Armas"], ["habilidades", "Habilidades"], ["performance", "Performance"]];   // o mapa de calor agora fica dentro de Mapas
+// Atributos: só a administradora, até a conferência das notas com a equipe
+const abasDe = () => (B.conta?.admin ? [...ABAS_JOGADOR, ["atributos", "Atributos"]] : ABAS_JOGADOR);
 
 export function cabecalhoJogador(e) {
   const av = (B.avaliacao[e.slug] || [])[0];
@@ -499,12 +502,14 @@ export async function viewJogador(slug, aba, f, q) {
   const e = B.porSlug.get(slug);
   if (!e) return { html: vazio("Jogador não encontrado", `<p>Volte para a <a href="#/equipe">equipe</a>.</p>`) };
   if (aba === "calor") { aba = "mapas"; q.set("vista", "calor"); }   // endereço antigo da aba de calor
-  aba = ABAS_JOGADOR.some(([id]) => id === aba) ? aba : "geral";
+  const lista = abasDe();
+  aba = lista.some(([id]) => id === aba) ? aba : "geral";
   const itens = itensDe(slug, f);
   const s = stats(itens);
   const qs = filtrosQuery(f);
   let corpo = "", depois = null;
   if (!e.partidas) corpo = vazio("Ainda sem partidas", `<p>Quando ${esc(e.apelido)} jogar uma partida válida, ela aparece aqui.</p>`);
+  else if (aba === "atributos") corpo = await htmlAtributos(e, q);
   else if (!itens.length && aba !== "geral") corpo = vazio("Nenhuma partida com estes filtros", `<p><button class="limpar" type="button" data-limpar-filtros>Limpar filtros</button></p>`);
   else if (aba === "geral") corpo = geral(e, itens, s, qs, q);
   else if (aba === "partidas") corpo = `${forma(itens, 20)}${listaPorDia(itens.slice(0, Number(q.get("n") || 40)))}
@@ -516,9 +521,9 @@ export async function viewJogador(slug, aba, f, q) {
   else if (aba === "habilidades") corpo = htmlHabilidadesJogador(agrupar(itens, (it) => it.m.ag)) || vazio("Sem contagem de habilidades", `<p>As partidas destes filtros foram exportadas antes do contador existir. Na próxima publicação pelo PC elas passam a aparecer aqui.</p>`);
   else if (aba === "performance") corpo = performance(e, itens, s, q);
   return {
-    titulo: `${e.apelido} · ${ABAS_JOGADOR.find(([id]) => id === aba)[1]}`,
-    html: `${cabecalhoJogador(e)}${abas(`#/j/${slug}`, aba, ABAS_JOGADOR, qs)}${barraFiltros(f, slug)}
-      ${itens.length && aba !== "geral" ? `<p class="suave pequeno" style="margin-top:6px">${itens.length} partida${itens.length === 1 ? "" : "s"} · ${s.v}V ${s.d}D · ${num(s.r)} rounds</p>` : ""}
+    titulo: `${e.apelido} · ${lista.find(([id]) => id === aba)[1]}`,
+    html: `${cabecalhoJogador(e)}${abas(`#/j/${slug}`, aba, lista, qs)}${aba === "atributos" ? "" : barraFiltros(f, slug)}
+      ${itens.length && aba !== "geral" && aba !== "atributos" ? `<p class="suave pequeno" style="margin-top:6px">${itens.length} partida${itens.length === 1 ? "" : "s"} · ${s.v}V ${s.d}D · ${num(s.r)} rounds</p>` : ""}
       <div class="secao">${corpo}</div>`,
     depois,
   };

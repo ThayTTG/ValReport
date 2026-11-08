@@ -27,6 +27,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import atributos
 import avaliacao as av
 import catalogo
 import gerar_report as gr
@@ -730,6 +731,7 @@ def exportar(cfg=None, verificar=False):
     tamanho += gravar(PASTA_DATA / "elo.json", elo_json(autorizados, slug))
     atualizar_previa(site)
     tamanho += gravar(PASTA_DATA / "formacoes.json", formacoes_json(ctx, cfg, autorizados, slug))
+    tamanho += gravar(PASTA_DATA / "atributos.json", atributos.calcular(ctx["analises"].values(), puuid_aut, cfg))
 
     # Quem ainda não tem partida guardada usa o card que o Sync buscou (dados/cache/contas.json)
     contas = gr.ler_json(PASTA / "dados" / "cache" / "contas.json", {}) or {}

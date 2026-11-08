@@ -58,6 +58,7 @@ export async function carregarBase() {
   return B;
 }
 export const detalhe = (id) => json(`data/partidas/${id}.json`);
+export const atributosDados = () => json("data/atributos.json");
 
 /** Salva uma nota pelo editor local (só funciona com o editar_notas.bat aberto) */
 export async function salvarNota(pedido) {
