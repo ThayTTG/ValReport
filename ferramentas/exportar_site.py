@@ -19,6 +19,7 @@ Uso:
 
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -731,7 +732,13 @@ def exportar(cfg=None, verificar=False):
     tamanho += gravar(PASTA_DATA / "elo.json", elo_json(autorizados, slug))
     atualizar_previa(site)
     tamanho += gravar(PASTA_DATA / "formacoes.json", formacoes_json(ctx, cfg, autorizados, slug))
-    tamanho += gravar(PASTA_DATA / "atributos.json", atributos.calcular(ctx["analises"].values(), puuid_aut, cfg))
+    atr = atributos.calcular(ctx["analises"].values(), puuid_aut, cfg)
+    # Resumo por IA: só no report das 21h na nuvem (VALREPORT_RESUMO_IA=1 e o GITHUB_TOKEN com models: read).
+    # Nas outras execuções, só reaproveita o resumo guardado.
+    atributos.aplicar_resumos(atr, PASTA / "dados" / "cache" / "resumos_ia.json",
+                              gerar=os.environ.get("VALREPORT_RESUMO_IA") == "1",
+                              token=os.environ.get("GITHUB_TOKEN"), hoje=datetime.now(av.FUSO_BR).date().isoformat())
+    tamanho += gravar(PASTA_DATA / "atributos.json", atr)
 
     # Quem ainda não tem partida guardada usa o card que o Sync buscou (dados/cache/contas.json)
     contas = gr.ler_json(PASTA / "dados" / "cache" / "contas.json", {}) or {}

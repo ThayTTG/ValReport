@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   actions: write
+  models: read     # resumo por IA dos Atributos (GitHub Models, com o próprio GITHUB_TOKEN: sem chave e sem custo)
 
 concurrency:
   group: coleta
@@ -30,6 +31,8 @@ jobs:
       DISCORD_WEBHOOK_FORMACOES: ${{ secrets.DISCORD_WEBHOOK_FORMACOES }}
       DISCORD_WEBHOOK_DICAS: ${{ secrets.DISCORD_WEBHOOK_DICAS }}
       GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      VALREPORT_RESUMO_IA: "1"   # só aqui (21h); a coleta de 20 em 20 min só reaproveita o resumo guardado
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

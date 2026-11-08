@@ -8,6 +8,9 @@ Como a nota sai:
      coletados que jogaram a mesma função (as duas equipes de cada partida; quem jogou várias partidas conta uma vez).
   2. A nota do atributo é a média dessas posições. 50 = o normal para quem joga a mesma função com a gente.
   3. Também sai separado por lado (ataque e defesa). Com menos de 100 rounds na função, vem "amostra pequena".
+  4. Estatísticas raras (sniper, abates com habilidade) têm um mínimo: abaixo dele, a posição cai na proporção.
+     Sem isso, quem comprou uma Marshal num eco passava na frente de todos os que têm zero.
+  5. Um texto por regras (sempre) e, no report das 21h na nuvem, um resumo por IA (GitHub Models) por cima dele.
 
 Uso: py ferramentas\\atributos.py   (mostra as notas da equipe aqui mesmo; o site recebe pelo exportar_site.py)
 """
@@ -23,6 +26,15 @@ MIN_BASE = 5               # jogadores na base para a nota sair
 AMOSTRA_FIRME = 100        # rounds na função para a nota deixar de ser "amostra pequena"
 LADOS = ("ambos", "ataque", "defesa")
 OPERATOR = {"Operator", "Tour de Force"}
+# Mínimo para uma estatística rara contar de verdade. Abaixo dele, posição × (valor / mínimo).
+PISOS = {
+    "r_sniper": 0.05,   # 5% dos rounds com sniper
+    "k_sniper": 0.05,   # 5% dos abates com sniper
+    "k_op": 0.05,       # 5% dos abates com Operator
+    "hab_pr": 0.03,     # 1 abate com habilidade a cada ~33 rounds
+}
+DIF_LADO = 15            # diferença entre ataque e defesa que vale citar no texto
+MIN_ROUNDS_LADO = 20     # rounds em cada lado para comparar os dois
 
 # id, nome, nome HLTV, o que mede, estatísticas: (id, nome, formato, maior_e_mais)
 #   formato: "pct" (fração mostrada em %), "n2" (2 casas), "n1" (1 casa), "s" (segundos)
@@ -164,6 +176,218 @@ def _frase(funcao, notas):
     return f"{funcao}: {', '.join(partes)}."
 
 
+# ----------------------------------------------------------------------------
+# Texto por regras (sempre presente, sem custo)
+# ----------------------------------------------------------------------------
+
+def _fmt(v, fmt):
+    if v is None:
+        return "—"
+    if fmt == "pct":
+        return f"{round(v * 100)}%"
+    if fmt == "s":
+        return f"{v:.1f}".replace(".", ",") + " s"
+    return (f"{v:.2f}" if fmt == "n2" else f"{v:.1f}").replace(".", ",")
+
+
+_FMT = {sid: fmt for *_, lista in ATRIBUTOS for sid, _, fmt, _ in lista}
+_NOME = {aid: nome for aid, nome, *_ in ATRIBUTOS}
+
+# Uma frase para nota alta e outra para nota baixa. {x} = valor da pessoa, {x_m} = média da função.
+# Sniper baixo não vira frase: quase todo mundo fora da função de sniper tem nota baixa ali.
+_FRASES = {
+    "fogo": ("Produz bastante dano: {adr} de dano por round, contra {adr_m} de quem joga a mesma função, e abate em {r_kill} dos rounds.",
+             "Produz menos dano que o normal da função ({adr} por round, média {adr_m}): o peso no jogo vem de outro lugar."),
+    "entrada": ("Costuma ir na frente e morrer abrindo espaço: {p_trocada} das mortes são trocadas pelo time (média {p_trocada_m}).",
+                "Raramente morre abrindo espaço para o time: só {p_trocada} das mortes são trocadas (média {p_trocada_m})."),
+    "troca": ("Joga perto do time e pune rápido: {p_troca} dos abates são troca (média {p_troca_m}).",
+              "Poucos abates vêm de troca ({p_troca}, média {p_troca_m}): costuma jogar mais longe do time."),
+    "abertura": ("Busca o primeiro duelo do round: está nele em {r_duelo} dos rounds (média {r_duelo_m}) e vence {p_duelo} deles.",
+                 "Evita o primeiro duelo do round: está nele em só {r_duelo} dos rounds (média {r_duelo_m})."),
+    "fechamento": ("Costuma decidir o fim do round: termina {vivo} dos rounds com vida (média {vivo_m}) e faz {pos_plant} abates depois do plant por round.",
+                   "Raramente está de pé no fim do round: termina {vivo} dos rounds com vida (média {vivo_m})."),
+    "sniper": ("Usa bastante sniper: tem uma na mão em {r_sniper} dos rounds e faz {k_sniper} dos abates com ela.", None),
+    "utilitario": ("Usa muito as habilidades: {util_pr} por round (média {util_pr_m}).",
+                   "Usa menos as habilidades que o normal da função: {util_pr} por round (média {util_pr_m})."),
+}
+
+
+# A estatística que cada frase usa: se ela é igual à média (ex.: 0% × 0%), a frase não diz nada e fica de fora
+_CHAVE = {"fogo": "adr", "entrada": "p_trocada", "troca": "p_troca", "abertura": "r_duelo", "fechamento": "vivo",
+          "sniper": "r_sniper", "utilitario": "util_pr"}
+
+
+def _valores(notas):
+    out = {}
+    for d in notas.values():
+        for sid, v, media, *_ in d["stats"]:
+            out[sid], out[f"{sid}_m"] = _fmt(v, _FMT[sid]), _fmt(media, _FMT[sid])
+    return out
+
+
+def texto_regras(j):
+    """Um parágrafo sobre o jeito de jogar, montado só com as notas e as estatísticas (os dois lados juntos)."""
+    amb = j["lados"].get("ambos")
+    if not amb:
+        return ""
+    fn, notas = j["funcao"], amb["notas"]
+    vals = _valores(notas)
+    com_nota = [(d["nota"], aid) for aid, d in notas.items() if d["nota"] is not None]
+    altas = sorted([x for x in com_nota if x[0] >= 65], reverse=True)[:3]
+    baixas = sorted(x for x in com_nota if x[0] <= 35 and _FRASES[x[1]][1])[:2]
+    partes = []
+    if altas:
+        nomes = [_NOME[a].lower() for _, a in altas]
+        lista = nomes[0] if len(nomes) == 1 else f"{', '.join(nomes[:-1])} e {nomes[-1]}"
+        partes.append(f"Como {fn}, tem um jeito puxado para {lista}.")
+    else:
+        partes.append(f"Como {fn}, tem um jeito equilibrado: nenhuma nota fica muito acima do normal da função.")
+    diz_algo = lambda a: vals.get(_CHAVE[a]) != vals.get(f"{_CHAVE[a]}_m")  # noqa: E731
+    partes += [_FRASES[a][0].format(**vals) for _, a in altas if diz_algo(a)]
+    partes += [_FRASES[a][1].format(**vals) for _, a in baixas if diz_algo(a)]
+
+    # Ataque × defesa: só quando a diferença é grande e os dois lados têm rounds para comparar
+    at, de = j["lados"].get("ataque"), j["lados"].get("defesa")
+    if at and de and at["rounds"] >= MIN_ROUNDS_LADO and de["rounds"] >= MIN_ROUNDS_LADO:
+        difs = []
+        for aid in notas:
+            na, nd = at["notas"][aid]["nota"], de["notas"][aid]["nota"]
+            # Só conta se um lado chega a 50 e a nota geral não é baixa: Sniper 0 × 23, ou um round de Marshal
+            # caindo todo num lado, não é um jeito diferente de jogar
+            geral = notas[aid]["nota"]
+            if (na is not None and nd is not None and abs(na - nd) >= DIF_LADO and max(na, nd) >= 50
+                    and geral is not None and geral > 35):
+                difs.append((abs(na - nd), aid, na, nd))
+        for _, aid, na, nd in sorted(difs, reverse=True)[:2]:
+            lado, outro = ("no ataque", "na defesa") if na > nd else ("na defesa", "no ataque")
+            partes.append(f"A nota de {_NOME[aid]} sobe {lado}: {max(na, nd)}, contra {min(na, nd)} {outro}.")
+    if j["amostra_pequena"]:
+        partes.append(f"Ainda são só {j['rounds']} rounds na função, então esse retrato pode mudar bastante.")
+    return " ".join(partes)
+
+
+# ----------------------------------------------------------------------------
+# Resumo por IA (GitHub Models, só no report das 21h na nuvem)
+# ----------------------------------------------------------------------------
+# - Vai só número e nota: nada de nome, apelido, Riot ID ou puuid ("o jogador").
+# - Roda só para quem teve partida nova desde o último resumo; o texto fica em dados/cache/resumos_ia.json
+#   (a pasta dados vai para o espaço privado da nuvem) e entra no atributos.json com a data.
+# - Se falhar, nada quebra: o site mostra o texto por regras (e o resumo anterior, com a data dele, se houver).
+# - O log da nuvem é público: aqui só se imprimem contagens.
+
+URL_MODELOS = "https://models.github.ai/inference/chat/completions"
+MODELOS = ("openai/gpt-4.1-mini", "openai/gpt-4o-mini")
+MAX_CARACTERES = 700
+
+INSTRUCAO = (
+    "Você escreve um resumo curto sobre o jeito de jogar de uma pessoa no Valorant, em português do Brasil, "
+    "para a própria equipe ler. Use só os dados enviados. Regras:\n"
+    "- 3 ou 4 frases, no máximo 90 palavras, num parágrafo só, sem títulos nem listas.\n"
+    "- As notas vão de 0 a 100 e dizem o que a pessoa costuma fazer, não o quanto ela é boa. "
+    "50 é o normal de quem joga a mesma função nesses lobbies; 65 ou mais é alto; 35 ou menos é baixo.\n"
+    "- Não afirme nada que não esteja nos números: nada de agentes, mapas, posições, jogadas, mira ou comunicação.\n"
+    "- Não dê conselhos nem diga se é bom ou ruim. Não cite nomes. Evite marcar gênero (prefira 'joga', 'costuma').\n"
+    "- Cite ataque e defesa só se a diferença numa nota for de 15 pontos ou mais.\n"
+    "- Se a amostra for pequena, diga que o retrato ainda pode mudar."
+)
+
+
+def dados_para_ia(j, atributos_def):
+    """O que vai para a IA: só função, contagens, notas e estatísticas (com a média da função)."""
+    def bloco(lado):
+        L = j["lados"].get(lado)
+        if not L:
+            return None
+        out = {"rounds": L["rounds"], "notas": {}}
+        for a in atributos_def:
+            d = L["notas"][a["id"]]
+            if lado != "ambos":        # nos lados, só a nota
+                out["notas"][a["nome"]] = d["nota"]
+                continue
+            nomes = {s["id"]: s["nome"] for s in a["stats"]}
+            out["notas"][a["nome"]] = {
+                "nota": d["nota"],
+                "estatisticas": {nomes[sid]: {"valor": _fmt(v, _FMT[sid]), "media_da_funcao": _fmt(m, _FMT[sid])}
+                                 for sid, v, m, *_ in d["stats"]},
+            }
+        return out
+    return {
+        "quem": "o jogador",
+        "funcao": j["funcao"], "partidas": j["partidas"], "rounds": j["rounds"],
+        "amostra_pequena": j["amostra_pequena"],
+        "os_dois_lados": bloco("ambos"), "ataque": bloco("ataque"), "defesa": bloco("defesa"),
+    }
+
+
+def _chamar_modelo(dados, token, timeout=60):
+    import json
+    import urllib.request
+    ultimo = None
+    for modelo in MODELOS:
+        corpo = {"model": modelo, "temperature": 0.3, "max_tokens": 300,
+                 "messages": [{"role": "system", "content": INSTRUCAO},
+                              {"role": "user", "content": json.dumps(dados, ensure_ascii=False)}]}
+        req = urllib.request.Request(URL_MODELOS, data=json.dumps(corpo).encode("utf-8"), method="POST", headers={
+            "Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                resp = json.loads(r.read().decode("utf-8"))
+            texto = _limpar(resp["choices"][0]["message"]["content"])
+            if texto:
+                return texto, modelo
+        except Exception as e:  # noqa: BLE001 — qualquer falha cai no texto por regras
+            ultimo = e
+    raise RuntimeError(type(ultimo).__name__ if ultimo else "resposta vazia")
+
+
+def _limpar(texto):
+    import re
+    t = re.sub(r"\s+", " ", (texto or "").replace("*", "").replace("#", "")).strip().strip('"').strip()
+    if not t or "http" in t.lower() or len(t) > MAX_CARACTERES:
+        return None
+    return t
+
+
+def chave_resumo(j):
+    """Muda quando entra partida nova (aí o resumo é refeito)."""
+    return f"{j['partidas']}-{j['rounds']}"
+
+
+def aplicar_resumos(d, caminho_cache, gerar=False, token=None, chamar=None, hoje=None):
+    """Põe em cada jogador o resumo por IA guardado e, com gerar=True, refaz o de quem teve partida nova.
+    Devolve (gerados, falhas)."""
+    import json
+    from datetime import date
+    caminho_cache = Path(caminho_cache)
+    try:
+        cache = json.loads(caminho_cache.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        cache = {}
+    chamar = chamar or _chamar_modelo
+    hoje = hoje or date.today().isoformat()
+    gerados = falhas = 0
+    if gerar and token:
+        for slug, j in d["jogadores"].items():
+            antigo = cache.get(slug) or {}
+            if antigo.get("chave") == chave_resumo(j):
+                continue
+            try:
+                texto, modelo = chamar(dados_para_ia(j, d["atributos"]), token)
+                cache[slug] = {"chave": chave_resumo(j), "texto": texto, "data": hoje, "modelo": modelo}
+                gerados += 1
+            except Exception:  # noqa: BLE001
+                falhas += 1
+        if gerados:
+            caminho_cache.parent.mkdir(parents=True, exist_ok=True)
+            caminho_cache.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"Resumo por IA: {gerados} gerado(s), {falhas} falha(s), {len(d['jogadores']) - gerados - falhas} sem partida nova.")
+    for slug, j in d["jogadores"].items():
+        c = cache.get(slug)
+        j["resumo_ia"] = ({"texto": c["texto"], "data": c["data"], "atual": c.get("chave") == chave_resumo(j)}
+                          if c and c.get("texto") else None)
+    return gerados, falhas
+
+
 def calcular(analises, membros, cfg=None):
     """membros = {puuid: slug} da equipe. Devolve o atributos.json do site."""
     analises = list(analises)
@@ -196,26 +420,32 @@ def calcular(analises, membros, cfg=None):
                 for sid, _, _, maior in lista:
                     vals = [g[sid] for g in grupo if g[sid] is not None]
                     pct = _percentil(st[sid], vals, maior)
+                    piso = PISOS.get(sid)
+                    abaixo_piso = pct is not None and piso is not None and st[sid] is not None and st[sid] < piso
+                    if abaixo_piso:
+                        pct = pct * st[sid] / piso
                     media = sum(vals) / len(vals) if vals else None
-                    linhas.append([sid, _r(st[sid]), _r(media), None if pct is None else round(pct)])
+                    linhas.append([sid, _r(st[sid]), _r(media), None if pct is None else round(pct), piso if abaixo_piso else None])
                     if pct is not None:
                         pcts.append(pct)
                 notas[aid] = {"nota": round(sum(pcts) / len(pcts)) if pcts else None, "stats": linhas}
             lados_out[l] = {"rounds": st["rounds"], "base": len(grupo), "notas": notas}
         amb = lados_out.get("ambos", {}).get("notas", {})
         nomes = {aid: nome for aid, nome, *_ in ATRIBUTOS}
-        jogadores[slug] = {
+        j = {
             "funcao": fn, "rounds": rounds, "partidas": partidas, "amostra_pequena": rounds < AMOSTRA_FIRME,
             "outras_funcoes": {f: n for f, n in funcoes.items() if f != fn},
             "frase": _frase(fn, {nomes[a]: v["nota"] for a, v in amb.items()}),
             "lados": lados_out,
         }
+        j["texto"] = texto_regras(j)
+        jogadores[slug] = j
 
     contagem = Counter(fn for (fn, l), g in base.items() if l == "ambos" for _ in g)
     return {
-        "versao": 1,
+        "versao": 2,
         "regras": {"amostra_firme": AMOSTRA_FIRME, "min_rounds_base": MIN_ROUNDS_BASE, "min_base": MIN_BASE,
-                   "partidas": len(analises)},
+                   "partidas": len(analises), "pisos": PISOS, "dif_lado": DIF_LADO},
         "base": dict(contagem),
         "atributos": [{"id": aid, "nome": nome, "hltv": hltv, "desc": desc,
                        "stats": [{"id": sid, "nome": snome, "fmt": fmt, "maior": maior} for sid, snome, fmt, maior in lista]}
