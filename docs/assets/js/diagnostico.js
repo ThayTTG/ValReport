@@ -75,7 +75,7 @@ function relatorio(c) {
   for (const e of c.erros.slice(-10)) L.push(`  ${e.t.slice(11, 19)} ${e.tipo}: ${e.msg}${e.onde ? ` (${e.onde})` : ""} [${e.rota}]`);
   const itens = [...(c.pc?.itens || []), ...(c.pc?.rede?.itens || [])];
   if (itens.length) {
-    L.push("", `PC (${c.pc.t || "?"}):`);
+    L.push("", `${c.naNuvem ? "Nuvem" : "PC"} (${c.pc.t || "?"}):`);
     for (const x of itens) L.push(`  ${({ ok: "ok ", aviso: "!  ", erro: "ERRO", info: "-  " })[x.estado] || "-  "} ${x.nome}: ${x.detalhe}`);
   }
   return L.join("\n").replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "(e-mail)");
@@ -100,7 +100,8 @@ export async function viewDiagnostico() {
   const nav = navegador();
   const erros = errosDaSessao();
   const pc = painel?.estado?.pc || null, semSync = Boolean(painel?.erro);
-  const c = { noAr, instalada, con, nav, erros, pc };
+  const naNuvem = painel?.estado?.ambiente === "nuvem", exe = painel?.estado?.execucao || null;
+  const c = { noAr, instalada, con, nav, erros, pc, naNuvem };
 
   const nAr = numVersao(noAr), nCache = numVersao(instalada);
   const atrasado = nAr && nCache && nCache < nAr;
@@ -127,7 +128,7 @@ export async function viewDiagnostico() {
       <span class="sync-resultado">${esc(e.msg)}${e.onde ? ` (${esc(e.onde)})` : ""}</span></div></li>`) : [`<li class="sync-item"><small class="suave">Nenhum erro nesta sessão. 🎉</small></li>`];
   const pcItens = [...(pc?.itens || []), ...(pc?.rede?.itens || [])].map((x) => linha(x.nome, x.detalhe, x.estado, x.dica));
   const pcHtml = semSync ? [`<li class="sync-item"><small class="suave">O checklist do PC aparece aqui depois que o Sync estiver ligado no banco (o <code>supabase\\sync.sql</code>).</small></li>`]
-    : !pc ? [`<li class="sync-item"><small class="suave">O PC ainda não mandou o checklist. Ele manda a cada coleta de 20 minutos; para o teste completo (com internet), rode o <code>Atalhos\\diagnostico.bat</code>.</small></li>`]
+    : !pc ? [`<li class="sync-item"><small class="suave">O PC ainda não mandou o checklist. Ele manda a cada coleta de 20 minutos; para o teste completo (com internet), rode o <code>Atalhos\\diagnostico.bat</code> (na nuvem, o teste completo roda junto com o report diário).</small></li>`]
     : pcItens;
   const problemasPc = [...(pc?.itens || []), ...(pc?.rede?.itens || [])].filter((x) => x.estado === "erro" || x.estado === "aviso").length;
 
@@ -136,7 +137,7 @@ export async function viewDiagnostico() {
     html: `<section class="secao sync diag">
       <a class="voltar limpar pequeno" href="#/painel">${icone("voltar")} Painel da administradora</a>
       <div class="sync-topo"><div><h1>Diagnóstico</h1>
-        <p class="suave">O que está acontecendo neste navegador e no PC que coleta as partidas. Para os dados (partidas, elo, cards), veja o <a href="#/painel/sync">Sync</a>.</p></div>
+        <p class="suave">O que está acontecendo neste navegador e ${naNuvem ? "na nuvem que coleta as partidas (GitHub Actions)" : "no PC que coleta as partidas"}. Para os dados (partidas, elo, cards), veja o <a href="#/painel/sync">Sync</a>.</p></div>
         <div class="sync-botoes">
           <button class="botao-primario" type="button" data-diag="copiar">${icone("nota")} Copiar relatório</button>
           <button class="botao-secundario" type="button" data-diag="atualizar">${icone("atualizar")} Forçar atualização</button>
@@ -148,8 +149,8 @@ export async function viewDiagnostico() {
         ${bloco("Conexões", "raio", conexoesHtml)}
         ${bloco("Erros desta sessão", "info", errosHtml, erros.length ? `<button class="limpar pequeno" type="button" data-diag="limpar">Limpar</button>` : "")}
       </div>
-      <div class="secao">${bloco("PC da coleta", "escudo", pcHtml,
-        pc?.t ? `<span class="suave pequeno">${problemasPc ? `${problemasPc} ponto(s) para olhar · ` : ""}${esc(relativo(pc.t))}${pc.rede?.t ? ` · teste completo ${esc(relativo(pc.rede.t))}` : ""}</span>` : "")}</div>
+      <div class="secao">${bloco(naNuvem ? "Coleta na nuvem" : "PC da coleta", "escudo", pcHtml,
+        pc?.t ? `<span class="suave pequeno">${problemasPc ? `${problemasPc} ponto(s) para olhar · ` : ""}${esc(relativo(pc.t))}${exe?.url ? ` · <a href="${esc(exe.url)}" target="_blank" rel="noopener">execução #${esc(String(exe.numero || ""))}</a>` : ""}${pc.rede?.t ? ` · teste completo ${esc(relativo(pc.rede.t))}` : ""}</span>` : "")}</div>
       <p class="suave pequeno">O relatório copiado não leva chaves, tokens nem e-mails: dá para colar no Discord ou mandar para o Claude.</p>
     </section>`,
     depois: (el) => {

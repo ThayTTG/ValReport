@@ -1,0 +1,65 @@
+# Coleta de 20 em 20 minutos na nuvem (no lugar da tarefa do PC). Também roda na hora quando a administradora
+# pede algo no Sync do site (o site chama este fluxo pela API do GitHub) ou pelo botão "Run workflow".
+# Só roda com a variável do repositório VALREPORT_NUVEM = ligada (Settings > Secrets and variables > Actions > Variables).
+# O log é público (repositório público): o script imprime só contagens; os detalhes ficam no log privado da nuvem.
+name: Coleta
+
+on:
+  schedule:
+    - cron: "7,27,47 * * * *"
+  workflow_dispatch:
+    inputs:
+      motivo:
+        description: "Por que rodar agora"
+        required: false
+        default: "manual"
+
+permissions:
+  contents: read
+  actions: write   # para renovar os agendamentos (o GitHub desliga depois de 60 dias sem atividade)
+
+concurrency:
+  group: coleta    # uma execução por vez (coleta e report dividem a mesma pasta dados)
+  cancel-in-progress: false
+
+jobs:
+  coleta:
+    if: vars.VALREPORT_NUVEM == 'ligada'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: America/Sao_Paulo
+      PYTHONUTF8: "1"
+      HENRIKDEV_API_KEY: ${{ secrets.HENRIKDEV_API_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      DISCORD_WEBHOOK_EQUIPE: ${{ secrets.DISCORD_WEBHOOK_EQUIPE }}
+      DISCORD_WEBHOOK_JOGADORES: ${{ secrets.DISCORD_WEBHOOK_JOGADORES }}
+      DISCORD_WEBHOOK_FORMACOES: ${{ secrets.DISCORD_WEBHOOK_FORMACOES }}
+      DISCORD_WEBHOOK_DICAS: ${{ secrets.DISCORD_WEBHOOK_DICAS }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restaurar o cache da pasta dados (criptografado)
+        uses: actions/cache/restore@v4
+        with:
+          path: estado.enc
+          key: estado-${{ github.run_id }}
+          restore-keys: estado-
+      - name: Preparar (configuração e pasta dados)
+        run: python ferramentas/nuvem.py preparar --cache estado.enc
+      - name: Coletar
+        run: python ferramentas/nuvem.py coletar
+      - name: Manter os agendamentos ligados
+        run: python ferramentas/nuvem.py manter
+      - name: Guardar a pasta dados
+        if: always()
+        run: python ferramentas/nuvem.py guardar --cache estado.enc
+      - name: Salvar o cache
+        if: always() && hashFiles('estado.enc') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: estado.enc
+          key: estado-${{ github.run_id }}

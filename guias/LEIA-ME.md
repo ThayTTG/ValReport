@@ -11,6 +11,26 @@
 Coleta as partidas da equipe pela HenrikDev API e gera, todo dia às 21h, reports em `.md`
 com análise tática por partida, avaliação justa por função e análise de duos/trios/five stack.
 
+## ☁️ Coleta na nuvem (sem depender do PC ligado)
+
+Desde a versão 18, a coleta de 20 em 20 minutos e o report das 21h podem rodar no **GitHub Actions**, de graça
+(o repositório é público). O PC só é preciso uma vez, para mandar a pasta `dados` e o `config.json`.
+
+- **Configuração:** fica no site, em **Painel > Configuração** (jogadores, apelidos, filas, região e os números do report),
+  com as 30 versões anteriores. A nuvem lê a versão mais nova a cada execução.
+- **Pasta dados:** fica num espaço privado do Supabase (`coleta`), com uma cópia por dia dos últimos 14 dias.
+  O GitHub guarda uma cópia criptografada para acelerar (só abre com a `SUPABASE_SECRET_KEY`).
+- **Sync na hora:** no **Painel > Sync**, cada pedido chama a nuvem na hora (botão **Coletar agora**), pela função
+  `docs\api\disparar.js` do Vercel. No máximo 1 chamada por minuto e 30 por hora.
+- **Registros:** o que aparece na aba Actions do GitHub (que é pública) é só horário e contagem. O log completo fica em
+  `dados\nuvem.log`, no espaço privado.
+- **Ligar/desligar:** a variável `VALREPORT_NUVEM` do repositório (`ligada` = a nuvem coleta). Com a nuvem ativa
+  (sinal de vida nas últimas 3 horas), o PC não coleta, para não fazer tudo duas vezes.
+- **Atalhos:** `Atalhos\enviar_para_nuvem.bat` (manda a pasta e a configuração do PC uma vez; se a nuvem já estiver
+  coletando, não sobrescreve nada) e `Atalhos\trazer_da_nuvem.bat` (traz a pasta da nuvem de volta, com uma cópia da atual antes).
+- **Ferramenta:** `ferramentas\nuvem.py` (preparar, coletar, guardar, diagnostico, manter, enviar, trazer). O `manter`
+  renova os agendamentos a cada 20 dias (o GitHub desliga agendamentos de repositórios parados há 60 dias).
+
 ## Arquivos
 
 | Arquivo | Para que serve |

@@ -253,7 +253,17 @@ def diagnosticar(cfg, estado=None):
         pc = diagnostico.para_o_site(cfg)
     except Exception as e:  # noqa: BLE001
         pc = {"erro": str(e)[:200]}
+    nuvem = os.environ.get("GITHUB_ACTIONS") == "true"
+    execucao = None
+    if nuvem:
+        repo, run = os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GITHUB_RUN_ID", "")
+        execucao = {"url": f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{repo}/actions/runs/{run}" if repo and run else None,
+                    "evento": os.environ.get("GITHUB_EVENT_NAME"), "fluxo": os.environ.get("GITHUB_WORKFLOW"),
+                    "numero": os.environ.get("GITHUB_RUN_NUMBER"),
+                    "acoes": f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{repo}/actions" if repo else None}
     return {
+        "ambiente": "nuvem" if nuvem else "pc",
+        "execucao": execucao,
         "pc": pc,
         "versao": VERSAO, "gerado_em": _agora().isoformat(timespec="seconds"),
         "coleta": {

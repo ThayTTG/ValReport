@@ -1664,3 +1664,32 @@ button.chip { cursor: pointer; }
 .diag .sync-item { flex-wrap: nowrap; align-items: flex-start; }
 .diag .sync-item__texto small { overflow-wrap: anywhere; }
 @media (max-width: 560px) { .diag-item > .selo { min-width: 0; } }
+
+/* ---------- Configuração da coleta (Painel > Configuração) ---------- */
+.cfg-form .cfg-bloco { display: grid; gap: 14px; align-content: start; }
+.cfg input:not([type=checkbox]), .cfg select, .cfg-json {
+  font: 500 15px var(--fonte); color: var(--texto); background: var(--superficie-2); border: 1px solid var(--borda); border-radius: 12px; padding: 9px 12px; min-height: 42px; min-width: 0; width: 100%; }
+.cfg input:focus, .cfg select:focus, .cfg-json:focus { outline: 2px solid var(--destaque); outline-offset: 1px; }
+.cfg input:invalid { border-color: var(--derrota); }
+.cfg-jogadores { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cfg-jogador { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.cfg-jogador__site { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--texto-2); white-space: nowrap; }
+.cfg input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--destaque); }
+.cfg-filas { display: flex; flex-wrap: wrap; gap: 8px; }
+.cfg-fila { cursor: pointer; }
+.cfg-fila:has(input:checked) { background: var(--destaque-suave); border-color: color-mix(in srgb, var(--destaque) 45%, var(--borda)); color: var(--texto); }
+.cfg-fila input { width: 15px; height: 15px; }
+.cfg-numeros .campo { align-content: start; }
+.cfg-numeros { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.cfg-avancado summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
+.cfg-avancado summary::-webkit-details-marker { display: none; }
+.cfg-avancado summary svg { color: var(--destaque); }
+.cfg-avancado[open] summary { margin-bottom: 10px; }
+.cfg-json { font: 500 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; tab-size: 2; }
+.cfg .sync-msg button { margin-left: 6px; }
+@media (max-width: 560px) {
+  .cfg-jogador { grid-template-columns: minmax(0, 1fr) auto; }
+  .cfg-jogador [data-j="apelido"] { grid-column: 1; }
+  .cfg-jogador__site { grid-column: 1; grid-row: 3; }
+  .cfg-jogador [data-cfg="tirar"] { grid-column: 2; grid-row: 1; }
+}

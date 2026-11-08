@@ -421,7 +421,19 @@ def processar_jogador(chave, cfg, estado, riot_id, incluidas):
     return bloco
 
 
+def nuvem_cuida():
+    """A coleta já roda na nuvem (GitHub Actions)? Aí o PC não coleta, para as duas não rodarem juntas."""
+    try:
+        import nuvem
+        return nuvem.nuvem_ativa()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def main():
+    if nuvem_cuida():
+        print("A coleta e o report agora rodam na nuvem (GitHub Actions); o PC não coleta para não duplicar.")
+        return
     log("=" * 60)
     log("Iniciando coleta")
 
@@ -582,6 +594,9 @@ def rapido():
             return
         if cfg.get("coleta_rapida", True) is False:
             print("Coleta rápida desligada no config.json (\"coleta_rapida\": false).")
+            return
+        if nuvem_cuida():
+            print("A coleta agora roda na nuvem (GitHub Actions); o PC não coleta para não duplicar.")
             return
         if not travar(esperar_s=0):
             print("Outra coleta está rodando agora; fica para a próxima.")

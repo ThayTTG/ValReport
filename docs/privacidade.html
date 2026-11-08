@@ -35,7 +35,8 @@
       <li><strong>Imagem da equipe:</strong> se a liderança enviar uma, ela é reduzida e regravada no navegador (o que apaga dados escondidos da foto, como local e câmera) e guardada no Supabase.</li>
       <li><strong>Táticas da equipe:</strong> as estratégias que a liderança e os treinadores montam (textos, desenhos no mapa, prints, apresentações, PDFs e clipes curtos), com quem criou e quem publicou cada versão. Prints e páginas de PDF também são regravados no navegador antes de enviar, sem os dados escondidos da foto.</li>
       <li><strong>Do jogo:</strong> estatísticas das partidas (abates, rounds, agentes, mapas, posições), obtidas pela HenrikDev API a partir dos dados públicos do VALORANT.</li>
-      <li><strong>Estado da coleta:</strong> o PC que coleta as partidas manda, a cada coleta, um resumo do que ficou faltando (partidas incompletas, elo ou card que não chegaram, erros recentes da coleta), com o apelido e o Riot ID de quem é da equipe, e guarda os pedidos de "buscar de novo" feitos pela administradora (os 200 mais recentes). Junto vai um checklist técnico do PC (versão do Python, se as chaves estão configuradas — nunca o valor delas —, as tarefas agendadas e se os serviços respondem).</li>
+      <li><strong>Configuração e pasta da coleta:</strong> a lista de jogadores (Riot IDs e apelidos) e os ajustes do relatório ficam no Supabase, com as 30 versões anteriores; as partidas guardadas, os relatórios e os registros da coleta ficam num espaço privado do Supabase (só a coleta tem acesso), com uma cópia por dia dos últimos 14 dias. Para acelerar, a coleta guarda também uma cópia criptografada no GitHub Actions, que só abre com a chave secreta do ValReport.</li>
+      <li><strong>Estado da coleta:</strong> a coleta (na nuvem ou no PC da administradora) manda, a cada coleta, um resumo do que ficou faltando (partidas incompletas, elo ou card que não chegaram, erros recentes da coleta), com o apelido e o Riot ID de quem é da equipe, e guarda os pedidos de "buscar de novo" feitos pela administradora (os 200 mais recentes). Junto vai um checklist técnico de onde a coleta roda (versão do Python, se as chaves estão configuradas — nunca o valor delas —, as tarefas agendadas e se os serviços respondem).</li>
       <li><strong>Erros do navegador:</strong> para a página de diagnóstico, o site anota os erros técnicos desta visita (sem senhas nem tokens). Eles ficam só no seu navegador e somem quando você fecha a aba.</li>
       <li><strong>Registros técnicos:</strong> os provedores de hospedagem e de banco de dados mantêm registros de acesso (como endereço IP e horário) por segurança, por tempo limitado.</li>
     </ul>
@@ -58,7 +59,7 @@
       <li><strong>Pessoas logadas no ValReport</strong> encontram pela busca o perfil de quem tem o Riot ID confirmado (apelido, bio, agentes, funções, card e nível) e veem as equipes marcadas como públicas. Quem tem 16 ou 17 anos fica fora da busca e das páginas públicas para quem não é da equipe.</li>
       <li><strong>Táticas</strong> aparecem só para o líder, os co-líderes, os treinadores e os jogadores da equipe; só a liderança e os treinadores criam e editam. Os arquivos delas ficam num espaço privado e abrem por endereços que expiram em 1 hora.</li>
       <li><strong>Imagens de equipe</strong> aparecem para quem vê a equipe e ficam num endereço público, como os cards do jogo. Não envie fotos de pessoas sem a permissão delas; a administradora pode remover qualquer imagem.</li>
-      <li><strong>A administradora</strong> vê a lista de contas (e-mail, apelido, faixa de idade, equipe e pedidos de verificação) e as equipes que esperam aprovação, para liberar acessos e cuidar da segurança. Só ela vê o estado da coleta e os pedidos de sincronização.</li>
+      <li><strong>A administradora</strong> vê a lista de contas (e-mail, apelido, faixa de idade, equipe e pedidos de verificação) e as equipes que esperam aprovação, para liberar acessos e cuidar da segurança. Só ela vê o estado da coleta, a configuração da coleta e os pedidos de sincronização.</li>
     </ul>
     <p>Essas regras ficam no próprio banco de dados: mesmo que alguém altere o site no navegador, o banco não entrega o que a pessoa não pode ver.</p>
 
@@ -67,7 +68,8 @@
       <li><strong>Supabase</strong> (banco de dados e login), com servidores em São Paulo.</li>
       <li><strong>Vercel</strong> (hospedagem do site).</li>
       <li><strong>Google</strong> (login com a sua conta).</li>
-      <li><strong>Computador da administradora</strong>, onde roda a coleta das partidas e os relatórios da equipe.</li>
+      <li><strong>GitHub Actions</strong>, onde roda a coleta das partidas e os relatórios da equipe (os registros públicos dessa coleta só mostram horários e contagens, nunca nomes ou Riot IDs).</li>
+      <li><strong>Computador da administradora</strong>, onde a coleta rodava antes e pode voltar a rodar.</li>
     </ul>
     <p>Esses provedores tratam os dados em nosso nome e podem usar servidores fora do Brasil, com as proteções que oferecem aos seus clientes.</p>
     <p><strong>Vídeos de outros sites nas táticas:</strong> nada é carregado até você tocar em "Assistir". Ao tocar, o player vem do próprio site do vídeo (YouTube no modo sem cookies, Medal, Streamable, Twitch ou Google Drive), que passa a receber o seu endereço IP e pode usar cookies, conforme a política de privacidade dele.</p>

@@ -250,8 +250,9 @@ export async function viewPainel() {
     html: `<section class="secao">
       <h1>Painel da administradora</h1>
       <div class="painel-atalhos secao">
-        <a class="cartao painel-atalho" href="#/painel/sync">${icone("atualizar")}<span><strong>Sync</strong><small class="suave">O que ficou faltando nos dados (partidas, elo, cards) e os pedidos para o PC refazer.</small></span>${icone("seta")}</a>
-        <a class="cartao painel-atalho" href="#/painel/diagnostico">${icone("info")}<span><strong>Diagnóstico</strong><small class="suave">Versão do site, conexões, erros deste navegador e o checklist do PC.</small></span>${icone("seta")}</a>
+        <a class="cartao painel-atalho" href="#/painel/sync">${icone("atualizar")}<span><strong>Sync</strong><small class="suave">O que ficou faltando nos dados (partidas, elo, cards), os pedidos para refazer e o “Coletar agora”.</small></span>${icone("seta")}</a>
+        <a class="cartao painel-atalho" href="#/painel/diagnostico">${icone("info")}<span><strong>Diagnóstico</strong><small class="suave">Versão do site, conexões, erros deste navegador e o checklist da coleta.</small></span>${icone("seta")}</a>
+        <a class="cartao painel-atalho" href="#/painel/configuracao">${icone("lapis")}<span><strong>Configuração</strong><small class="suave">Jogadores, apelidos, filas, região e os números do report (o antigo config.json), com histórico de versões.</small></span>${icone("seta")}</a>
       </div>
       ${aprovacoes}
       ${imagens}

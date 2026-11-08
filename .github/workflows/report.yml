@@ -1,0 +1,81 @@
+# Report diário das 21h (horário de Brasília = 00h00 UTC) na nuvem: coleta completa, report, cards, Discord e site.
+# Também pelo botão "Run workflow". Só roda com a variável do repositório VALREPORT_NUVEM = ligada.
+name: Report
+
+on:
+  schedule:
+    - cron: "3 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: coleta
+  cancel-in-progress: false
+
+jobs:
+  report:
+    if: vars.VALREPORT_NUVEM == 'ligada'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TZ: America/Sao_Paulo
+      PYTHONUTF8: "1"
+      HENRIKDEV_API_KEY: ${{ secrets.HENRIKDEV_API_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      DISCORD_WEBHOOK_EQUIPE: ${{ secrets.DISCORD_WEBHOOK_EQUIPE }}
+      DISCORD_WEBHOOK_JOGADORES: ${{ secrets.DISCORD_WEBHOOK_JOGADORES }}
+      DISCORD_WEBHOOK_FORMACOES: ${{ secrets.DISCORD_WEBHOOK_FORMACOES }}
+      DISCORD_WEBHOOK_DICAS: ${{ secrets.DISCORD_WEBHOOK_DICAS }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar o Pillow (imagens dos cards)
+        run: python -m pip install --quiet "pillow>=10,<13"
+      - name: Restaurar o cache da pasta dados (criptografado)
+        uses: actions/cache/restore@v4
+        with:
+          path: estado.enc
+          key: estado-${{ github.run_id }}
+          restore-keys: estado-
+      - name: Restaurar as imagens dos agentes e mapas (públicas)
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            dados/cache/agentes
+            dados/cache/mapas
+          key: imagens-${{ github.run_id }}
+          restore-keys: imagens-
+      - name: Preparar (configuração e pasta dados)
+        run: python ferramentas/nuvem.py preparar --cache estado.enc
+      - name: Coleta completa, report e Discord
+        run: python ferramentas/nuvem.py coletar --report
+      - name: Diagnóstico completo
+        if: always()
+        run: python ferramentas/nuvem.py diagnostico
+      - name: Manter os agendamentos ligados
+        run: python ferramentas/nuvem.py manter
+      - name: Guardar a pasta dados
+        if: always()
+        run: python ferramentas/nuvem.py guardar --cache estado.enc
+      - name: Salvar o cache
+        if: always() && hashFiles('estado.enc') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: estado.enc
+          key: estado-${{ github.run_id }}
+      - name: Salvar as imagens
+        if: always() && hashFiles('dados/cache/agentes/**', 'dados/cache/mapas/**') != ''
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            dados/cache/agentes
+            dados/cache/mapas
+          key: imagens-${{ github.run_id }}

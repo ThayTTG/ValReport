@@ -143,7 +143,11 @@ def leves(cfg=None):
     itens.append(_item("discord", "Discord", "ok" if n_hooks else "info",
                        f"{n_hooks} de 4 canais configurados" if n_hooks else "nenhum canal configurado (o report não vai para o Discord)"))
 
-    itens += _tarefas()
+    na_nuvem = os.environ.get("GITHUB_ACTIONS") == "true"
+    if na_nuvem:
+        itens.append(_item("ambiente", "Onde roda", "ok", f"na nuvem (GitHub Actions, execução #{os.environ.get('GITHUB_RUN_NUMBER', '?')})"))
+    else:
+        itens += _tarefas()
 
     rapida = _ler(DADOS / "ultima_coleta_rapida.json", {}) or {}
     quando = rapida.get("em")
@@ -174,6 +178,10 @@ def leves(cfg=None):
                            f"uma coleta está rodando ({_ha(idade)})" if idade < 40 else f"trava antiga ({_ha(idade)})",
                            "" if idade < 40 else "Ela é ignorada sozinha; se a coleta não roda, apague dados\\coleta.trava."))
 
+    if na_nuvem:   # disco, código local e git não fazem sentido numa máquina que nasce e morre a cada execução
+        n_partidas = len(list((DADOS / "partidas").glob("*.json*"))) if (DADOS / "partidas").exists() else 0
+        itens.append(_item("partidas", "Partidas guardadas", "info", f"{n_partidas} na nuvem"))
+        return itens
     try:
         livre = shutil.disk_usage(PASTA).free / 1024 ** 3
         itens.append(_item("disco", "Espaço em disco", "ok" if livre >= 1 else "aviso", f"{livre:.1f} GB livres",

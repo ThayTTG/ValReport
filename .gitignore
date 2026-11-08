@@ -2,6 +2,8 @@
 
 # Dados locais: partidas brutas, reports, cache de imagens, modelo, logs e estado
 dados/
+dados_antes_da_nuvem_*.zip
+estado.enc
 
 # Desde a 2.0 os dados do site ficam no banco (Supabase), protegidos por login.
 # Esta pasta antiga nunca mais pode ir para o GitHub.

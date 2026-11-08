@@ -1,8 +1,9 @@
-// Sync da administradora: o que ficou faltando nos dados (o PC manda a cada coleta) e os pedidos para o PC refazer.
-// O PC atende na próxima coleta (de 20 em 20 minutos, com ele ligado). Tudo passa pelas funções admin_sync_* do banco.
+// Sync da administradora: o que ficou faltando nos dados (a coleta manda a cada execução) e os pedidos para refazer.
+// Com a coleta na nuvem (GitHub Actions), cada pedido chama a nuvem na hora (/api/disparar); no PC, ele atende na
+// próxima coleta de 20 minutos. Tudo passa pelas funções admin_sync_* do banco.
 
 import { esc, icone, dataHora, relativo, nomeFila } from "./util.js";
-import { rpc } from "./nuvem.js";
+import { rpc, token } from "./nuvem.js";
 import { B } from "./dados.js";
 import { EQUIPE_PADRAO } from "./config.js";
 
@@ -12,7 +13,19 @@ const STATUS = { pendente: ["Na fila", "alerta"], fazendo: ["O PC está fazendo"
   erro: ["Não deu", "derrota"], cancelado: ["Cancelado", ""] };
 const chave = (tipo, alvo) => `${tipo}|${alvo || ""}`;
 
-/** Sinal de vida do PC: ok (até 30 min), atrasado (até 3 h) ou parado */
+/** Chama a coleta na nuvem agora (a função do Vercel confere a administradora e o ritmo) */
+export async function dispararNuvem() {
+  try {
+    const t = await token();
+    const r = await fetch("/api/disparar", { method: "POST", headers: { Authorization: `Bearer ${t || ""}` } });
+    const j = await r.json().catch(() => null);
+    return j || { ok: false, motivo: `A nuvem não respondeu (${r.status}).` };
+  } catch {
+    return { ok: false, motivo: "Sem conexão para chamar a nuvem agora." };
+  }
+}
+
+/** Sinal de vida da coleta (PC ou nuvem): ok (até 30 min), atrasado (até 3 h) ou parado */
 function saudePc(visto, agora) {
   if (!visto) return ["parado", "Sem notícias", "ainda não mandou o estado"];
   const min = (new Date(agora) - new Date(visto)) / 60000, quando = `visto ${relativo(visto, new Date(agora))}`;
@@ -87,6 +100,8 @@ export async function viewSync() {
   const pedidos = d.pedidos || [];
   const abertos = new Map(pedidos.filter((p) => p.status === "pendente" || p.status === "fazendo").map((p) => [chave(p.tipo, p.alvo), p]));
   const [saude, rotSaude, txtSaude] = saudePc(d.pc_visto_em, d.agora);
+  const naNuvem = est?.ambiente === "nuvem", exe = est?.execucao || null;
+  const quem = naNuvem ? "a nuvem" : "o PC";
   const fila = [...abertos.values()].length;
 
   const partidas = [...(est?.sem_dados || []).map((x) => linhaPartida(x, abertos, true)), ...(est?.partidas || []).map((x) => linhaPartida(x, abertos))];
@@ -101,31 +116,37 @@ export async function viewSync() {
   const html = `<section class="secao sync">
       <a class="voltar limpar pequeno" href="#/painel">${icone("voltar")} Painel da administradora</a>
       <div class="sync-topo"><div><h1>Sync</h1>
-        <p class="suave">O que ficou faltando nos dados da ${esc(d.equipe?.nome || "equipe")} e os pedidos para o PC refazer. O PC atende na próxima coleta (de 20 em 20 minutos, enquanto estiver ligado). O checklist do PC fica no <a href="#/painel/diagnostico">Diagnóstico</a>.</p></div>
+        <p class="suave">O que ficou faltando nos dados da ${esc(d.equipe?.nome || "equipe")} e os pedidos para refazer. ${naNuvem
+          ? "A coleta roda na nuvem: cada pedido chama a nuvem na hora (o resultado aparece em 2 a 4 minutos)."
+          : "O PC atende na próxima coleta (de 20 em 20 minutos, enquanto estiver ligado)."} O checklist fica no <a href="#/painel/diagnostico">Diagnóstico</a>.</p></div>
         <div class="sync-botoes">${abertos.has(chave("tudo")) ? acao(abertos, "tudo", null) : `<button class="botao-primario" type="button" data-sync-pedir="tudo" data-sync-alvo="">${icone("atualizar")} Sincronizar tudo</button>`}
           ${abertos.has(chave("site")) ? "" : `<button class="botao-secundario" type="button" data-sync-pedir="site" data-sync-alvo="">${icone("enviar")} Reenviar ao site</button>`}
+          ${naNuvem ? `<button class="botao-secundario" type="button" data-sync-agora>${icone("relogio")} Coletar agora</button>` : ""}
           <button class="botao-secundario" type="button" data-sync-recarregar title="Ler de novo">${icone("relogio")} Atualizar</button></div></div>
       <p class="form-msg sync-msg" role="status" hidden></p>
       <div class="grade-stats sync-tiles">
-        ${tile("PC", `<span class="sync-saude sync-saude--${saude}" aria-hidden="true"></span>${esc(rotSaude)}`, esc(txtSaude))}
+        ${tile(naNuvem ? "Nuvem" : "PC", `<span class="sync-saude sync-saude--${saude}" aria-hidden="true"></span>${esc(naNuvem && saude === "ok" ? "Ativa" : rotSaude)}`,
+          `${esc(txtSaude)}${exe?.url ? ` · <a href="${esc(exe.url)}" target="_blank" rel="noopener">execução #${esc(String(exe.numero || ""))}</a>` : ""}`)}
         ${tile("Coleta rápida", esc(col.rapida_em ? relativo(col.rapida_em, new Date(d.agora)) : "—"), col.rapida_ligada === false ? "desligada no config.json" : col.rapida_em ? esc(dataHora(col.rapida_em)) : "")}
         ${tile("Report diário", esc(col.report_em ? col.report_em.split("-").reverse().slice(0, 2).join("/") : "—"), col.pendentes_report ? `${col.pendentes_report} partida(s) esperando o próximo` : "")}
         ${tile("Envio ao site", esc(d.envio_em ? relativo(d.envio_em, new Date(d.agora)) : "nunca"), `${d.arquivos || 0} arquivo(s)`)}
-        ${tile("Partidas no PC", esc(String(col.partidas_guardadas ?? "—")), col.jogadores ? `${col.jogadores} jogadores na coleta` : "")}
-        ${tile("Pedidos na fila", esc(String(fila)), fila ? "o PC pega na próxima coleta" : "nenhum")}
+        ${tile(naNuvem ? "Partidas guardadas" : "Partidas no PC", esc(String(col.partidas_guardadas ?? "—")), col.jogadores ? `${col.jogadores} jogadores na coleta` : "")}
+        ${tile("Pedidos na fila", esc(String(fila)), fila ? (naNuvem ? "a nuvem já foi chamada" : "o PC pega na próxima coleta") : "nenhum")}
       </div>
       ${!est ? `<div class="aviso secao">${icone("info")}<span>O PC ainda não mandou o estado. Depois de instalar a atualização, ele manda na próxima coleta de 20 minutos (ou rode o <code>Atalhos\\atualizar_agora.bat</code>).</span></div>`
-        : saude === "parado" ? `<div class="aviso aviso--erro secao">${icone("info")}<span>O PC não aparece há algum tempo. Confira se ele está ligado e se a tarefa “NokyLabs - Atualizar site VALORANT” está ativa no Agendador de Tarefas.</span></div>` : ""}
-      ${col.chave_henrik === false ? `<div class="aviso aviso--erro secao">${icone("info")}<span>O PC está sem a chave da HenrikDev (variável <code>HENRIKDEV_API_KEY</code>): a coleta não consegue buscar nada.</span></div>` : ""}
-      ${est ? `<p class="suave pequeno sync-quando">Diagnóstico de ${esc(dataHora(est.gerado_em))}${d.versao ? ` · ${esc(d.versao)}` : ""}</p>` : ""}
+        : saude === "parado" ? `<div class="aviso aviso--erro secao">${icone("info")}<span>${naNuvem
+          ? "A nuvem não aparece há algum tempo. Confira no GitHub (aba Actions) se o fluxo “Coleta” está ativo e se a variável VALREPORT_NUVEM continua “ligada”."
+          : "O PC não aparece há algum tempo. Confira se ele está ligado e se a tarefa “NokyLabs - Atualizar site VALORANT” está ativa no Agendador de Tarefas."}</span></div>` : ""}
+      ${col.chave_henrik === false ? `<div class="aviso aviso--erro secao">${icone("info")}<span>${naNuvem ? "A nuvem está sem a chave da HenrikDev (segredo <code>HENRIKDEV_API_KEY</code> no GitHub)" : "O PC está sem a chave da HenrikDev (variável <code>HENRIKDEV_API_KEY</code>)"}: a coleta não consegue buscar nada.</span></div>` : ""}
+      ${est ? `<p class="suave pequeno sync-quando">${naNuvem ? "Na nuvem · " : ""}Diagnóstico de ${esc(dataHora(est.gerado_em))}${d.versao ? ` · ${esc(d.versao)}` : ""}</p>` : ""}
       <div class="sync-blocos">
         ${bloco("Partidas com dados faltando", "mapa", partidas, "Todas as partidas guardadas estão completas.",
           "A API às vezes manda uma partida pela metade (sem rounds, sem a posição dos abates…). Buscar de novo costuma resolver depois de algumas horas.", !est)}
         ${bloco("Elo desatualizado", "trofeu", elos, "O elo de todo mundo está em dia com as competitivas.",
           "Quem jogou uma competitiva depois da última mudança de RR guardada. Partidas de colocação não mudam o RR.", !est)}
         ${bloco("Contas sem card", "imagem", cards, "Todo mundo da equipe tem card no site.",
-          "Quem ainda não tem partida guardada fica sem card; o PC busca o card direto na conta.", !est)}
-        ${bloco("Erros recentes da coleta", "info", erros, "Nenhum erro nos últimos 3 dias.", "As últimas linhas de erro do log do PC (dados\\coletor.log).", !est)}
+          `Quem ainda não tem partida guardada fica sem card; ${quem} busca o card direto na conta.`, !est)}
+        ${bloco("Erros recentes da coleta", "info", erros, "Nenhum erro nos últimos 3 dias.", naNuvem ? "As últimas linhas de erro do log da coleta (guardado no espaço privado)." : "As últimas linhas de erro do log do PC (dados\\coletor.log).", !est)}
       </div>
       <section class="cartao secao sync-bloco"><div class="cartao__titulo"><h3>${icone("relogio")} Pedidos</h3><span class="suave pequeno">os 40 mais recentes</span></div>
         ${pedidos.length ? `<ul class="sync-lista">${pedidos.map(htmlPedido).join("")}</ul>` : `<p class="suave pequeno">Nenhum pedido ainda. Use “Buscar de novo” nos itens acima ou “Sincronizar tudo”.</p>`}</section>
@@ -143,21 +164,31 @@ export async function viewSync() {
         v.depois?.(el);
       };
       el.querySelector(".sync").addEventListener("click", async (ev) => {
-        const b = ev.target.closest("[data-sync-pedir], [data-sync-cancelar], [data-sync-recarregar]");
+        const b = ev.target.closest("[data-sync-pedir], [data-sync-cancelar], [data-sync-recarregar], [data-sync-agora]");
         if (!b) return;
         b.disabled = true;
         try {
           if (b.dataset.syncRecarregar !== undefined) { await redesenhar(); return; }
+          if (b.dataset.syncAgora !== undefined) {
+            const r = await dispararNuvem();
+            b.disabled = false;
+            aviso(r.motivo || (r.ok ? "A nuvem começou a coletar." : "Não deu para chamar a nuvem."), !r.ok && r.codigo !== "espera");
+            return;
+          }
           if (b.dataset.syncCancelar) {
             await rpc("admin_sync_cancelar", { p_id: b.dataset.syncCancelar });
           } else {
             const r = await rpc("admin_sync_pedir", { p_slug: EQUIPE_PADRAO, p_tipo: b.dataset.syncPedir, p_alvo: b.dataset.syncAlvo || null });
+            let texto = r?.ja_existia ? "Esse pedido já estava na fila." : "Pedido na fila: o PC atende na próxima coleta.", erro = false;
+            if (naNuvem) {
+              const n = await dispararNuvem();
+              texto = n.ok ? `${r?.ja_existia ? "Esse pedido já estava na fila. " : "Pedido na fila. "}${n.motivo}`
+                : n.codigo === "espera" ? `Pedido na fila. ${n.motivo}` : `Pedido na fila (a coleta de 20 minutos atende). Não deu para chamar a nuvem agora: ${n.motivo}`;
+              erro = !n.ok && n.codigo !== "espera";
+            }
             await redesenhar();
-            el.querySelector(".sync-msg") && (() => {
-              const m = el.querySelector(".sync-msg");
-              m.textContent = r?.ja_existia ? "Esse pedido já estava na fila." : "Pedido na fila: o PC atende na próxima coleta.";
-              m.className = "form-msg sync-msg aviso"; m.hidden = false;
-            })();
+            const m = el.querySelector(".sync-msg");
+            if (m) { m.textContent = texto; m.className = `form-msg sync-msg aviso${erro ? " aviso--erro" : ""}`; m.hidden = false; }
             return;
           }
           await redesenhar();
