@@ -761,6 +761,8 @@ main[data-anim="pagina"] .lados__barra i, main[data-anim="aba"] .lados__barra i 
 @media (max-width: 700px) { .botao-nokylabs { width: 40px; padding: 0; } .botao-nokylabs span { display: none; } }
 @media (max-width: 440px) { .marca__texto { display: none; } .topo__linha { gap: 8px; } }
 .rodape__noky { font-weight: 600; }
+.rodape__credito { display: grid; gap: 2px; padding-top: 10px; margin-top: 2px !important; border-top: 1px dashed var(--borda); font-size: 13px; }
+.rodape__credito strong { color: var(--texto); font-weight: 600; }
 
 /* ---------- Coroa do MVP da semana ---------- */
 .foto-coroa { position: relative; display: inline-flex; flex: none; }
