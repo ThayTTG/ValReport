@@ -4,7 +4,7 @@
 // v3: à direita das notas fica a comparação (radar com as 7 notas e os números frente a frente, "A × B"); o jeito de
 // jogar em texto (por regras, sempre, e o resumo por IA por cima, quando houver) desce para baixo, na largura toda.
 // No celular: comparação, notas e texto. A pessoa comparada vai no endereço (?vs=slug).
-// Por enquanto só a administradora vê, até a conferência das notas com a equipe.
+// v4 (11/11): liberada para toda a equipe; a escolha de quem comparar virou um menu (cabe qualquer número de pessoas).
 
 import { esc, num, icone } from "./util.js";
 import { atributosDados, B } from "./dados.js";
@@ -101,11 +101,12 @@ function comparacao(d, e, j, vs) {
   return `<section class="cartao atr-vs" aria-label="Comparação dos atributos">
       <div class="atr-vs__topo">
         <h3 class="atr-vs__titulo"><span class="atr-vs__a">${esc(e.apelido)}</span>${o ? ` <span class="suave" aria-label="comparado com">×</span> <span class="atr-vs__b">${esc(nome(vs))}</span>` : ""}</h3>
-        ${outros.length ? `<div class="chips atr-vs__escolha" role="group" aria-label="Comparar com">
-            <span class="suave pequeno">Comparar com</span>
-            ${outros.map((s) => `<button class="chip atr-vs__chip" type="button" data-param="vs" data-valor="${esc(s)}" aria-pressed="${s === vs && !!o}">${esc(nome(s))}</button>`).join("")}
-            ${o ? `<button class="chip atr-vs__chip" type="button" data-param="vs" data-valor="-" aria-pressed="false">Ninguém</button>` : ""}
-          </div>` : ""}
+        ${outros.length ? `<label class="seletor-funcao atr-vs__escolha"><span>Comparar com</span>
+            <select data-param-sel="vs" data-padrao="" aria-label="Escolher com quem comparar">
+              <option value=""${o ? "" : " selected"}>Ninguém</option>
+              ${outros.map((s) => [s, nome(s)]).sort((x, y) => x[1].localeCompare(y[1], "pt-BR")).map(([s, n]) =>
+                `<option value="${esc(s)}"${o && s === vs ? " selected" : ""}>${esc(n)} · ${esc(d.jogadores[s].funcao)}</option>`).join("")}
+            </select></label>` : ""}
       </div>
       <div class="atr-vs__corpo">
         ${radar(d.atributos, series)}
@@ -133,7 +134,6 @@ export async function htmlAtributos(e, q) {
   const outras = Object.entries(j.outras_funcoes || {}).map(([f, n]) => `${f} (${n} rounds)`).join(", ");
   const ia = j.resumo_ia;
   return `<section class="atr">
-      <div class="aviso secao atr-so-admin">${icone("info")}<span>Só você vê esta aba por enquanto. Confira com a equipe se o “jeito” de cada um bate com o que vocês veem; depois ela é liberada para todos.</span></div>
       <div class="atr-layout${j.amostra_pequena ? " atr-layout--pequena" : ""}">
         ${comparacao(d, e, j, q?.get("vs"))}
         <aside class="cartao atr-notas" aria-label="Notas dos atributos">

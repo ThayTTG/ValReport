@@ -19,9 +19,9 @@ const cartao = (titulo, corpo, extra = "") => cartaoMin(chaveCartao(titulo), tit
 const ultimoElo = (slug) => (B.elo[slug] || []).filter((h) => h.tier != null).at(-1);
 
 export const ABAS_JOGADOR = [["geral", "Geral"], ["partidas", "Partidas"], ["agentes", "Agentes"], ["mapas", "Mapas"],
-  ["armas", "Armas"], ["habilidades", "Habilidades"], ["performance", "Performance"]];   // o mapa de calor agora fica dentro de Mapas
-// Atributos: só a administradora, até a conferência das notas com a equipe
-const abasDe = () => (B.conta?.admin ? [...ABAS_JOGADOR, ["atributos", "Atributos"]] : ABAS_JOGADOR);
+  ["armas", "Armas"], ["habilidades", "Habilidades"], ["performance", "Performance"], ["atributos", "Atributos"]];   // o mapa de calor agora fica dentro de Mapas
+// Atributos: liberados para toda a equipe em 11/11 (os dados vêm do Supabase, que só a equipe lê, como as outras abas)
+const abasDe = () => ABAS_JOGADOR;
 
 export function cabecalhoJogador(e) {
   const av = (B.avaliacao[e.slug] || [])[0];

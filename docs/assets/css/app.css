@@ -1698,7 +1698,6 @@ button.chip { cursor: pointer; }
 
 /* ---------- Atributos do jogador (notas de estilo, no jeito da HLTV) ---------- */
 .atr { display: grid; gap: 14px; }
-.atr-so-admin { margin: 0; }
 /* v3: notas à esquerda, comparação (radar) à direita e o texto embaixo, na largura toda; no celular: comparação, notas, texto */
 .atr-layout { display: grid; gap: 14px; margin-top: 14px; align-items: start; }
 .atr-layout > * { min-width: 0; }
@@ -1712,9 +1711,7 @@ button.chip { cursor: pointer; }
 .atr-vs__topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 .atr-vs__titulo { font: 700 20px var(--fonte-titulo); }
 .atr-vs__a { color: var(--destaque-texto); }
-.atr-vs__escolha { align-items: center; }
-.atr-vs__chip { cursor: pointer; }
-.atr-vs__chip[aria-pressed="true"] { border-color: var(--destaque); color: var(--destaque-texto); }
+.atr-vs__escolha select { max-width: min(260px, 70vw); }
 .atr-vs__corpo { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 24px; }
 .atr-radar { flex: 1 1 300px; max-width: 420px; height: auto; overflow: visible; }
 .atr-radar__anel { fill: none; stroke: var(--borda); stroke-width: 1; }
