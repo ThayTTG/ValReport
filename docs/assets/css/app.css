@@ -1699,14 +1699,45 @@ button.chip { cursor: pointer; }
 /* ---------- Atributos do jogador (notas de estilo, no jeito da HLTV) ---------- */
 .atr { display: grid; gap: 14px; }
 .atr-so-admin { margin: 0; }
-/* v2: notas numa coluna compacta à esquerda e o texto à direita; no celular, o texto vem primeiro */
+/* v3: notas à esquerda, comparação (radar) à direita e o texto embaixo, na largura toda; no celular: comparação, notas, texto */
 .atr-layout { display: grid; gap: 14px; margin-top: 14px; align-items: start; }
 .atr-layout > * { min-width: 0; }
 @media (min-width: 980px) {
   .atr-layout { grid-template-columns: 340px minmax(0, 1fr); }
   .atr-notas { grid-column: 1; grid-row: 1; }
-  .atr-painel { grid-column: 2; grid-row: 1; }
+  .atr-vs { grid-column: 2; grid-row: 1; }
+  .atr-painel { grid-column: 1 / -1; grid-row: 2; }
 }
+.atr-vs { margin: 0; display: grid; gap: 12px; }
+.atr-vs__topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.atr-vs__titulo { font: 700 20px var(--fonte-titulo); }
+.atr-vs__a { color: var(--destaque-texto); }
+.atr-vs__escolha { align-items: center; }
+.atr-vs__chip { cursor: pointer; }
+.atr-vs__chip[aria-pressed="true"] { border-color: var(--destaque); color: var(--destaque-texto); }
+.atr-vs__corpo { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 24px; }
+.atr-radar { flex: 1 1 300px; max-width: 420px; height: auto; overflow: visible; }
+.atr-radar__anel { fill: none; stroke: var(--borda); stroke-width: 1; }
+.atr-radar__anel--meio { stroke: var(--suave); stroke-dasharray: 2 4; }
+.atr-radar__eixo { stroke: var(--borda); stroke-width: 1; }
+.atr-radar__rotulo { fill: var(--texto-2); font: 600 11.5px var(--fonte); }
+.atr-radar__escala { fill: var(--suave); font: 600 10px var(--fonte); }
+.atr-radar__forma { stroke-width: 2; stroke-linejoin: round; }
+.atr-radar__forma--a { fill: color-mix(in srgb, var(--destaque) 26%, transparent); stroke: var(--destaque); }
+.atr-radar__forma--b { fill: color-mix(in srgb, var(--texto) 9%, transparent); stroke: var(--texto-2); stroke-dasharray: 6 4; }
+.atr-radar__ponto--a { fill: var(--destaque); }
+.atr-radar__ponto--b { fill: var(--superficie); stroke: var(--texto-2); stroke-width: 1.5; }
+.atr-vs__tabela { flex: 0 1 290px; border-collapse: collapse; font-size: 14px; }
+.atr-vs__tabela th, .atr-vs__tabela td { padding: 7px 8px; border-bottom: 1px solid var(--borda); }
+.atr-vs__tabela thead th { font-size: 13px; text-align: right; vertical-align: bottom; white-space: nowrap; }
+.atr-vs__tabela thead small { display: block; font-weight: 500; font-size: 11.5px; }
+.atr-vs__tabela tbody th, .atr-vs__tabela tfoot th { text-align: left; font-weight: 500; color: var(--texto-2); white-space: nowrap; }
+.atr-vs__tabela td { text-align: right; font: 500 17px/1 var(--fonte-titulo); font-variant-numeric: tabular-nums; color: var(--texto-2); }
+.atr-vs__tabela td.atr-vs__maior { color: var(--texto); font-weight: 700; }
+.atr-vs__tabela tfoot th, .atr-vs__tabela tfoot td { border-bottom: 0; font-size: 12.5px; font-weight: 500; color: var(--suave); }
+.atr-vs__marca { display: inline-block; width: 14px; height: 0; margin-right: 6px; vertical-align: middle; border-top: 3px solid var(--destaque); }
+.atr-vs__marca--b { border-top: 3px dashed var(--texto-2); }
+.atr-vs__nota { max-width: 80ch; }
 .atr-resumo { display: grid; gap: 10px; justify-items: start; margin: 0; }
 .atr-frase { font: 700 19px var(--fonte-titulo); }
 .atr-amostra { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--texto-2); }
@@ -1726,7 +1757,8 @@ button.chip { cursor: pointer; }
 .atr-linha > summary:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; border-radius: 6px; }
 .atr-linha__topo { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .atr-linha__nome small { font-size: 12px; }
-.atr-linha__corpo { padding: 0 0 12px; display: grid; gap: 10px; }
+/* as subestatísticas ficam recuadas, com um fio à esquerda, para não se misturarem com as notas principais */
+.atr-linha__corpo { margin: 0 0 12px 6px; padding: 2px 0 2px 14px; border-left: 2px solid var(--borda); display: grid; gap: 10px; }
 .atr-notas .atr-nota { font: 700 22px/1 var(--fonte-titulo); font-variant-numeric: tabular-nums; }
 .atr-layout--pequena .atr-nota, .atr-layout--pequena .atr-linha > summary .atr-barra__fill { opacity: .62; }
 .atr-notas__dica { margin-top: 6px; }
