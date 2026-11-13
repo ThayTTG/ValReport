@@ -3,7 +3,8 @@
 import "./registro.js";   // primeiro: guarda os erros desta sessão para a página Diagnóstico
 import { esc, icone, imagem, imgCard, imgAgente, definirMeta, dataHora, vazio, larguraGrafico } from "./util.js";
 import { B, carregarBase, FILTROS_PADRAO, salvarNota, limparCache, detectarEditor, metaFresca } from "./dados.js";
-import { iniciarNuvem, rpc, entrar, usuario } from "./nuvem.js";
+import { iniciarNuvem, rpc, entrar, usuario, token } from "./nuvem.js";
+import { EQUIPE_PADRAO } from "./config.js";
 import { viewBoasVindas, viewCadastro, viewSemEquipe, viewConta, viewPainel } from "./conta.js";
 import { viewSync } from "./sync.js";
 import { viewDiagnostico } from "./diagnostico.js";
@@ -331,8 +332,51 @@ async function conferirDados(manual = false) {
 }
 botaoAtualizar.addEventListener("click", () => conferirDados(true));
 // Confere só com a aba visível; ao voltar para o site depois de um tempo, confere na hora
-setInterval(() => { if (!document.hidden && Date.now() - ultimaConferida >= INTERVALO_MS) conferirDados(); }, 60 * 1000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - ultimaConferida >= INTERVALO_MS) conferirDados(); });
+setInterval(() => {
+  if (document.hidden) return;
+  if (Date.now() - ultimaConferida >= INTERVALO_MS) conferirDados();
+  talvezColetar();
+}, 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (Date.now() - ultimaConferida >= INTERVALO_MS) conferirDados();
+  talvezColetar();
+});
+
+// ---------- Coleta na visita (v24) ----------
+// O GitHub pula a maior parte dos agendamentos de 20 minutos. Então, quando alguém da equipe está com o site aberto e
+// os dados têm mais de 15 minutos, o site pede a coleta (/api/disparar, modo "visita"). Quem decide se roda é o banco
+// (nuvem_disparo_visita): no máximo uma coleta a cada 15 minutos, nunca duas juntas. Aqui só há um freio local
+// (10 minutos por navegador), para não perguntar à toa.
+const DADOS_VELHOS_MS = 15 * 60 * 1000, PAUSA_VISITA_MS = 10 * 60 * 1000, CHAVE_VISITA = "valreport.visita";
+let pedindoColeta = false;
+async function talvezColetar() {
+  if (pedindoColeta || tela !== "app" || B.editor || B.equipeAtual?.slug !== EQUIPE_PADRAO || document.hidden) return;
+  if (Date.now() - new Date(B.meta?.gerado_em || 0).getTime() < DADOS_VELHOS_MS) return;
+  let ultima = 0;
+  try { ultima = Number(localStorage.getItem(CHAVE_VISITA)) || 0; } catch (e) { /* sem armazenamento */ }
+  if (Date.now() - ultima < PAUSA_VISITA_MS) return;
+  try { localStorage.setItem(CHAVE_VISITA, String(Date.now())); } catch (e) { /* sem armazenamento */ }
+  pedindoColeta = true;
+  try {
+    const t = await token();
+    const r = await fetch("/api/disparar", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t || ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ modo: "visita" }),
+    });
+    const j = await r.json().catch(() => null);
+    if (j?.ok) {
+      avisar("Buscando partidas novas… elas aparecem aqui em poucos minutos.", "novo");
+      // a coleta leva de 2 a 4 minutos: confere algumas vezes e para quando os dados chegarem
+      for (const min of [3, 5, 8]) setTimeout(() => { if (!document.hidden) conferirDados(); }, min * 60 * 1000);
+    }
+  } catch (e) {
+    /* sem conexão: tenta de novo na próxima pausa */
+  } finally {
+    pedindoColeta = false;
+  }
+}
 
 // ---------- App instalável (PWA) ----------
 if ("serviceWorker" in navigator && location.protocol === "https:") {
@@ -462,6 +506,7 @@ async function iniciar() {
   ligarBrilho(main);
   await renderizar();
   talvezRevelar();
+  talvezColetar();
 }
 window.addEventListener("valreport:recarregar", () => location.reload());
 ligarGaveta(() => tela);

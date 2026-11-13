@@ -164,7 +164,10 @@ def leves(cfg=None):
         estado = "ok" if idade is not None and idade <= 45 else "aviso"
         itens.append(_item("coleta", "Coleta rápida", estado,
                            f"última em {quando[:16].replace('T', ' ')}" + (f" ({_ha(idade)})" if idade is not None else ""),
-                           "" if estado == "ok" else "A tarefa de 20 minutos parece parada: confira o Agendador de Tarefas."))
+                           "" if estado == "ok" else
+                           ("O GitHub pulou agendamentos; as visitas ao site também chamam a coleta (no máximo a cada 15 min)."
+                            if os.environ.get("GITHUB_ACTIONS") else
+                            "A tarefa de 20 minutos parece parada: confira o Agendador de Tarefas.")))
     estado_col = _ler(DADOS / "estado.json", {}) or {}
     ult = estado_col.get("ultima_execucao")
     if ult:

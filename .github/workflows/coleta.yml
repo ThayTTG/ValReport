@@ -1,5 +1,9 @@
-# Coleta de 20 em 20 minutos na nuvem (no lugar da tarefa do PC). Também roda na hora quando a administradora
-# pede algo no Sync do site (o site chama este fluxo pela API do GitHub) ou pelo botão "Run workflow".
+# Coleta na nuvem (no lugar da tarefa do PC). Roda de três jeitos:
+#   - quando alguém da equipe abre o site e os dados têm mais de 15 minutos (v24; o site chama pela API do GitHub,
+#     e o banco segura o ritmo: no máximo uma a cada 15 minutos);
+#   - quando a administradora pede algo no Sync do site, ou pelo botão "Run workflow";
+#   - pelo agendamento abaixo, que fica como reserva: o GitHub pula a maior parte dos horários (de 08/11 a 13/11
+#     foram 24 execuções no lugar de ~350).
 # Só roda com a variável do repositório VALREPORT_NUVEM = ligada (Settings > Secrets and variables > Actions > Variables).
 # O log é público (repositório público): o script imprime só contagens; os detalhes ficam no log privado da nuvem.
 name: Coleta
