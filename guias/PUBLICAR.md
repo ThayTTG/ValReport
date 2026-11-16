@@ -24,3 +24,8 @@ Dois cliques em `Atalhos\publicar_site.bat`. Ele exporta, envia os dados ao Supa
 Agenda, Map pool, Comps, Calls, partidas fora das contas e o elo opcional precisam de mais uma parte no banco.
 No Supabase, abra o **SQL Editor** e rode o arquivo `supabase/planejamento.sql` inteiro (depois do `taticas.sql`).
 Pode rodar de novo sem medo: ele não apaga nada. Enquanto ele não roda, essas abas mostram o aviso "ative no banco".
+
+## Botão Atualizar (v26)
+
+O botão das setinhas, no topo do site, pede a coleta na hora. Ela refaz estatísticas, atributos, Índice e recordes, mesmo sem partida nova, e o site carrega sozinho quando termina (2 a 4 minutos).
+Para ligar, rode `supabase/atualizar.sql` no SQL Editor do Supabase (depois do `visita.sql`). O banco segura o ritmo: uma atualização a cada 4 minutos para a equipe toda.

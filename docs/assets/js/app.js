@@ -328,11 +328,56 @@ async function conferirDados(manual = false) {
     if (manual) avisar("Sem conexão agora. Tento de novo daqui a pouco.", "erro");
   } finally {
     conferindo = false;
-    botaoAtualizar.classList.remove("girando-icone");
+    if (!esperandoColeta) botaoAtualizar.classList.remove("girando-icone");
     botaoAtualizar.disabled = false;
   }
 }
-botaoAtualizar.addEventListener("click", () => conferirDados(true));
+botaoAtualizar.addEventListener("click", () => atualizarTudo());
+
+// ---------- Botão Atualizar (v26): pede a coleta na hora e espera os dados refeitos ----------
+// A coleta refaz estatísticas, atributos, Índice e recordes mesmo sem partida nova (partidas fora das contas, elo
+// oculto...). O banco segura o ritmo (nuvem_disparo_manual): uma chamada a cada 4 minutos para a equipe toda.
+let esperandoColeta = false;
+async function atualizarTudo() {
+  if (esperandoColeta) { avisar("Já estou atualizando; os dados chegam em instantes."); return; }
+  const antes = B.meta?.gerado_em;
+  await conferirDados(false);
+  if (B.meta?.gerado_em !== antes) return;   // já tinha dados novos prontos: carregou e avisou
+  if (B.editor || tela !== "app" || B.equipeAtual?.slug !== EQUIPE_PADRAO) { avisar(`Tudo em dia · dados de ${dataHora(B.meta.gerado_em)}`); return; }
+  let j = null;
+  try {
+    const t = await token();
+    const r = await fetch("/api/disparar", { method: "POST", headers: { Authorization: `Bearer ${t || ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ modo: "atualizar" }) });
+    j = await r.json().catch(() => null);
+  } catch (e) {
+    avisar("Sem conexão agora. Tente de novo daqui a pouco.", "erro");
+    return;
+  }
+  if (!j?.ok && j?.codigo !== "recente") { avisar(j?.motivo || "Não deu para atualizar agora.", "erro"); return; }
+  avisar(j.ok ? "Atualizando estatísticas e atributos… leva de 2 a 4 minutos." : j.motivo, "novo");
+  esperarColeta(antes);
+}
+async function esperarColeta(antes) {
+  esperandoColeta = true;
+  botaoAtualizar.classList.add("girando-icone", "aguardando");
+  botaoAtualizar.title = "Atualizando: os dados chegam em instantes";
+  const limite = Date.now() + 8 * 60 * 1000;
+  try {
+    while (Date.now() < limite) {
+      await new Promise((ok) => setTimeout(ok, 30 * 1000));
+      try {
+        const meta = await metaFresca();
+        if (meta.gerado_em !== antes) { await conferirDados(true); return; }
+      } catch (e) { /* sem conexão agora: tenta na próxima volta */ }
+    }
+    avisar("A atualização está demorando. Os dados aparecem sozinhos quando chegarem.");
+  } finally {
+    esperandoColeta = false;
+    botaoAtualizar.classList.remove("girando-icone", "aguardando");
+    botaoAtualizar.title = "Atualizar estatísticas e atributos agora";
+  }
+}
 // Confere só com a aba visível; ao voltar para o site depois de um tempo, confere na hora
 setInterval(() => {
   if (document.hidden) return;

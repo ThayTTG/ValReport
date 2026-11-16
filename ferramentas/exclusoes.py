@@ -80,10 +80,26 @@ def aplicar(analise, excluidos_pu):
 # A coleta rápida só exporta quando chega partida nova. Tirar/voltar uma partida das contas ou mudar a escolha
 # de mostrar o elo também muda os números (atributos, Índice, recordes...), então conta como novidade.
 
+# Arquivos do cálculo: quando o código deles muda (ex.: a regra do Playmaker), o site é refeito na próxima coleta
+ARQS_CALCULO = ("avaliacao.py", "atributos.py", "exportar_site.py", "gerar_report.py", "exclusoes.py")
+
+
+def versao_calculo():
+    import hashlib
+    h = hashlib.sha256()
+    for nome in ARQS_CALCULO:
+        try:
+            h.update((Path(__file__).resolve().parent / nome).read_bytes())
+        except OSError:
+            pass
+    return h.hexdigest()[:16]
+
+
 def assinatura(cfg):
-    """O que, além das partidas, muda os dados do site: partidas fora das contas e quem esconde o elo."""
+    """O que, além das partidas, muda os dados do site: partidas fora das contas, quem esconde o elo e o cálculo."""
     return {"excluidas": sorted(f"{m}|{s}" for m, s in buscar(cfg)),
-            "sem_elo": sorted((cfg or {}).get("_sem_elo") or [])}
+            "sem_elo": sorted((cfg or {}).get("_sem_elo") or []),
+            "calculo": versao_calculo()}
 
 
 def mudou_desde_exportacao(cfg):

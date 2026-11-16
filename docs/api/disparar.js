@@ -2,7 +2,9 @@
 // Dois modos:
 //   - sem corpo (ou {"modo": "admin"}): o "Coletar agora" do Sync, só a administradora (admin_nuvem_disparo);
 //   - {"modo": "visita"}: o site pede sozinho quando alguém da equipe abre e os dados estão velhos (v24). O banco
-//     (nuvem_disparo_visita) confere se é da equipe e segura o ritmo: no máximo uma coleta a cada 15 minutos.
+//     (nuvem_disparo_visita) confere se é da equipe e segura o ritmo: no máximo uma coleta a cada 15 minutos;
+//   - {"modo": "atualizar"}: o botão Atualizar do site (v26). Refaz tudo mesmo sem partida nova (nuvem_disparo_manual:
+//     integrante da equipe, uma chamada a cada 4 minutos, até 8 por hora).
 // Quem pede manda o login do site (Authorization: Bearer <token do Supabase>); o banco confere se é a administradora e
 // segura o ritmo (no máximo 1 por minuto e 30 por hora) na função admin_nuvem_disparo. O token do GitHub fica só aqui,
 // na variável VALREPORT_GITHUB_TOKEN do Vercel (fine-grained, só Actions: leitura e escrita no ThayTTG/ValReport).
@@ -33,27 +35,31 @@ module.exports = async function disparar(req, res) {
 
   let corpo = req.body;
   if (typeof corpo === "string") { try { corpo = JSON.parse(corpo); } catch { corpo = null; } }
-  const visita = corpo?.modo === "visita";
+  const visita = corpo?.modo === "visita", atualizar = corpo?.modo === "atualizar";
+  const funcao = atualizar ? "nuvem_disparo_manual" : visita ? "nuvem_disparo_visita" : "admin_nuvem_disparo";
+  const sql = atualizar ? "atualizar" : visita ? "visita" : "nuvem";
 
   // 1. Pode chamar agora? (o banco decide e anota: a administradora no Sync, ou alguém da equipe numa visita)
   let d;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${visita ? "nuvem_disparo_visita" : "admin_nuvem_disparo"}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${funcao}`, {
       method: "POST",
       headers: { apikey: SUPABASE_CHAVE, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
       body: JSON.stringify({ p_slug: EQUIPE }),
     });
     d = await lerJson(r);
     if (r.status === 401 || r.status === 403) {
-      return responder(res, 403, visita ? { ok: false, codigo: "equipe", motivo: "Só quem é da equipe chama a coleta." }
+      return responder(res, 403, visita || atualizar ? { ok: false, codigo: "equipe", motivo: "Só quem é da equipe chama a coleta." }
         : { ok: false, codigo: "admin", motivo: "Somente a administradora chama a coleta." });
     }
-    if (r.status === 404) return responder(res, 503, { ok: false, codigo: "sem_sql", motivo: `Falta aplicar o supabase/${visita ? "visita" : "nuvem"}.sql no banco.` });
+    if (r.status === 404) return responder(res, 503, { ok: false, codigo: "sem_sql", motivo: `Falta aplicar o supabase/${sql}.sql no banco.` });
     if (!r.ok) return responder(res, 502, { ok: false, codigo: "banco", motivo: "O banco não respondeu direito; tente de novo em instantes." });
   } catch {
     return responder(res, 502, { ok: false, codigo: "banco", motivo: "Não deu para falar com o banco agora." });
   }
   // Numa visita, "não precisa agora" é o caso comum (dados em dia ou alguém acabou de chamar): responde 200, sem erro
+  if (!d?.pode && atualizar) return responder(res, 200, { ok: false, codigo: d?.codigo || "espera", ultimo: d?.ultimo || null,
+    motivo: d?.codigo === "limite" ? "O botão já foi usado muitas vezes nesta hora; tente mais tarde." : "Uma atualização acabou de ser pedida; os dados chegam em instantes." });
   if (!d?.pode && visita) return responder(res, 200, { ok: false, codigo: d?.codigo || "espera", motivo: "Os dados estão em dia." });
   if (!d?.pode) return responder(res, 429, { ok: false, codigo: "espera", motivo: d?.motivo || "Espere um pouco antes de chamar de novo." });
 
@@ -63,7 +69,7 @@ module.exports = async function disparar(req, res) {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "ValReport", "Content-Type": "application/json" },
-      body: JSON.stringify({ ref: "main", inputs: { motivo: visita ? "visita" : "site" } }),
+      body: JSON.stringify({ ref: "main", inputs: { motivo: atualizar ? "atualizar" : visita ? "visita" : "site" } }),
     });
     if (g.status === 204 || g.status === 200) return responder(res, 200, { ok: true, motivo: "A nuvem começou a coletar; em 2 a 4 minutos o resultado aparece aqui." });
     const motivo = g.status === 401 ? "O token do GitHub no Vercel venceu ou está errado (VALREPORT_GITHUB_TOKEN)."

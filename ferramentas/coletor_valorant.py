@@ -654,7 +654,7 @@ def _rapido_travado(chave, cfg):
         # v25: a liderança tirou/voltou uma partida das contas ou alguém mudou a escolha do elo: refaz o site
         try:
             import exclusoes
-            ajustes = exclusoes.mudou_desde_exportacao(cfg)
+            ajustes = os.environ.get("VALREPORT_REFAZER") == "1" or exclusoes.mudou_desde_exportacao(cfg)
         except Exception as e:  # noqa: BLE001
             log(f"Coleta rápida: não consegui conferir as partidas fora das contas ({e}).")
             ajustes = False
@@ -665,7 +665,7 @@ def _rapido_travado(chave, cfg):
         site = cfg.get("site") or {}
         if site.get("ativo", True) is not False and not exportar_site.exportar_e_publicar(cfg):
             log("Site exportado, mas não enviado ao Supabase (veja a mensagem acima).")
-        log("Coleta rápida: nenhuma partida nova, mas a lista de partidas fora das contas (ou do elo oculto) mudou; site refeito.")
+        log("Coleta rápida: nenhuma partida nova, mas pediram para atualizar (ou mudou o cálculo, as partidas fora das contas ou o elo oculto); site refeito.")
         return True
     if cfg.get("coletar_elo", True):
         for riot_id in com_novas:
