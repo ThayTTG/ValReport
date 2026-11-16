@@ -4,7 +4,7 @@ import { esc, icone, imagem, imgCard } from "./util.js";
 import { B } from "./dados.js";
 import { rpc, atualizar, funcao, usuario } from "./nuvem.js";
 
-export const FUNCOES = ["Duelista", "Iniciador", "Controlador", "Sentinela", "Flex"];
+export const FUNCOES = ["Duelista", "Iniciador", "Controlador", "Sentinela", "Playmaker", "Flex"];
 export const CORES = [["#ff4655", "Vermelho"], ["#f2994a", "Laranja"], ["#e5b93c", "Dourado"], ["#2fbf71", "Verde"],
   ["#1fb5c9", "Ciano"], ["#4a7dff", "Azul"], ["#9b6bff", "Roxo"], ["#ff5fa2", "Rosa"]];
 const CDN = "https://media.valorant-api.com";
@@ -193,6 +193,8 @@ function formPerfil(p, agentes, protegido) {
     <fieldset class="campo"><legend>Cor de destaque</legend><div class="cores">${cores}</div></fieldset>
     <label class="campo--check"><input type="checkbox" name="historico"${p.historico_publico !== false ? " checked" : ""}>
       <span>Mostrar o meu histórico de partidas no perfil público${protegido ? " (no modo protegido, só a sua equipe vê o perfil)" : ""}</span></label>
+    <label class="campo--check"><input type="checkbox" name="elo"${p.mostrar_elo !== false ? " checked" : ""}>
+      <span>Mostrar o meu elo no ValReport <small class="suave">(desligado, o elo some das estatísticas, das partidas e do histórico na próxima atualização dos dados)</small></span></label>
     <p class="form-msg aviso" role="status" hidden></p>
     <div class="lp-acoes"><button class="botao-primario" type="submit">Salvar perfil</button></div>
   </form>`;
@@ -250,6 +252,7 @@ function ligarFormPerfil(el) {
     const apelido = f.apelido.value.trim();
     if (apelido.length < 2) { mensagem(msg, "O apelido precisa ter de 2 a 24 caracteres.", "erro"); return; }
     const mudancas = { apelido, bio: f.bio.value.trim(), agentes: escolhidos, funcoes, cor: f.cor.value || null, historico_publico: f.historico.checked };
+    if (f.elo && f.elo.checked !== (B.conta.perfil.mostrar_elo !== false)) mudancas.mostrar_elo = f.elo.checked;   // v25 (só manda se mudou: funciona antes do planejamento.sql)
     const botao = f.querySelector("[type=submit]");
     botao.disabled = true;
     try {

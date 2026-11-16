@@ -18,3 +18,9 @@ Dois cliques em `Atalhos\publicar_site.bat`. Ele exporta, envia os dados ao Supa
 - **Algo não apareceu?** Rode `py ferramentas\exportar_site.py --verificar` e leia as mensagens que começam com "Site:" e "Elenco:".
 - **Elenco só do config.json (sem o site):** `"site": {"elenco_do_site": false}` no `config.json`.
 - **Histórico antigo:** as partidas que já estiveram no GitHub foram apagadas do histórico em 26/10/2026. O backup ficou em `Downloads\ValReport-backup-2026-10-26_1938.bundle` e pode ser apagado quando quiser.
+
+## Planejamento da equipe (v25)
+
+Agenda, Map pool, Comps, Calls, partidas fora das contas e o elo opcional precisam de mais uma parte no banco.
+No Supabase, abra o **SQL Editor** e rode o arquivo `supabase/planejamento.sql` inteiro (depois do `taticas.sql`).
+Pode rodar de novo sem medo: ele não apaga nada. Enquanto ele não roda, essas abas mostram o aviso "ative no banco".

@@ -1,5 +1,6 @@
 // Perfil de um jogador: Geral, Partidas, Agentes, Mapas, Armas, Performance e Calor
 
+import { listaExcluidasDe, ligarExcluidasJogador } from "./planejamento.js";
 import {
   esc, num, pct, sinal, div, imagem, imgAgente, imgCard, imgRank, imgMapaFaixa, imgArma, imgHabilidade, nomeTier, relativo, dataCurta,
   tile, destaque, vazio, cartao as cartaoSimples, secao, barra, escala, selo, classeSinal, classeNivel, icone, TIPOS, nomeFila,
@@ -520,6 +521,11 @@ export async function viewJogador(slug, aba, f, q) {
   else if (aba === "armas") corpo = armas(itens);
   else if (aba === "habilidades") corpo = htmlHabilidadesJogador(agrupar(itens, (it) => it.m.ag)) || vazio("Sem contagem de habilidades", `<p>As partidas destes filtros foram exportadas antes do contador existir. Na próxima publicação pelo PC elas passam a aparecer aqui.</p>`);
   else if (aba === "performance") corpo = performance(e, itens, s, q);
+  if (aba === "partidas" && e.partidas) {   // v25: as partidas que a liderança tirou das contas
+    corpo = listaExcluidasDe(slug) + corpo;
+    const antes = depois;
+    depois = (el) => { antes?.(el); ligarExcluidasJogador(el, slug, () => window.dispatchEvent(new HashChangeEvent("hashchange"))); };
+  }
   return {
     titulo: `${e.apelido} · ${lista.find(([id]) => id === aba)[1]}`,
     html: `${cabecalhoJogador(e)}${abas(`#/j/${slug}`, aba, lista, qs)}${aba === "atributos" ? "" : barraFiltros(f, slug)}

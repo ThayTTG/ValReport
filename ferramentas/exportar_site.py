@@ -45,6 +45,8 @@ PASTA_ELO = PASTA / "dados" / "elo"
 URL_PADRAO = "https://valreport.vercel.app/"
 CODIGO_TIPO = {"pistol": 0, "eco": 1, "force": 2, "armado": 3, "anti-eco": 4}
 VERSAO_DADOS = 1
+ELO_OCULTO = "Oculto"      # v25: elo de quem desligou "mostrar meu elo" no perfil
+SEM_ELO_PU = set()         # puuids dessas pessoas (preenchido a cada exportação)
 TIERS_UUID = "03621f52-342b-cf4e-4f86-9350a49c6d04"  # tabela de elos atual da valorant-api
 
 # Reserva sem internet (mesmos valores do mapa_calor.py)
@@ -274,7 +276,8 @@ def detalhe_partida(a, bruta, nosso, slug_de_puuid, cfg, membros_info):
         n = a["n_rounds"] or 1
         jogadores.append({
             "nome": nome, "slug": slug, "time": p.get("team_id"), "ag": g(p, "agent", "name") or "?",
-            "tier": g(p, "tier", "id", padrao=0) or 0, "tn": g(p, "tier", "name") or "Unrated",
+            "tier": 0 if pu in SEM_ELO_PU else (g(p, "tier", "id", padrao=0) or 0),
+            "tn": ELO_OCULTO if pu in SEM_ELO_PU else (g(p, "tier", "name") or "Unrated"),
             "k": st.get("kills", 0), "d": st.get("deaths", 0), "a": st.get("assists", 0),
             "acs": round((st.get("score", 0) or 0) / n), "adr": round((g(st, "damage", "dealt", padrao=0) or 0) / n),
             "hs": round(100 * (st.get("headshots", 0) or 0) / tiros) if tiros else 0,
@@ -640,11 +643,17 @@ def exportar(cfg=None, verificar=False):
     refs = ctx["refs"]
     puuid_aut = {ctx["puuid_de"][r]: slug[r] for r in autorizados if r in ctx["puuid_de"]}
     puuid_todos = {ctx["puuid_de"][r] for r in todos if r in ctx["puuid_de"]}
+    # Elo opcional (v25): quem desligou no perfil não tem o elo em nenhum dado do site
+    sem_elo_rid = {r for r in autorizados if r.lower() in set(cfg.get("_sem_elo") or [])}
+    SEM_ELO_PU.clear()
+    SEM_ELO_PU.update(ctx["puuid_de"][r] for r in sem_elo_rid if r in ctx["puuid_de"])
 
     membros_info = {slug[r]: {"slug": slug[r], "apelido": gr.apelido(r, cfg),
                               "riot": r if site.get("mostrar_riot_id", False) else None,
                               "partidas": 0, "ultima": None, "card": None, "tier": 0, "tn": "Unrated",
                               "lvl": None, "funcoes": Counter(), "agentes": Counter()} for r in autorizados}
+    for r in sem_elo_rid:
+        membros_info[slug[r]]["tn"] = ELO_OCULTO
 
     if PASTA_DATA_ANTIGA.exists():  # migração: os dados saem da pasta pública do site
         shutil.rmtree(PASTA_DATA_ANTIGA, ignore_errors=True)
@@ -692,6 +701,8 @@ def exportar(cfg=None, verificar=False):
             j = a["jogadores"][pu]
             membros_time = [p for p in puuid_todos if p in a["jogadores"] and a["jogadores"][p]["time"] == j["time"]]
             m = resumo_membro(a, bruta, j, membros_time, cfg, refs, mvp_partida, mvp_times, puuid_aut, posicao.get(pu))
+            if pu in SEM_ELO_PU:
+                m["tier"], m["tn"] = 0, ELO_OCULTO
             sl = puuid_aut[pu]
             resumo[sl] = m
             info = membros_info[sl]
@@ -723,13 +734,13 @@ def exportar(cfg=None, verificar=False):
     tamanho += gravar(PASTA_DATA / "partidas.json", indice)
     for sl, c in calor.items():
         tamanho += gravar(PASTA_DATA / "calor" / f"{sl}.json", c)
-    faixas = {rid: faixa_de(membros_info[slug[rid]]["tn"]) for rid in autorizados}
+    faixas = {rid: (None if rid in sem_elo_rid else faixa_de(membros_info[slug[rid]]["tn"])) for rid in autorizados}
     tamanho += gravar(PASTA_DATA / "avaliacao.json", avaliacao_json(ctx14, cfg, autorizados, slug, ctx, faixas))
     sem = semana_com_slugs(gr.resumo_semana(ctx, cfg, autorizados, datetime.now(av.FUSO_BR)), slug)
     tamanho += gravar(PASTA_DATA / "semana.json", sem)
     tamanho += gravar(PASTA_DATA / "semana_fechada.json", semana_fechada(ctx, cfg, autorizados, slug))
     tamanho += gravar(PASTA_DATA / "notas.json", notas_json(cfg, {p["id"] for p in indice}))
-    tamanho += gravar(PASTA_DATA / "elo.json", elo_json(autorizados, slug))
+    tamanho += gravar(PASTA_DATA / "elo.json", elo_json([r for r in autorizados if r not in sem_elo_rid], slug))
     atualizar_previa(site)
     tamanho += gravar(PASTA_DATA / "formacoes.json", formacoes_json(ctx, cfg, autorizados, slug))
     atr = atributos.calcular(ctx["analises"].values(), puuid_aut, cfg)

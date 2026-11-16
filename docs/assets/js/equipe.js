@@ -9,11 +9,17 @@ import { temCoroa, coroaSobre } from "./coroa.js";
 import { moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { abas, filtrosQuery } from "./jogador.js";
 import { viewTaticas, podeVerTaticas, contarTaticasPorMapa } from "./taticas.js";
+import { viewMapPool, viewComps, viewCalls, podeVerPlanejamento } from "./planejamento.js";
+import { viewAgenda } from "./agenda.js";
 
 export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
-  ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Destaques"], ["taticas", "Táticas"]];
-/** As abas que esta pessoa vê: Táticas só para a equipe (convidados não) */
-const abasEquipe = () => ABAS_EQUIPE.filter(([a]) => a !== "taticas" || podeVerTaticas());
+  ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Destaques"], ["taticas", "Táticas"],
+  ["agenda", "Agenda"], ["mappool", "Map pool"], ["comps", "Comps"], ["calls", "Calls"]];
+// Planejamento da equipe (v25): funciona mesmo sem partidas exportadas
+const ABAS_PLAN = { agenda: ["Agenda", viewAgenda], mappool: ["Map pool", viewMapPool], comps: ["Comps e defaults", viewComps], calls: ["Calls", viewCalls] };
+const SEM_DADOS = ["taticas", ...Object.keys(ABAS_PLAN)];
+/** As abas que esta pessoa vê: Táticas e o planejamento só para a equipe (convidados não) */
+const abasEquipe = () => ABAS_EQUIPE.filter(([a]) => (a !== "taticas" || podeVerTaticas()) && (!(a in ABAS_PLAN) || podeVerPlanejamento()));
 const membrosCom = () => B.equipe.filter((e) => e.partidas > 0);
 
 function cabecalhoEquipe(f) {
@@ -352,8 +358,17 @@ function cabecalhoSimples() {
 }
 
 export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
-  const lista = semDados ? ABAS_EQUIPE.filter(([a]) => a === "taticas") : abasEquipe();
-  aba = lista.some(([a]) => a === aba) ? aba : "visao";
+  const lista = semDados ? abasEquipe().filter(([a]) => SEM_DADOS.includes(a)) : abasEquipe();
+  aba = lista.some(([a]) => a === aba) ? aba : (semDados ? lista[0]?.[0] : "visao");
+  if (aba in ABAS_PLAN) {
+    const [titulo, view] = ABAS_PLAN[aba];
+    const t = view();
+    return {
+      titulo: `Equipe · ${titulo}`,
+      html: `${semDados ? cabecalhoSimples() : cabecalhoEquipe(f)}${abas("#/equipe", aba, lista, semDados ? "" : filtrosQuery(f))}${t.html}`,
+      depois: t.depois,
+    };
+  }
   if (aba === "taticas") {
     const t = await viewTaticas(q);
     return {

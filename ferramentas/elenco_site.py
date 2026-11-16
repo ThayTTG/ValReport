@@ -145,6 +145,8 @@ def misturar(cfg, elenco):
     c["apelidos"] = apelidos
     autorizados = list(site.get("jogadores_autorizados") or [])
     site["jogadores_autorizados"] = autorizados + [r for r in do_site if r.lower() not in {a.lower() for a in autorizados}]
+    # v25: quem desligou "mostrar meu elo" no perfil não tem o elo no site
+    c["_sem_elo"] = sorted({m["riot_id"].lower() for m in elenco.get("membros") or [] if m.get("riot_id") and m.get("mostrar_elo") is False})
     c["_elenco_site"] = True
     return c, {"do_site": do_site, "do_config": do_config, "fora": fora, "trocou": trocou, "puuids": puuids}
 

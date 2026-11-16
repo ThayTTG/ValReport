@@ -213,9 +213,38 @@ def carregar_contexto(dia, cfg):
         elenco_site.lembrar_puuids(puuid_de)
     except Exception:  # noqa: BLE001
         pass
+    # Partidas que a liderança tirou das contas de alguém (v25): o jogador sai da análise daquela partida
+    excl = exclusoes_por_partida(cfg, equipe, puuid_de)
+    if excl:
+        import exclusoes
+        n = sum(exclusoes.aplicar(analises[mid], pus) for mid, pus in excl.items() if mid in analises)
+        if n:
+            print(f"Partidas excluídas: {n} participação(ões) fora das contas.")
     refs = av.calcular_referencias(list(analises.values()), set(puuid_de.values()), cfg)
     return {"dia": dia, "fim": fim, "ini_janela": ini_janela, "modelo": modelo, "analises": analises,
-            "puuid_de": puuid_de, "refs": refs, "equipe": equipe, "brutas": {}}
+            "puuid_de": puuid_de, "refs": refs, "equipe": equipe, "brutas": {}, "excluidas": excl}
+
+
+def exclusoes_por_partida(cfg, equipe, puuid_de):
+    """{match_id: {puuid}} das partidas fora das contas (pelo slug do site de cada jogador)."""
+    try:
+        import exclusoes
+        lista = exclusoes.buscar(cfg)
+    except Exception as e:  # noqa: BLE001 — sem a lista, nada é excluído (a coleta nunca para por isso)
+        print(f"Partidas excluídas: ignoradas nesta execução ({e}).")
+        return {}
+    if not lista:
+        return {}
+    pu_do_slug = {}
+    for rid in equipe:
+        pu = puuid_de.get(rid) or av.PUUIDS.get(rid.lower())
+        if pu:
+            pu_do_slug[nome_arquivo(apelido(rid, cfg)).lower()] = pu
+    out = {}
+    for mid, slug in lista:
+        if slug in pu_do_slug:
+            out.setdefault(mid, set()).add(pu_do_slug[slug])
+    return out
 
 
 def analise_de(ctx, mid, cfg):
@@ -223,7 +252,11 @@ def analise_de(ctx, mid, cfg):
         p = armazem.ler_partida(mid)
         if not p or not av.partida_valida(p):
             return None
-        ctx["analises"][mid] = av.analisar_partida_completa(p, ctx["modelo"], cfg)
+        a = av.analisar_partida_completa(p, ctx["modelo"], cfg)
+        if mid in (ctx.get("excluidas") or {}):
+            import exclusoes
+            exclusoes.aplicar(a, ctx["excluidas"][mid])
+        ctx["analises"][mid] = a
     return ctx["analises"][mid]
 
 

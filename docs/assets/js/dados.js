@@ -103,13 +103,13 @@ export function itensDe(slug, f = FILTROS_PADRAO) {
   const out = [];
   for (const p of B.partidas) {
     const m = p.m[slug];
-    if (m && passaPartida(p, f) && passaMembro(m, f)) out.push({ p, m, slug });
+    if (m && passaPartida(p, f) && passaMembro(m, f) && !B.excluidas?.has(`${p.id}|${slug}`)) out.push({ p, m, slug });
   }
   return out;
 }
 /** Partidas da equipe (qualquer membro visível), com os filtros de partida */
 export function partidasDaEquipe(f = FILTROS_PADRAO) {
-  return B.partidas.filter((p) => passaPartida(p, f) && Object.values(p.m).some((m) => passaMembro(m, f)));
+  return B.partidas.filter((p) => passaPartida(p, f) && Object.entries(p.m).some(([s, m]) => passaMembro(m, f) && !B.excluidas?.has(`${p.id}|${s}`)));
 }
 
 // ---------- Agregação ----------

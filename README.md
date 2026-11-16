@@ -19,7 +19,8 @@ Report diário e site de estatísticas da nossa equipe de VALORANT, com partidas
 ### Abas do site
 
 - **Por jogador:** Geral · Partidas · Agentes · Mapas · Armas · Performance (com evolução de elo e recordes pessoais) · Mapa de calor (filtra por tipo de round)
-- **Equipe:** Visão geral (com ranking) · Semana (MVP, comparação com a semana anterior, rounds para rever) · Partidas · Formações · Sinergia · Comparar · Mapas (com o plano da IGL) · Recordes
+- **Equipe:** Visão geral (com ranking) · Semana (MVP, comparação com a semana anterior, rounds para rever) · Partidas · Formações · Sinergia · Comparar · Mapas (com o plano da IGL) · Recordes · Táticas
+- **Planejamento (v25):** Agenda (treinos, scrims, campeonatos, presença, Google/.ics) · Map pool (votação 7..1 ou pontos definidos pela liderança) · Comps (5 agentes + defaults de ataque e defesa por mapa, com print do lugar) · Calls
 - **Por partida:** Placar · Rounds (killfeed, economia e leitura de cada round) · Mapa 2D · Leitura da equipe · Notas da IGL
 - **Filtros:** fila, temporada, período, mapa, agente e "com quem" (sem a equipe, com a equipe, com uma pessoa específica)
 
@@ -32,6 +33,10 @@ Report diário e site de estatísticas da nossa equipe de VALORANT, com partidas
 - **Régua “vs elo”:** o mesmo índice comparado só com quem joga a mesma função na mesma faixa de elo.
 - **Notas da IGL:** a IGL escreve o plano de cada mapa e a leitura de partidas e rounds num editor local, e as notas aparecem no site.
 - **App instalável:** o site funciona como app no celular (PWA), com ícone e leitura sem internet, e tem prévia bonita quando o link é compartilhado.
+
+- **Playmaker:** Chamber sem outro sentinela na comp e Yoru com outro duelista contam como Playmaker, com média e pesos próprios.
+- **Partidas fora das contas:** a liderança tira uma partida das estatísticas de um jogador (outra pessoa jogou na conta, jogou passando mal...).
+- **Elo opcional:** cada um escolhe no perfil se o elo aparece no site.
 
 A metodologia completa está na página **Sobre** do site e em [`avaliacao.py`](ferramentas/avaliacao.py).
 

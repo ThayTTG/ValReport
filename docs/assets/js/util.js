@@ -41,9 +41,9 @@ export function relativo(iso, ref = new Date()) {
 export const FILAS = { competitive: "Competitivo", premier: "Premier", custom: "Personalizada", unrated: "Sem classificação", swiftplay: "Swiftplay" };
 export const nomeFila = (id) => FILAS[id] || (id ? id[0].toUpperCase() + id.slice(1) : "Outra");
 export const TIPOS = { pistol: "Pistol", eco: "Eco", force: "Force", armado: "Armado", "anti-eco": "Anti-eco" };
-export const FUNCOES_ICONE = { Duelista: "⚔", Iniciador: "◎", Controlador: "◐", Sentinela: "▣" };
+export const FUNCOES_ICONE = { Duelista: "⚔", Iniciador: "◎", Controlador: "◐", Sentinela: "▣", Playmaker: "✦" };
 const TIERS = { Iron: "Ferro", Bronze: "Bronze", Silver: "Prata", Gold: "Ouro", Platinum: "Platina", Diamond: "Diamante", Ascendant: "Ascendente", Immortal: "Imortal", Radiant: "Radiante", Unrated: "Sem rank", Unranked: "Sem rank" };
-export const nomeTier = (tn) => { if (!tn) return "Sem rank"; const [a, b] = tn.split(" "); return (TIERS[a] || a) + (b ? ` ${b}` : ""); };
+export const nomeTier = (tn) => { if (!tn) return "Sem rank"; if (tn === "Oculto") return "Elo oculto"; const [a, b] = tn.split(" "); return (TIERS[a] || a) + (b ? ` ${b}` : ""); };
 const ORDEM_TIERS = ["Iron", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Ascendant", "Immortal"];
 /** Nome do elo pelo número do tier (3 = Ferro 1 ... 27 = Radiante) */
 export const nomeTierId = (id) => (id >= 27 ? "Radiante" : id >= 3 ? `${TIERS[ORDEM_TIERS[Math.floor((id - 3) / 3)]]} ${((id - 3) % 3) + 1}` : "Sem rank");

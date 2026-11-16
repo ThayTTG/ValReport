@@ -1,5 +1,6 @@
 // Detalhe de uma partida: Placar, Rounds (killfeed + economia + leitura), Mapa 2D e Leitura da equipe
 
+import { cartaoExclusoes, ligarExclusoes } from "./planejamento.js";
 import { md, esc, num, sinal, imagem, imgAgente, imgRank, imgMapaSplash, imgArmaKill, imgHabilidade, nomeFila, nomeTier, dataHora, duracao, vazio, cartao, secao, selo, icone, classeSinal, TIPOS, FIM_ROUND, CERIMONIAS } from "./util.js";
 import { B, detalhe, notaPartida, notaRound } from "./dados.js";
 import { tabela, blocoNota } from "./componentes.js";
@@ -175,6 +176,8 @@ export async function viewPartida(id, aba, q) {
       el.querySelectorAll(".round-cel[data-n]").forEach((c) => c.classList.toggle("tem-nota", roundTemComentario(id, c.dataset.n)));
     }));
     ligarNotasPendentes(el, () => window.dispatchEvent(new HashChangeEvent("hashchange")));
+    ligarExclusoes(el, () => window.dispatchEvent(new HashChangeEvent("hashchange")));
   };
+  if (aba === "placar") corpo += cartaoExclusoes(p);   // v25: liderança tira a partida das contas de alguém
   return { titulo: `${d.mapa} · ${dataHora(d.t)}`, html: `${cabecalho(d, p)}${abas(`#/p/${id}`, aba, lista)}<div class="secao">${corpo}</div>`, depois };
 }

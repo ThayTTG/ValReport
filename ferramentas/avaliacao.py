@@ -40,7 +40,14 @@ FUNCOES_PADRAO = {
     "Controlador": ["Brimstone", "Viper", "Omen", "Astra", "Harbor", "Clove"],
     "Sentinela":   ["Sage", "Cypher", "Killjoy", "Chamber", "Deadlock", "Vyse", "Veto"],
 }
-FUNCOES = ["Duelista", "Iniciador", "Controlador", "Sentinela", "Outra"]
+FUNCOES = ["Duelista", "Iniciador", "Controlador", "Sentinela", "Playmaker", "Outra"]
+
+# Playmaker (v25): agentes que, dependendo da comp, jogam de criar jogada (pick, lurk, Operator) e não na função do jogo.
+#   Chamber: Playmaker quando o time não tem outro sentinela (ele não está segurando bomb sozinho de sentinela).
+#   Yoru:    Playmaker quando o time tem outro duelista (alguém faz o entry e ele joga de lurk / flanco).
+# Jett, Vyse e Phoenix ficam fora da conta automática (podem fazer o entry ou ser sentinela de verdade).
+# Para desligar: "playmaker": false no config.json.
+PLAYMAKERS = {"Chamber": ("Sentinela", "sem_outro"), "Yoru": ("Duelista", "com_outro")}
 
 # Métricas (todas por round). "menor_melhor" inverte o sinal na comparação.
 METRICAS = {
@@ -65,6 +72,7 @@ PESOS = {
     "Iniciador":   {"impacto": 3, "apr": 1.5, "kast": 1, "util_pr": 1, "trades_pr": 0.5, "adr": 0.5},
     "Controlador": {"impacto": 3, "kast": 1.5, "sobrevivencia": 1, "apr": 1, "util_pr": 1},
     "Sentinela":   {"impacto": 3, "kast": 1, "sobrevivencia": 1.5, "fdpr": 1, "trades_pr": 0.5, "adr": 0.5},
+    "Playmaker":   {"impacto": 3, "fkpr": 1.5, "kpr": 1, "sobrevivencia": 1, "adr": 0.5, "fdpr": 0.5},
     "Outra":       {"impacto": 3, "kast": 1, "kpr": 1, "adr": 1},
 }
 
@@ -84,6 +92,9 @@ _MEDIAS = {
                     "kast": 0.73, "adr": 128, "sobrevivencia": 0.32, "trades_pr": 0.10, "util_pr": 2.5, "ult_pr": 0.07, "kills_hab_pr": 0.01},
     "Sentinela":   {"impacto": 1.5, "kpr": 0.67, "dpr": 0.68, "apr": 0.22, "fkpr": 0.08, "fdpr": 0.09,
                     "kast": 0.71, "adr": 128, "sobrevivencia": 0.32, "trades_pr": 0.09, "util_pr": 2.2, "ult_pr": 0.07, "kills_hab_pr": 0.02},
+    # entre duelista e sentinela: abre round com pick, mata bastante e precisa sobreviver (Operator, lurk)
+    "Playmaker":   {"impacto": 1.5, "kpr": 0.76, "dpr": 0.70, "apr": 0.20, "fkpr": 0.13, "fdpr": 0.11,
+                    "kast": 0.70, "adr": 142, "sobrevivencia": 0.30, "trades_pr": 0.10, "util_pr": 2.0, "ult_pr": 0.08, "kills_hab_pr": 0.02},
 }
 
 
@@ -114,6 +125,27 @@ def opcoes(cfg):
         "peso_trocada": cfg.get("peso_morte_trocada", 0.5),
         "peso_assist": cfg.get("peso_assistencia", 0.25),
     }
+
+
+def aplicar_playmaker(jogadores, cfg=None):
+    """Troca a função para "Playmaker" conforme a comp do time de cada um (ver PLAYMAKERS). Muda os dicts no lugar."""
+    cfg = cfg or {}
+    if cfg.get("playmaker") is False:
+        return
+    extras = cfg.get("funcoes_extras") or {}
+    por_time = defaultdict(list)
+    for j in jogadores.values():
+        por_time[j.get("time")].append(j)
+    for time in por_time.values():
+        base = {id(j): j["funcao"] for j in time}   # a comp como o jogo define (antes de qualquer troca)
+        for j in time:
+            regra = PLAYMAKERS.get(j.get("agente"))
+            if not regra or j["agente"] in extras:
+                continue
+            funcao_base, quando = regra
+            outros = sum(1 for o in time if o is not j and base[id(o)] == funcao_base)
+            if (quando == "sem_outro" and outros == 0) or (quando == "com_outro" and outros > 0):
+                j["funcao"] = "Playmaker"
 
 
 def funcao_do_agente(agente, cfg=None):
@@ -352,6 +384,8 @@ def analisar_partida_completa(partida, modelo=None, cfg=None):
             "rounds": [],
             "rounds_afk": 0,
         }
+
+    aplicar_playmaker(jogadores, cfg)
 
     for pos, r in enumerate(rounds):
         rid = r.get("id", pos)
