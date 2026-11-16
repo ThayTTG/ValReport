@@ -18,6 +18,7 @@ import elenco_site
 
 PASTA = Path(__file__).resolve().parent.parent
 ARQ_CACHE = PASTA / "dados" / "exclusoes.json"
+ARQ_EXPORTADO = PASTA / "dados" / "cache" / "ajustes_exportados.json"
 
 _memoria = {}   # uma busca por execução
 
@@ -73,3 +74,31 @@ def aplicar(analise, excluidos_pu):
             analise.setdefault("excluidos", {})[pu] = j
             n += 1
     return n
+
+
+# ---------- Refazer o site quando a liderança muda algo (sem esperar partida nova) ----------
+# A coleta rápida só exporta quando chega partida nova. Tirar/voltar uma partida das contas ou mudar a escolha
+# de mostrar o elo também muda os números (atributos, Índice, recordes...), então conta como novidade.
+
+def assinatura(cfg):
+    """O que, além das partidas, muda os dados do site: partidas fora das contas e quem esconde o elo."""
+    return {"excluidas": sorted(f"{m}|{s}" for m, s in buscar(cfg)),
+            "sem_elo": sorted((cfg or {}).get("_sem_elo") or [])}
+
+
+def mudou_desde_exportacao(cfg):
+    try:
+        antes = json.loads(ARQ_EXPORTADO.read_text(encoding="utf-8")).get("assinatura")
+    except (OSError, ValueError):
+        antes = None
+    return antes != assinatura(cfg)
+
+
+def marcar_exportado(cfg):
+    try:
+        ARQ_EXPORTADO.parent.mkdir(parents=True, exist_ok=True)
+        ARQ_EXPORTADO.write_text(json.dumps({"assinatura": assinatura(cfg),
+                                             "em": datetime.now(timezone.utc).isoformat(timespec="seconds")},
+                                            ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        pass

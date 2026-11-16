@@ -930,7 +930,14 @@ def exportar_e_publicar(cfg=None):
     site = cfg.get("site") or {}
     if site.get("ativo", True) is False:
         return False
-    return bool(exportar(cfg)) and enviar_supabase(cfg)
+    ok = bool(exportar(cfg)) and enviar_supabase(cfg)
+    if ok:
+        try:  # v25: lembra com quais exclusões/elo oculto o site foi gerado (a coleta rápida refaz quando mudar)
+            import exclusoes
+            exclusoes.marcar_exportado(cfg)
+        except Exception:  # noqa: BLE001
+            pass
+    return ok
 
 
 if __name__ == "__main__":

@@ -651,8 +651,22 @@ def _rapido_travado(chave, cfg):
     if pend["jogadores"]:
         salvar_json(ARQ_PENDENTES, pend)
     if not novas_total:
-        print("Nenhuma partida nova. Até daqui a pouco!")
-        return erros > 0
+        # v25: a liderança tirou/voltou uma partida das contas ou alguém mudou a escolha do elo: refaz o site
+        try:
+            import exclusoes
+            ajustes = exclusoes.mudou_desde_exportacao(cfg)
+        except Exception as e:  # noqa: BLE001
+            log(f"Coleta rápida: não consegui conferir as partidas fora das contas ({e}).")
+            ajustes = False
+        if not ajustes:
+            print("Nenhuma partida nova. Até daqui a pouco!")
+            return erros > 0
+        import exportar_site
+        site = cfg.get("site") or {}
+        if site.get("ativo", True) is not False and not exportar_site.exportar_e_publicar(cfg):
+            log("Site exportado, mas não enviado ao Supabase (veja a mensagem acima).")
+        log("Coleta rápida: nenhuma partida nova, mas a lista de partidas fora das contas (ou do elo oculto) mudou; site refeito.")
+        return True
     if cfg.get("coletar_elo", True):
         for riot_id in com_novas:
             try:
