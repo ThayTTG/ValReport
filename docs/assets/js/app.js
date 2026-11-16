@@ -19,6 +19,7 @@ import { viewPartida } from "./partida.js";
 import { viewEquipe } from "./equipe.js";
 import { viewTatica, podeVerTaticas } from "./taticas.js";
 import { comAgendaNoInicio } from "./agenda.js";
+import { comMapPool } from "./planejamento.js";
 import { carregarExcluidas } from "./planejamento.js";
 import { carregarContagem } from "./comentarios.js";
 import { viewSobre } from "./sobre.js";
@@ -95,7 +96,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
     else if (partes[0] === "tatica" && partes[1]) v = await viewTatica(decodeURIComponent(partes[1]), partes[2] || "", q);
     else if (tela === "sem-dados" && partes[0] === "equipe" && ["taticas", "agenda", "mappool", "comps", "calls"].includes(partes[1])) v = await viewEquipe(partes[1], f, q, { semDados: true });
     else if (tela === "sem-dados") v = { titulo: "Sem dados", html: avisoSemDados };
-    else if (!partes.length) v = comAgendaNoInicio(viewHoje(q));
+    else if (!partes.length) v = comAgendaNoInicio(comMapPool(viewHoje(q)));
     else if (partes[0] === "equipe") v = await viewEquipe(partes[1] || "visao", f, q);
     else if (partes[0] === "j") v = await viewJogador(decodeURIComponent(partes[1] || ""), partes[2] || "geral", f, q);
     else if (partes[0] === "p") v = await viewPartida(decodeURIComponent(partes[1] || ""), partes[2] || "placar", q);
@@ -337,13 +338,13 @@ botaoAtualizar.addEventListener("click", () => atualizarTudo());
 // ---------- Botão Atualizar (v26): pede a coleta na hora e espera os dados refeitos ----------
 // A coleta refaz estatísticas, atributos, Índice e recordes mesmo sem partida nova (partidas fora das contas, elo
 // oculto...). O banco segura o ritmo (nuvem_disparo_manual): uma chamada a cada 4 minutos para a equipe toda.
-let esperandoColeta = false;
-async function atualizarTudo() {
-  if (esperandoColeta) { avisar("Já estou atualizando; os dados chegam em instantes."); return; }
+let esperandoColeta = false, pedidoEm = 0, ultimaMudanca = 0, tempoMudanca = null, tempoRepetir = null;
+async function atualizarTudo({ automatico = false } = {}) {
+  if (esperandoColeta) { if (!automatico) avisar("Já estou atualizando; os dados chegam em instantes."); return; }
   const antes = B.meta?.gerado_em;
   await conferirDados(false);
-  if (B.meta?.gerado_em !== antes) return;   // já tinha dados novos prontos: carregou e avisou
-  if (B.editor || tela !== "app" || B.equipeAtual?.slug !== EQUIPE_PADRAO) { avisar(`Tudo em dia · dados de ${dataHora(B.meta.gerado_em)}`); return; }
+  if (B.meta?.gerado_em !== antes && !(ultimaMudanca > pedidoEm)) return;   // já tinha dados novos prontos: carregou e avisou
+  if (B.editor || tela !== "app" || B.equipeAtual?.slug !== EQUIPE_PADRAO) { if (!automatico) avisar(`Tudo em dia · dados de ${dataHora(B.meta.gerado_em)}`); return; }
   let j = null;
   try {
     const t = await token();
@@ -351,13 +352,27 @@ async function atualizarTudo() {
       body: JSON.stringify({ modo: "atualizar" }) });
     j = await r.json().catch(() => null);
   } catch (e) {
-    avisar("Sem conexão agora. Tente de novo daqui a pouco.", "erro");
+    if (!automatico) avisar("Sem conexão agora. Tente de novo daqui a pouco.", "erro");
     return;
   }
-  if (!j?.ok && j?.codigo !== "recente") { avisar(j?.motivo || "Não deu para atualizar agora.", "erro"); return; }
-  avisar(j.ok ? "Atualizando estatísticas e atributos… leva de 2 a 4 minutos." : j.motivo, "novo");
-  esperarColeta(antes);
+  if (!j?.ok && j?.codigo !== "recente") { if (!automatico || j?.codigo !== "sem_sql") avisar(j?.motivo || "Não deu para atualizar agora.", "erro"); return; }
+  const ultimo = j.ultimo ? Date.parse(j.ultimo) : 0;
+  if (!j.ok && ultimo && ultimo <= pedidoEm && ultimaMudanca > ultimo) {
+    // a atualização em andamento começou antes da última mudança: pede de novo quando o freio de 4 minutos passar
+    clearTimeout(tempoRepetir);
+    tempoRepetir = setTimeout(() => atualizarTudo({ automatico: true }), Math.max(15e3, ultimo + 4 * 60e3 + 5e3 - Date.now()));
+    return;
+  }
+  pedidoEm = j.ok ? Date.now() : ultimo || Date.now();
+  if (!automatico || j.ok) avisar(j.ok ? "Atualizando estatísticas e atributos… leva de 2 a 4 minutos." : j.motivo, "novo");
+  esperarColeta(B.meta?.gerado_em);
 }
+// Partida tirada ou devolvida às contas: espera 20 s (para juntar várias seguidas) e pede a atualização
+window.addEventListener("valreport:atualizar", (ev) => {
+  ultimaMudanca = ev.detail?.mudanca || Date.now();
+  clearTimeout(tempoMudanca);
+  tempoMudanca = setTimeout(() => atualizarTudo({ automatico: true }), 20 * 1000);
+});
 async function esperarColeta(antes) {
   esperandoColeta = true;
   botaoAtualizar.classList.add("girando-icone", "aguardando");
@@ -368,7 +383,12 @@ async function esperarColeta(antes) {
       await new Promise((ok) => setTimeout(ok, 30 * 1000));
       try {
         const meta = await metaFresca();
-        if (meta.gerado_em !== antes) { await conferirDados(true); return; }
+        if (meta.gerado_em !== antes) {
+          await conferirDados(true);
+          // alguém mudou a lista depois que esta coleta começou: pede mais uma
+          if (ultimaMudanca > pedidoEm) setTimeout(() => atualizarTudo({ automatico: true }), 1000);
+          return;
+        }
       } catch (e) { /* sem conexão agora: tenta na próxima volta */ }
     }
     avisar("A atualização está demorando. Os dados aparecem sozinhos quando chegarem.");

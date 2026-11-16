@@ -788,7 +788,9 @@ export async function alternarExclusao(partida, slug, excluir, resumo = {}) {
   try {
     await rpc("excluir_partida", { p_equipe: B.equipeAtual.id, p_partida: partida, p_slug: slug, p_excluir: excluir, p_motivo: motivo, p_resumo: resumo });
     await carregarExcluidas();
-    avisar(excluir ? "Partida fora das contas ✓" : "A partida volta a contar ✓", "novo");
+    avisar(excluir ? "Partida fora das contas ✓ · atualizando Índice e atributos…" : "A partida volta a contar ✓ · atualizando Índice e atributos…", "novo");
+    // v26: pede a coleta para refazer o que é calculado nela (Índice, atributos, recordes...); várias seguidas viram um pedido só
+    window.dispatchEvent(new CustomEvent("valreport:atualizar", { detail: { mudanca: Date.now() } }));
     return true;
   } catch (e) {
     avisar(faltaSql(e) ? "Falta rodar o supabase/planejamento.sql no banco." : textoErro(e), "erro");
@@ -799,7 +801,8 @@ export async function alternarExclusao(partida, slug, excluir, resumo = {}) {
 /** Cartão no placar da partida: quem conta e quem não conta (a liderança muda) */
 export function cartaoExclusoes(p) {
   if (!p || B.editor || !B.equipeAtual) return "";
-  const slugs = Object.keys(p.m || {});
+  // quem foi excluído some do resumo da partida depois da coleta: entra de volta pela lista de excluídas
+  const slugs = [...new Set([...Object.keys(p.m || {}), ...(B.excluidasLista || []).filter((x) => x.partida === p.id).map((x) => x.slug)])];
   const fora = slugs.filter((s) => estaExcluida(p.id, s));
   const edita = podeEditarPlanejamento();
   if (!edita && !fora.length) return "";
@@ -850,4 +853,42 @@ export function ligarExcluidasJogador(el, slug, aoMudar) {
     if (await alternarExclusao(b.dataset.voltarContar, slug, false)) aoMudar?.();
     else b.disabled = false;
   });
+}
+
+// =====================================================================
+// RESUMO DA MAP POOL (v26): no Início e na Visão geral da equipe
+// =====================================================================
+/** { html, depois(main) }: a pool na ordem (picks e ban), com quem definiu. Fica vazio para quem não vê o planejamento. */
+export function blocoMapPool({ titulo = "Map pool da equipe" } = {}) {
+  if (!podeVerPlanejamento()) return { html: "", depois: () => {} };
+  return {
+    html: `<section class="secao mappool-resumo" data-mappool-resumo hidden></section>`,
+    depois: async (main) => {
+      const el = main.querySelector("[data-mappool-resumo]");
+      if (!el) return;
+      try {
+        const [d] = await Promise.all([lerPlanejamento(), carregarAgentes(), carregarMapas()]);
+        if (!el.isConnected) return;
+        const r = resultadoPool(d);
+        const membros = d.membros || [];
+        const meuVoto = (d.votos || []).some((v) => v.usuario_id === d.eu && v.ranking?.length === r.pool.length);
+        const vazia = !r.manual && !r.votos.votantes;
+        const origem = r.manual ? `definida pela liderança${d.pontos_manuais_por ? ` (${esc(d.pontos_manuais_por)})` : ""}`
+          : `${r.votos.votantes} de ${membros.length} votaram`;
+        el.innerHTML = `<div class="secao__titulo"><h2>${esc(titulo)}</h2>
+            <a class="pequeno" href="#/equipe/mappool">${vazia || (!r.manual && !meuVoto) ? "Votar" : "Ver votação"}</a></div>
+          ${vazia ? `<div class="cartao"><p class="suave pequeno">Ninguém votou ainda. <a href="#/equipe/mappool">Abrir a votação</a>.</p></div>`
+            : `${cartoesPool(d, r)}<p class="suave pequeno mappool-resumo__origem">${origem}${!r.manual && !meuVoto ? ` · <a href="#/equipe/mappool">falta o seu voto</a>` : ""}</p>`}`;
+        el.hidden = false;
+      } catch (e) {
+        el.hidden = true;   // sem o planejamento.sql (ou sem conexão): o resto da página segue normal
+      }
+    },
+  };
+}
+/** Junta o resumo da map pool numa view { html, depois } (no fim ou no começo) */
+export function comMapPool(v, { noComeco = false } = {}) {
+  const b = blocoMapPool();
+  if (!b.html) return v;
+  return { ...v, html: noComeco ? `${b.html}${v.html}` : `${v.html}${b.html}`, depois: async (main) => { if (v.depois) await v.depois(main); await b.depois(main); } };
 }

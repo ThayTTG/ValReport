@@ -9,7 +9,7 @@ import { temCoroa, coroaSobre } from "./coroa.js";
 import { moldeMapa, desenharCalor, calloutMaisProximo } from "./graficos.js";
 import { abas, filtrosQuery } from "./jogador.js";
 import { viewTaticas, podeVerTaticas, contarTaticasPorMapa } from "./taticas.js";
-import { viewMapPool, viewComps, viewCalls, podeVerPlanejamento } from "./planejamento.js";
+import { viewMapPool, viewComps, viewCalls, podeVerPlanejamento, blocoMapPool } from "./planejamento.js";
 import { viewAgenda } from "./agenda.js";
 
 export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
@@ -381,7 +381,7 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
   let corpo = "", depois = null;
   const semFiltros = ["formacoes", "semana"].includes(aba);
   if (!B.partidas.length) corpo = vazio("Ainda não há partidas exportadas", "<p>Rode o report no PC para gerar os dados do site.</p>");
-  else if (aba === "visao") corpo = visao(f);
+  else if (aba === "visao") { const mp = blocoMapPool(); corpo = mp.html + visao(f); depois = mp.depois; }   // v26: a pool votada no topo
   else if (aba === "partidas") { const ps = partidasDaEquipe(f); corpo = listaEquipe(ps.slice(0, Number(q.get("n") || 40))) || vazio("Nenhuma partida com estes filtros"); if (ps.length > Number(q.get("n") || 40)) corpo += `<p style="text-align:center;margin-top:14px"><button class="limpar" type="button" data-param="n" data-valor="${Number(q.get("n") || 40) + 40}">Mostrar mais</button></p>`; }
   else if (aba === "formacoes") corpo = formacoes();
   else if (aba === "semana") corpo = semana();

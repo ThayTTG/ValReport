@@ -1817,7 +1817,7 @@ button.chip { cursor: pointer; }
 .pool__mapa--ban { filter: grayscale(.85); opacity: .78; }
 .pool__mapa--ban strong { text-decoration: line-through 2px var(--derrota); }
 .pool__mapa--ban .pool__n { background: var(--derrota); }
-@media (max-width: 560px) { .pool { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pool__mapa { min-height: 130px; } .pool__mapa--ban { grid-column: span 2; min-height: 84px; } }
+@media (max-width: 560px) { .pool { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pool__mapa { min-height: 130px; } .pool__mapa--ban { grid-column: span 2; min-height: 104px; } }
 
 @media (min-width: 980px) { .grade-2--voto { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); align-items: start; } }
 .voto { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
@@ -2049,3 +2049,10 @@ div.posicao[data-plan-acao] { cursor: zoom-in; }
 .excluidas-discreta > summary:hover, .excluidas-discreta[open] > summary { opacity: 1; background: color-mix(in srgb, currentColor 8%, transparent); }
 .excluidas-discreta > summary .icone, .excluidas-discreta > summary svg { width: 14px; height: 14px; }
 .excluidas-discreta > .cartao { margin-top: 8px; }
+
+/* v26: resumo da map pool no Início e na Visão geral */
+.mappool-resumo[hidden] { display: none; }
+.mappool-resumo .pool__mapa { min-height: 128px; }
+.mappool-resumo__origem { margin-top: 8px; }
+.mappool-resumo { margin-bottom: 22px; }
+@media (max-width: 560px) { .mappool-resumo .pool__mapa { min-height: 96px; } .mappool-resumo .pool__mapa--ban { min-height: 104px; } }
