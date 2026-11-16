@@ -522,7 +522,7 @@ export async function viewJogador(slug, aba, f, q) {
   else if (aba === "habilidades") corpo = htmlHabilidadesJogador(agrupar(itens, (it) => it.m.ag)) || vazio("Sem contagem de habilidades", `<p>As partidas destes filtros foram exportadas antes do contador existir. Na próxima publicação pelo PC elas passam a aparecer aqui.</p>`);
   else if (aba === "performance") corpo = performance(e, itens, s, q);
   if (aba === "partidas" && e.partidas) {   // v25: as partidas que a liderança tirou das contas
-    corpo = listaExcluidasDe(slug) + corpo;
+    corpo += listaExcluidasDe(slug);   // no fim da página, recolhida
     const antes = depois;
     depois = (el) => { antes?.(el); ligarExcluidasJogador(el, slug, () => window.dispatchEvent(new HashChangeEvent("hashchange"))); };
   }

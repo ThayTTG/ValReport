@@ -2040,3 +2040,12 @@ div.posicao[data-plan-acao] { cursor: zoom-in; }
 .tipo-linha { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: center; }
 .tipo-linha input[type=color] { width: 44px; height: 40px; padding: 2px; border-radius: 10px; border: 1px solid var(--borda); background: var(--superficie-2); cursor: pointer; }
 .janela__erro[hidden] { display: none !important; }
+
+/* v26: partidas fora das estatísticas, recolhidas no fim da aba Partidas do jogador */
+.excluidas-discreta { margin-top: 28px; }
+.excluidas-discreta > summary { list-style: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: .8rem; color: var(--suave, inherit); opacity: .75; padding: 4px 8px; border-radius: 999px; }
+.excluidas-discreta > summary::-webkit-details-marker { display: none; }
+.excluidas-discreta > summary:hover, .excluidas-discreta[open] > summary { opacity: 1; background: color-mix(in srgb, currentColor 8%, transparent); }
+.excluidas-discreta > summary .icone, .excluidas-discreta > summary svg { width: 14px; height: 14px; }
+.excluidas-discreta > .cartao { margin-top: 8px; }

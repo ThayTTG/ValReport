@@ -826,19 +826,24 @@ export function ligarExclusoes(el, aoMudar) {
   }));
 }
 /** Na aba Partidas do jogador: as partidas que estão fora das contas dele */
+let excluidasAberta = false;   // continua aberta depois de "Voltar a contar"
 export function listaExcluidasDe(slug) {
   const lista = (B.excluidasLista || []).filter((x) => x.slug === slug);
   if (!lista.length) return "";
   const edita = podeEditarPlanejamento();
-  return `<section class="cartao secao exclusoes" data-exclusoes-jogador>
-    <div class="cartao__titulo"><h3>Fora das estatísticas · ${lista.length}</h3></div>
+  return `<details class="excluidas-discreta secao" data-exclusoes-jogador${excluidasAberta ? " open" : ""}>
+    <summary>${icone("olho")}${lista.length} partida${lista.length === 1 ? "" : "s"} fora das estatísticas</summary>
+    <div class="cartao exclusoes">
     ${lista.map((x) => `<div class="exclusoes__linha"><span><a href="#/p/${esc(x.partida)}"><strong>${esc(x.resumo?.mapa || "Partida")}</strong></a>
         <span class="suave pequeno">${x.resumo?.t ? ` · ${esc(dataHora(x.resumo.t))}` : ""}${x.resumo?.agente ? ` · ${esc(x.resumo.agente)}` : ""}${x.resumo?.kda ? ` · ${esc(x.resumo.kda)}` : ""}${x.motivo ? ` · ${esc(x.motivo)}` : ""}${x.por ? ` · por ${esc(x.por)}` : ""}</span></span>
       ${edita ? `<button type="button" class="botao-secundario botao-mini" data-voltar-contar="${esc(x.partida)}">Voltar a contar</button>` : ""}</div>`).join("")}
-  </section>`;
+    </div>
+  </details>`;
 }
 export function ligarExcluidasJogador(el, slug, aoMudar) {
-  el.querySelector("[data-exclusoes-jogador]")?.addEventListener("click", async (ev) => {
+  const caixa = el.querySelector("[data-exclusoes-jogador]");
+  caixa?.addEventListener("toggle", () => { excluidasAberta = caixa.open; });
+  caixa?.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-voltar-contar]");
     if (!b) return;
     b.disabled = true;
