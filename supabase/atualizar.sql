@@ -63,3 +63,65 @@ grant execute on function public.pc_elenco_equipe(text) to service_role;
 
 -- Conferência: deve mostrar true
 select exists (select 1 from pg_proc where proname = 'nuvem_disparo_manual') as atualizar_pronto;
+
+-- =====================================================================
+-- v34: manter alguém como jogador numa equipe Premier, mesmo fora do elenco do jogo
+-- (ex.: quem joga com a equipe mas não está no elenco oficial do Premier). Precisa do etapa3b.sql.
+-- A liderança marca a pessoa em Membros e convites; a sincronização do Premier não rebaixa mais quem está marcado.
+-- =====================================================================
+alter table public.membros add column if not exists liberado_premier boolean not null default false;
+
+-- Só o elenco do jogo (sem a liberação)
+create or replace function public.no_elenco_premier_jogo(p_equipe uuid, p_usuario uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.equipes e join public.perfis p on p.id = p_usuario
+    where e.id = p_equipe and p.riot_verificado_em is not null and p.riot_puuid is not null
+      and coalesce(e.premier_elenco, '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('puuid', p.riot_puuid)))
+$$;
+-- "Pode jogar pela equipe Premier": está no elenco do jogo OU a liderança liberou.
+-- Todas as regras do Premier (cargos, sincronização, sucessão da liderança) usam esta função.
+create or replace function public.no_elenco_premier(p_equipe uuid, p_usuario uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.no_elenco_premier_jogo(p_equipe, p_usuario)
+      or exists (select 1 from public.membros m where m.equipe_id = p_equipe and m.usuario_id = p_usuario and m.liberado_premier)
+$$;
+
+-- Liberar (ou tirar a liberação). Quem perde a liberação e está fora do elenco volta a convidado.
+create or replace function public.premier_liberar(p_equipe uuid, p_usuario uuid, p_liberar boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not (public.eh_admin() or public.e_lideranca(p_equipe)) then
+    raise exception 'Somente a liderança muda isso.' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.equipes where id = p_equipe and tipo = 'premier') then
+    raise exception 'Essa equipe não é Premier.' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.membros where equipe_id = p_equipe and usuario_id = p_usuario) then
+    raise exception 'Essa pessoa não está na equipe.' using errcode = 'P0001';
+  end if;
+  if coalesce(p_liberar, false) then
+    update public.membros set liberado_premier = true where equipe_id = p_equipe and usuario_id = p_usuario;
+  else
+    perform set_config('valreport.sincronizando', 'sim', true);
+    update public.membros
+       set liberado_premier = false,
+           cargo = case when cargo in ('colider', 'jogador') and not public.no_elenco_premier_jogo(p_equipe, p_usuario) then 'convidado' else cargo end::public.cargo
+     where equipe_id = p_equipe and usuario_id = p_usuario;
+    perform set_config('valreport.sincronizando', '', true);
+  end if;
+end $$;
+
+-- Quem está liberado (para a página Membros mostrar o selo e o botão)
+create or replace function public.premier_liberados(p_equipe uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(m.usuario_id), '[]'::jsonb) from public.membros m
+   where m.equipe_id = p_equipe and m.liberado_premier and (public.eh_membro(p_equipe) or public.eh_admin())
+$$;
+
+revoke execute on function public.no_elenco_premier_jogo(uuid, uuid), public.no_elenco_premier(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.premier_liberar(uuid, uuid, boolean), public.premier_liberados(uuid) from public, anon;
+grant execute on function public.premier_liberar(uuid, uuid, boolean), public.premier_liberados(uuid) to authenticated;
+
+-- Conferência: deve mostrar true
+select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'membros' and column_name = 'liberado_premier') as liberar_pronto;

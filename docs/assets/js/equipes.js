@@ -406,6 +406,9 @@ export async function viewTime(slug, aba = "membros") {
   if (aba === "convites") {
     try { convites = await rpc("listar_convites", { p_equipe: d.id }); } catch (e) { convites = []; }
   }
+  if (aba === "membros" && d.tipo === "premier" && (d.sou_membro || d.admin)) {   // v34: quem a liderança liberou fora do elenco
+    try { d.liberados = await rpc("premier_liberados", { p_equipe: d.id }) || []; } catch (e) { d.liberados = null; }
+  }
   if (aba === "membros") corpo = abaMembros(d, lider);
   else if (aba === "convites") corpo = abaConvites(d, convites);
   else corpo = abaAjustes(d, lider);
@@ -424,7 +427,7 @@ function blocoElenco(d) {
       ${d.lideranca ? `<button class="botao-secundario botao-mini" type="button" data-premier-sincronizar>${icone("atualizar")} Atualizar elenco</button>` : ""}</div>
     ${liderFora && d.lideranca ? `<p class="aviso">${icone("info")}<span>A liderança atual não está no elenco do Premier. Quando alguém do elenco entrar no site, passe a liderança para essa pessoa.</span></p>` : ""}
     ${elencoHtml(p.elenco, (m) => m.no_site)}
-    <p class="suave pequeno">Só quem está neste elenco, com o Riot ID verificado, pode ser líder, co-líder ou jogador. ${p.sincronizado_em ? `Elenco conferido em ${esc(dataHora(p.sincronizado_em))}.` : ""}
+    <p class="suave pequeno">Só quem está neste elenco, com o Riot ID verificado, pode ser líder, co-líder ou jogador. Quem joga com a equipe fora dele: use “Manter como jogador” em Membros. ${p.sincronizado_em ? `Elenco conferido em ${esc(dataHora(p.sincronizado_em))}.` : ""}
       O elenco também é conferido todo dia pela coleta.</p></section>`;
 }
 
@@ -439,16 +442,22 @@ function abaMembros(d, lider) {
     if (d.lideranca && m.usuario_id && m.riot_id_pedido && d.status === "aprovada") {
       acoes.push(`<button class="botao-primario botao-mini" type="button" data-acao="confirmar" data-riot="${esc(m.riot_id_pedido)}" title="Confirme que essa conta é mesmo dessa pessoa">Confirmar Riot ID</button>`);
     }
+    const liberado = premier && (d.liberados || []).includes(m.usuario_id);
+    if (premier && d.liberados && d.lideranca && m.usuario_id && m.cargo !== "lider" && d.status === "aprovada" && (liberado || !m.no_elenco)) {
+      acoes.push(liberado
+        ? `<button class="botao-secundario botao-mini" type="button" data-acao="liberar" data-valor="0" title="Volta a valer o elenco do Premier: fora dele, vira convidado">Tirar liberação</button>`
+        : `<button class="botao-secundario botao-mini" type="button" data-acao="liberar" data-valor="1" title="Joga pela equipe e entra nas estatísticas, mesmo fora do elenco do Premier">Manter como jogador</button>`);
+    }
     if (lider && m.usuario_id && m.cargo !== "lider" && d.status === "aprovada") {
       const fora = premier && !m.no_elenco;   // fora do elenco do Premier: só treinador ou convidado
       acoes.push(`<select data-acao="cargo" aria-label="Cargo de ${esc(m.apelido)}">${CARGOS_EDITAVEIS.map((c) => `<option value="${c}"${c === m.cargo ? " selected" : ""}${fora && ["colider", "jogador"].includes(c) ? " disabled" : ""}>${esc(nomeCargo(c))}${fora && ["colider", "jogador"].includes(c) ? " (só elenco)" : ""}</option>`).join("")}</select>`);
       if (!fora) acoes.push(`<button class="botao-secundario botao-mini" type="button" data-acao="lideranca">Passar a liderança</button>`);
     }
     if (podeExpulsar) acoes.push(`<button class="botao-perigo botao-mini" type="button" data-acao="expulsar">Remover</button>`);
-    return `<li class="integrante" data-usuario="${esc(m.usuario_id || "")}" data-apelido="${esc(m.apelido)}"${/^#[0-9a-f]{6}$/i.test(m.cor || "") ? ` style="--cor-perfil:${m.cor}"` : ""}>
+    return `<li class="integrante" data-usuario="${esc(m.usuario_id || "")}" data-apelido="${esc(m.apelido)}" data-cargo="${esc(m.cargo)}"${/^#[0-9a-f]{6}$/i.test(m.cor || "") ? ` style="--cor-perfil:${m.cor}"` : ""}>
       <span class="integrante__avatar">${imagem(imgCard(m.riot_card), "", "", m.apelido)}</span>
       <div class="integrante__texto"><strong>${esc(m.apelido)}${m.eu ? ` <span class="suave">(você)</span>` : ""}</strong>
-        <span><span class="selo">${esc(nomeCargo(m.cargo))}</span>${m.no_elenco ? ` <span class="selo selo--premier" title="Está no elenco do Premier">${icone("escudo")} elenco</span>` : ""}${m.protegido ? ` <span class="selo selo--alerta" title="16 ou 17 anos">modo protegido</span>` : ""} ${riot}</span></div>
+        <span><span class="selo">${esc(nomeCargo(m.cargo))}</span>${liberado ? ` <span class="selo selo--destaque" title="Fora do elenco do Premier, mas a liderança manteve como jogador">${icone("escudo")} liberado</span>` : m.no_elenco ? ` <span class="selo selo--premier" title="Está no elenco do Premier">${icone("escudo")} elenco</span>` : ""}${m.protegido ? ` <span class="selo selo--alerta" title="16 ou 17 anos">modo protegido</span>` : ""} ${riot}</span></div>
       ${acoes.length ? `<div class="integrante__acoes">${acoes.join("")}</div>` : ""}</li>`;
   };
   return `${blocoElenco(d)}<p class="vagas${d.premier ? " secao" : ""}"><span><strong>${d.vagas.jogadores}/7</strong> jogadores (liderança inclusa)</span><span><strong>${d.vagas.extras}/8</strong> treinadores e convidados</span></p>
@@ -526,6 +535,15 @@ function ligarTime(el, d) {
     } else if (b.dataset.acao === "lideranca") {
       if (!confirm(`Passar a liderança para ${apelido}? Você vira co-líder (ou jogador, se já houver 2 co-líderes).`)) return;
       acao(b, () => rpc("passar_lideranca", { p_equipe: d.id, p_usuario: alvo }));
+    } else if (b.dataset.acao === "liberar") {
+      const liberar = b.dataset.valor === "1", convidado = li.dataset.cargo === "convidado", lider = d.admin || d.meu_cargo === "lider";
+      if (!confirm(liberar
+        ? `Manter ${apelido} como jogador mesmo fora do elenco do Premier?${convidado && lider ? " Ele(a) passa de convidado a jogador e" : " Ele(a)"} entra nas estatísticas, e a sincronização do Premier não rebaixa mais.`
+        : `Tirar a liberação de ${apelido}? Se não estiver no elenco do Premier, volta a convidado e sai das estatísticas.`)) return;
+      acao(b, async () => {
+        await rpc("premier_liberar", { p_equipe: d.id, p_usuario: alvo, p_liberar: liberar });
+        if (liberar && convidado && lider) await rpc("definir_cargo", { p_equipe: d.id, p_usuario: alvo, p_cargo: "jogador" });
+      });
     } else if (b.dataset.acao === "expulsar") {
       if (!confirm(`Remover ${apelido} da equipe?`)) return;
       acao(b, () => rpc("expulsar_membro", { p_equipe: d.id, p_usuario: alvo }));
