@@ -171,6 +171,8 @@ export function ligarPaleta() {
     botao.setAttribute("aria-label", `Ir para página, jogador ou mapa (${atalhoPaleta})`);
     botao.setAttribute("aria-haspopup", "dialog");
     botao.removeAttribute("aria-controls");
+    // no computador, o botão vira um campo "Buscar… Ctrl K"
+    if (!botao.querySelector(".buscar__texto")) botao.insertAdjacentHTML("beforeend", `<span class="buscar__texto">Buscar…</span><kbd class="buscar__atalho">${atalhoPaleta}</kbd>`);
     botao.addEventListener("click", () => abrirPaleta());
   }
   document.addEventListener("keydown", (ev) => {

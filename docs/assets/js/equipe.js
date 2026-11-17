@@ -15,6 +15,27 @@ import { viewAgenda } from "./agenda.js";
 export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
   ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Destaques"], ["taticas", "Táticas"],
   ["agenda", "Agenda"], ["mappool", "Map pool"], ["comps", "Comps"], ["calls", "Calls"]];
+// v32: as 13 telas viram 8 abas principais; as do mesmo assunto ficam como sub-abas (os endereços continuam os mesmos)
+export const GRUPOS_EQUIPE = { semana: ["semana", "recordes"], formacoes: ["formacoes", "sinergia"], mapas: ["mapas", "mappool", "comps", "calls"] };
+export const PRINCIPAIS_EQUIPE = [["visao", "Visão geral", "equipe"], ["partidas", "Partidas", "nota"], ["semana", "Semana", "relogio"], ["comparar", "Comparar", "filtro"],
+  ["formacoes", "Formações", "rota"], ["mapas", "Mapas", "mapa"], ["taticas", "Táticas", "slides"], ["agenda", "Agenda", "calendario"]];
+const NOME_SUB = { semana: "Resumo", recordes: "Destaques", formacoes: "Formações", sinergia: "Sinergia", mapas: "Desempenho", mappool: "Map pool", comps: "Comp e defaults", calls: "Calls" };
+/** A aba principal de uma tela (ex.: "comps" → "mapas") */
+export const paiDe = (aba) => Object.keys(GRUPOS_EQUIPE).find((p) => GRUPOS_EQUIPE[p].includes(aba)) || aba;
+/** As abas principais que esta pessoa vê, cada uma com o endereço da primeira tela visível: [[pai, nome, ícone, destino]] */
+export function principaisVisiveis(visiveis = abasEquipe().map(([a]) => a)) {
+  const vis = new Set(visiveis);
+  return PRINCIPAIS_EQUIPE.map(([p, nome, ic]) => [p, nome, ic, (GRUPOS_EQUIPE[p] || [p]).find((a) => vis.has(a))]).filter((x) => x[3]);
+}
+function abasDaEquipe(aba, lista, q = "") {
+  const pai = paiDe(aba), vis = lista.map(([a]) => a);
+  const principais = principaisVisiveis(vis);
+  const subs = (GRUPOS_EQUIPE[pai] || []).filter((a) => vis.includes(a));
+  return `<nav class="abas abas--equipe" aria-label="Seções da equipe">${principais.map(([p, nome, , destino]) =>
+      `<a class="aba ${p === pai ? "ativa" : ""}" href="#/equipe/${destino}${q}"${p === pai ? ' aria-current="page"' : ""}>${esc(nome)}</a>`).join("")}</nav>
+    ${subs.length > 1 ? `<nav class="subabas" aria-label="${esc(PRINCIPAIS_EQUIPE.find(([p]) => p === pai)?.[1] || "")}">${subs.map((a) =>
+      `<a class="subaba ${a === aba ? "ativa" : ""}" href="#/equipe/${a}${q}"${a === aba ? ' aria-current="page"' : ""}>${esc(NOME_SUB[a] || a)}</a>`).join("")}</nav>` : ""}`;
+}
 // Planejamento da equipe (v25): funciona mesmo sem partidas exportadas
 const ABAS_PLAN = { agenda: ["Agenda", viewAgenda], mappool: ["Map pool", viewMapPool], comps: ["Comps e defaults", viewComps], calls: ["Calls", viewCalls] };
 const SEM_DADOS = ["taticas", ...Object.keys(ABAS_PLAN)];
@@ -365,7 +386,7 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
     const t = view(q);
     return {
       titulo: `Equipe · ${titulo}`,
-      html: `${semDados ? cabecalhoSimples() : cabecalhoEquipe(f)}${abas("#/equipe", aba, lista, semDados ? "" : filtrosQuery(f))}${t.html}`,
+      html: `${semDados ? cabecalhoSimples() : cabecalhoEquipe(f)}${abasDaEquipe(aba, lista, semDados ? "" : filtrosQuery(f))}${t.html}`,
       depois: t.depois,
     };
   }
@@ -373,7 +394,7 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
     const t = await viewTaticas(q);
     return {
       titulo: "Equipe · Táticas",
-      html: `${semDados ? cabecalhoSimples() : cabecalhoEquipe(f)}${abas("#/equipe", aba, lista, semDados ? "" : filtrosQuery(f))}<div class="secao">${t.html}</div>`,
+      html: `${semDados ? cabecalhoSimples() : cabecalhoEquipe(f)}${abasDaEquipe(aba, lista, semDados ? "" : filtrosQuery(f))}<div class="secao">${t.html}</div>`,
       depois: t.depois,
     };
   }
@@ -390,8 +411,8 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
   else if (aba === "comparar") corpo = comparar(f, q);
   else if (aba === "mapas") ({ html: corpo, depois } = await mapasEquipe(f, q));
   return {
-    titulo: `Equipe · ${ABAS_EQUIPE.find(([a]) => a === aba)[1]}`,
-    html: `${cabecalhoEquipe(f)}${abas("#/equipe", aba, lista, qs)}${semFiltros ? "" : barraFiltros(f, null, { mostrar: ["fila", "temporada", "periodo", "mapa"] })}<div class="secao">${corpo}</div>`,
+    titulo: `Equipe · ${NOME_SUB[aba] && paiDe(aba) !== aba ? `${PRINCIPAIS_EQUIPE.find(([p]) => p === paiDe(aba))[1]} · ` : ""}${ABAS_EQUIPE.find(([a]) => a === aba)[1]}`,
+    html: `${cabecalhoEquipe(f)}${abasDaEquipe(aba, lista, qs)}${semFiltros ? "" : barraFiltros(f, null, { mostrar: ["fila", "temporada", "periodo", "mapa"] })}<div class="secao">${corpo}</div>`,
     depois,
   };
 }

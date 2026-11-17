@@ -1,9 +1,8 @@
-// Menu lateral do celular: o topo mostra só o logo e a foto; o resto (navegação, busca, atualizar, tema...) fica aqui
+// Menu da conta (a foto no topo): perfil, equipes, atualizar, instalar, tema, sair. A navegação fica em navegacao.js
 
 import { esc, icone, imagem, imgCard } from "./util.js";
 import { B } from "./dados.js";
 import { usuario, sair } from "./nuvem.js";
-import { podeVerTaticas } from "./taticas.js";
 
 export const CELULAR = matchMedia("(max-width: 700px)");
 let obterTela = () => "app";
@@ -26,25 +25,15 @@ function montar() {
   const escuro = (document.documentElement.dataset.tema || (matchMedia("(prefers-color-scheme: light)").matches ? "claro" : "escuro")) === "escuro";
   const instalavel = !document.getElementById("instalar")?.hidden;
   const secoes = [];
-  if (tela === "app") {
-    secoes.push([
-      item("inicio", "Início", { href: "#/", atual: em("/") }),
-      item("equipe", "Equipe", { href: "#/equipe", atual: em("/equipe") && !em("/equipe/taticas") }),
-      podeVerTaticas() ? item("mapa", "Táticas", { href: "#/equipe/taticas", atual: em("/equipe/taticas") || em("/tatica/") }) : "",
-      B.equipeAtual?.slug ? item("escudo", "Membros e convites", { href: `#/time/${B.equipeAtual.slug}`, atual: em(`/time/${B.equipeAtual.slug}`) }) : "",
-      item("info", "Sobre e créditos", { href: "#/sobre", atual: em("/sobre") }),
-    ].join(""));
+  // v32: Início, Equipe, Táticas e Sobre ficam na sidebar (computador) e na barra de baixo (celular)
+  if (["app", "sem-dados"].includes(tela) && B.equipeAtual?.slug) {
+    secoes.push(item("escudo", "Membros e convites", { href: `#/time/${B.equipeAtual.slug}`, atual: em(`/time/${B.equipeAtual.slug}`) }));
   }
-  if (tela === "sem-dados" && podeVerTaticas()) {
-    secoes.push([
-      item("mapa", "Táticas", { href: "#/equipe/taticas", atual: em("/equipe/taticas") || em("/tatica/") }),
-      B.equipeAtual?.slug ? item("escudo", "Membros e convites", { href: `#/time/${B.equipeAtual.slug}`, atual: em(`/time/${B.equipeAtual.slug}`) }) : "",
-    ].join(""));
-  }
+  if (!["app", "sem-dados"].includes(tela)) secoes.push(item("info", "Sobre e créditos", { href: "#/sobre", atual: em("/sobre") }));
   if (p.apelido) {
     secoes.push([
       item("equipe", "Minhas equipes", { href: "#/equipes", atual: em("/equipes") }),
-      item("busca", "Procurar jogador", { acao: "buscar" }),
+      item("busca", "Procurar (Ctrl K)", { acao: "buscar" }),
       c.admin ? item("escudo", "Painel da administradora", { href: "#/painel", atual: em("/painel") && !em("/painel/sync") && !em("/painel/diagnostico") && !em("/painel/configuracao"), extra: B.pendencias?.equipes_pendentes ? `<b class="gaveta__selo">${B.pendencias.equipes_pendentes}</b>` : "" }) : "",
       c.admin ? item("atualizar", "Sync dos dados", { href: "#/painel/sync", atual: em("/painel/sync") }) : "",
       c.admin ? item("info", "Diagnóstico", { href: "#/painel/diagnostico", atual: em("/painel/diagnostico") }) : "",
@@ -52,7 +41,7 @@ function montar() {
     ].join(""));
   }
   secoes.push([
-    tela === "app" ? item("atualizar", "Procurar partidas novas", { acao: "atualizar" }) : "",
+    tela === "app" ? item("atualizar", "Atualizar dados", { acao: "atualizar" }) : "",
     instalavel ? item("instalar", "Instalar o app", { acao: "instalar" }) : "",
     item(escuro ? "sol" : "lua", escuro ? "Tema claro" : "Tema escuro", { acao: "tema" }),
     item("nokylabs", "Voltar para a NokyLabs", { href: "https://thayttg.github.io/nokylabs/" }),
@@ -129,12 +118,10 @@ export function ligarGaveta(tela) {
   obterTela = tela;
   const chip = document.getElementById("conta-link");
   chip?.setAttribute("aria-haspopup", "dialog");
-  chip?.addEventListener("click", (ev) => {
-    if (!CELULAR.matches) return;
+  chip?.addEventListener("click", (ev) => {   // v32: em qualquer tela, a foto abre o menu da conta
     ev.preventDefault();
     abrirGaveta();
   });
   document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") fecharGaveta(); });
   window.addEventListener("hashchange", fecharGaveta);
-  CELULAR.addEventListener?.("change", () => { if (!CELULAR.matches) fecharGaveta(); });
 }

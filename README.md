@@ -16,12 +16,14 @@ Report diário e site de estatísticas da nossa equipe de VALORANT, com partidas
 | **Cards e Discord** (`cards.py`, `mapa_calor.py`, `discord_envio.py`) | Desenha cards em imagem (tema escuro, vertical) e manda tudo para os canais da equipe por webhook. |
 | **Site** (`exportar_site.py` + `docs/`) | Exporta os dados para JSON e publica um site estático, mobile-first, com tema claro e escuro. |
 
-### Abas do site
+### Navegação do site
 
-- **Por jogador:** Geral · Partidas · Agentes · Mapas · Armas · Performance (com evolução de elo e recordes pessoais) · Mapa de calor (filtra por tipo de round)
-- **Equipe:** Visão geral (com ranking) · Semana (MVP, comparação com a semana anterior, rounds para rever) · Partidas · Formações · Sinergia · Comparar · Mapas (com o plano da IGL) · Recordes · Táticas
-- **Planejamento (v25):** Agenda (treinos, scrims, campeonatos, presença, Google/.ics) · Map pool (votação 7..1 ou pontos definidos pela liderança) · Comps (5 agentes + defaults de ataque e defesa por mapa, com print do lugar) · Calls
+- **Computador:** sidebar (dá para recolher e deixar só os ícones) com Início, as seções da Equipe, a Estratégia e os jogadores (com foto, coroa do MVP e elo). No topo ficam só a busca (Ctrl+K) e a foto, que abre o menu da conta (atualizar, instalar, tema, sair).
+- **Celular:** barra fixa embaixo com Início · Equipe · Mapas · Agenda · Jogadores.
+- **Equipe (8 seções):** Visão geral · Partidas · Semana (Resumo · Destaques) · Comparar · Formações (Formações · Sinergia) · Mapas (Desempenho · Map pool · Comp e defaults · Calls) · Táticas · Agenda
+- **Por jogador:** Geral · Partidas · Agentes · Mapas · Armas · Habilidades · Performance · Atributos
 - **Por partida:** Placar · Rounds (killfeed, economia e leitura de cada round) · Mapa 2D · Leitura da equipe · Notas da IGL
+- **Ctrl+K (ou "/"):** vai direto para qualquer página, jogador, aba, mapa ou partida recente, e procura jogadores por nick#tag.
 - **Filtros:** fila, temporada, período, mapa, agente e "com quem" (sem a equipe, com a equipe, com uma pessoa específica)
 
 ### O que é diferente de um tracker comum

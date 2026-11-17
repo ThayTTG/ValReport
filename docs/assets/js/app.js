@@ -21,6 +21,7 @@ import { viewTatica, podeVerTaticas } from "./taticas.js";
 import { comAgendaNoInicio } from "./agenda.js";
 import { comMapPool } from "./planejamento.js";
 import { ligarPaleta } from "./paleta.js";
+import { ligarNavegacao, atualizarNavegacao } from "./navegacao.js";
 import { carregarExcluidas } from "./planejamento.js";
 import { carregarContagem } from "./comentarios.js";
 import { viewSobre } from "./sobre.js";
@@ -121,6 +122,8 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
 }
 
 function marcarNavegacao(partes) {
+  atualizarNavegacao();   // v32: sidebar e barra de baixo
+  ajustarTopo();
   const sec = !partes.length ? "inicio" : partes[0] === "sobre" ? "sobre" : ["equipe", "equipes", "time", "tatica"].includes(partes[0]) ? "equipe" : ["conta", "painel", "perfil"].includes(partes[0]) ? "conta" : "";
   document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("ativo", a.dataset.nav === sec));
   const slug = partes[0] === "j" ? partes[1] : null;
@@ -579,5 +582,6 @@ async function iniciar() {
 }
 window.addEventListener("valreport:recarregar", () => location.reload());
 ligarGaveta(() => tela);
+ligarNavegacao(() => tela);
 document.getElementById("entrar-topo")?.addEventListener("click", () => entrar());
 iniciar();
