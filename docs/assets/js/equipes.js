@@ -448,10 +448,13 @@ function abaMembros(d, lider) {
         ? `<button class="botao-secundario botao-mini" type="button" data-acao="liberar" data-valor="0" title="Volta a valer o elenco do Premier: fora dele, vira convidado">Tirar liberação</button>`
         : `<button class="botao-secundario botao-mini" type="button" data-acao="liberar" data-valor="1" title="Joga pela equipe e entra nas estatísticas, mesmo fora do elenco do Premier">Manter como jogador</button>`);
     }
-    if (lider && m.usuario_id && m.cargo !== "lider" && d.status === "aprovada") {
+    // v35: o co-líder também define cargos (de jogador, treinador e convidado, sem promover a co-líder)
+    const coLider = !lider && d.meu_cargo === "colider" && ["jogador", "treinador", "convidado"].includes(m.cargo) && !m.eu;
+    if ((lider || coLider) && m.usuario_id && m.cargo !== "lider" && d.status === "aprovada") {
       const fora = premier && !m.no_elenco;   // fora do elenco do Premier: só treinador ou convidado
-      acoes.push(`<select data-acao="cargo" aria-label="Cargo de ${esc(m.apelido)}">${CARGOS_EDITAVEIS.map((c) => `<option value="${c}"${c === m.cargo ? " selected" : ""}${fora && ["colider", "jogador"].includes(c) ? " disabled" : ""}>${esc(nomeCargo(c))}${fora && ["colider", "jogador"].includes(c) ? " (só elenco)" : ""}</option>`).join("")}</select>`);
-      if (!fora) acoes.push(`<button class="botao-secundario botao-mini" type="button" data-acao="lideranca">Passar a liderança</button>`);
+      const cargos = lider ? CARGOS_EDITAVEIS : CARGOS_EDITAVEIS.filter((c) => c !== "colider");
+      acoes.push(`<select data-acao="cargo" aria-label="Cargo de ${esc(m.apelido)}">${cargos.map((c) => `<option value="${c}"${c === m.cargo ? " selected" : ""}${fora && ["colider", "jogador"].includes(c) ? " disabled" : ""}>${esc(nomeCargo(c))}${fora && ["colider", "jogador"].includes(c) ? " (só elenco)" : ""}</option>`).join("")}</select>`);
+      if (!fora && lider) acoes.push(`<button class="botao-secundario botao-mini" type="button" data-acao="lideranca">Passar a liderança</button>`);
     }
     if (podeExpulsar) acoes.push(`<button class="botao-perigo botao-mini" type="button" data-acao="expulsar">Remover</button>`);
     return `<li class="integrante" data-usuario="${esc(m.usuario_id || "")}" data-apelido="${esc(m.apelido)}" data-cargo="${esc(m.cargo)}"${/^#[0-9a-f]{6}$/i.test(m.cor || "") ? ` style="--cor-perfil:${m.cor}"` : ""}>
@@ -463,7 +466,7 @@ function abaMembros(d, lider) {
   return `${blocoElenco(d)}<p class="vagas${d.premier ? " secao" : ""}"><span><strong>${d.vagas.jogadores}/7</strong> jogadores (liderança inclusa)</span><span><strong>${d.vagas.extras}/8</strong> treinadores e convidados</span></p>
     <ul class="integrantes">${d.membros.map(linha).join("")}</ul>
     ${d.ocultos ? `<p class="suave pequeno">+${d.ocultos} membro${d.ocultos === 1 ? "" : "s"} no modo protegido (só a equipe vê).</p>` : ""}
-    ${lider && d.status === "aprovada" ? `<p class="suave pequeno">Cargos: até 2 co-líderes e 2 treinadores. Co-líderes criam convites, confirmam Riot IDs e removem jogadores, treinadores e convidados. Convidados não veem as notas da IGL.</p>` : ""}`;
+    ${(lider || d.meu_cargo === "colider") && d.status === "aprovada" ? `<p class="suave pequeno">Cargos: até 2 co-líderes e 2 treinadores. Co-líderes também mudam o cargo de jogadores, treinadores e convidados. Co-líderes criam convites, confirmam Riot IDs e removem jogadores, treinadores e convidados. Convidados não veem as notas da IGL.</p>` : ""}`;
 }
 
 function abaConvites(d, convites) {
@@ -536,7 +539,7 @@ function ligarTime(el, d) {
       if (!confirm(`Passar a liderança para ${apelido}? Você vira co-líder (ou jogador, se já houver 2 co-líderes).`)) return;
       acao(b, () => rpc("passar_lideranca", { p_equipe: d.id, p_usuario: alvo }));
     } else if (b.dataset.acao === "liberar") {
-      const liberar = b.dataset.valor === "1", convidado = li.dataset.cargo === "convidado", lider = d.admin || d.meu_cargo === "lider";
+      const liberar = b.dataset.valor === "1", convidado = li.dataset.cargo === "convidado", lider = d.admin || ["lider", "colider"].includes(d.meu_cargo);
       if (!confirm(liberar
         ? `Manter ${apelido} como jogador mesmo fora do elenco do Premier?${convidado && lider ? " Ele(a) passa de convidado a jogador e" : " Ele(a)"} entra nas estatísticas, e a sincronização do Premier não rebaixa mais.`
         : `Tirar a liberação de ${apelido}? Se não estiver no elenco do Premier, volta a convidado e sai das estatísticas.`)) return;

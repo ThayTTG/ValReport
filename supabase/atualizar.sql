@@ -125,3 +125,29 @@ grant execute on function public.premier_liberar(uuid, uuid, boolean), public.pr
 
 -- Conferência: deve mostrar true
 select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'membros' and column_name = 'liberado_premier') as liberar_pronto;
+
+-- =====================================================================
+-- v35: co-líderes também definem cargos (de jogadores, treinadores e convidados, entre esses três cargos).
+-- Só a liderança principal promove a co-líder, mexe em outros co-líderes ou passa a liderança.
+-- =====================================================================
+create or replace function public.definir_cargo(p_equipe uuid, p_usuario uuid, p_cargo public.cargo)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_eu public.cargo := public.cargo_em(p_equipe); v_atual public.cargo;
+begin
+  if not (public.eh_admin() or v_eu in ('lider', 'colider')) then
+    raise exception 'Somente a liderança da equipe define cargos.' using errcode = '42501';
+  end if;
+  if p_cargo = 'lider' then raise exception 'Para trocar a liderança, use "Passar a liderança".' using errcode = 'P0001'; end if;
+  select cargo into v_atual from public.membros where equipe_id = p_equipe and usuario_id = p_usuario;
+  if v_atual is null then raise exception 'Essa pessoa não está na equipe.' using errcode = 'P0001'; end if;
+  if v_atual = 'lider' then raise exception 'Para mudar o cargo da liderança, passe a liderança antes.' using errcode = 'P0001'; end if;
+  if not public.eh_admin() and v_eu = 'colider' then
+    if p_usuario = auth.uid() then raise exception 'Você não muda o próprio cargo.' using errcode = 'P0001'; end if;
+    if v_atual = 'colider' or p_cargo = 'colider' then
+      raise exception 'Só a líder ou o líder promove ou muda co-líderes.' using errcode = '42501';
+    end if;
+  end if;
+  update public.membros set cargo = p_cargo where equipe_id = p_equipe and usuario_id = p_usuario;
+end $$;
+revoke execute on function public.definir_cargo(uuid, uuid, public.cargo) from public, anon;
+grant execute on function public.definir_cargo(uuid, uuid, public.cargo) to authenticated;
