@@ -82,3 +82,6 @@ export function avisar(texto, tipo = "") {
 
 /** Mensagem de erro do banco sem o prefixo técnico ("pontos: …" → "…") */
 export const textoErro = (e) => String(e?.message || e || "Algo deu errado.").replace(/^[a-z_áéíóúãõç ]+: /i, (m) => (m.length < 24 ? "" : m));
+
+// Um link dentro da janela (ex.: "Convide em Membros e convites") troca a página: a janela fecha junto
+window.addEventListener("hashchange", () => fecharJanela("cancelar"));

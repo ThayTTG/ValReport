@@ -2207,3 +2207,15 @@ body.com-nav .conta-chip { order: 2; }
 .folha__jogador > span:nth-child(2) { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .folha__jogador small { color: var(--suave); font-size: 12.5px; }
 .folha__elo { font-size: 12px; font-weight: 700; color: var(--texto-2); padding: 3px 9px; border-radius: 999px; background: var(--superficie-2); }
+
+/* v33: marcar o ponto da posição no minimapa */
+.marcar-ponto { display: grid; grid-template-columns: minmax(0, 260px) 1fr; gap: 16px; align-items: start; margin-top: 14px; padding: 12px; border: 1px solid var(--borda); border-radius: 14px; background: var(--superficie-2); }
+.marcar-ponto__mapa { position: relative; aspect-ratio: 1; border-radius: 10px; background: #0b0912; cursor: crosshair; overflow: hidden; touch-action: manipulation; }
+.marcar-ponto__mapa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; user-select: none; }
+.marcar-ponto__mapa:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+.marcar-ponto__pino { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--destaque); box-shadow: 0 0 0 3px #fff, 0 2px 8px rgb(0 0 0 / .5); pointer-events: none; }
+.marcar-ponto__pino.manual { background: #f5b83d; }
+.marcar-ponto__pino[hidden] { display: none; }
+.marcar-ponto__texto { display: grid; gap: 8px; justify-items: start; }
+.escolhas__dica { margin-top: 8px; }
+@media (max-width: 560px) { .marcar-ponto { grid-template-columns: 1fr; } }

@@ -87,7 +87,11 @@ export function avisoErro(e) {
 }
 
 // ---------- Membros ----------
-export const membroPor = (d, uid) => (d.membros || []).find((m) => m.usuario_id === uid);
+export const membroPor = (d, uid) => [...(d.membros || []), ...(d.convidados || [])].find((m) => m.usuario_id === uid);
+/** Quem pode entrar na comp e nas posições: a equipe e os convidados (sub, stand-in) */
+const escalaveis = (d) => [...(d.membros || []), ...(d.convidados || [])];
+const avisoFaltaAlguem = () => `<p class="suave pequeno escolhas__dica">Aparece quem tem conta no ValReport e está na equipe (convidados também). Falta alguém?
+  ${B.equipeAtual?.slug ? `<a href="#/time/${esc(B.equipeAtual.slug)}">Convide em Membros e convites</a>.` : "Convide pela página da equipe."}</p>`;
 export const fotoMembro = (m, classe = "avatar") => imagem(imgCard(m?.riot_card), m?.apelido || "?", classe, m?.apelido || "?");
 
 // ---------- Agentes e mapas da valorant-api ----------
@@ -142,22 +146,33 @@ function pontoDo(mapa, lugar) {
     let sc = resto.filter((w) => nw.includes(w)).length * 2 + resto.filter((w) => n.includes(w)).length + (site && nw[0] === site ? 1.5 : 0);
     if (sc > nota) { nota = sc; melhor = c; }
   }
-  return nota >= 2 ? conv(melhor) : null;
+  if (nota >= 2) return conv(melhor);
+  // v33: o nome pode estar com o bombsite trocado (ex.: "Mid Garage" é "C Garage" no Haven): procura só pelo resto do nome
+  if (site && resto.length) {
+    melhor = null; nota = 0;
+    for (const c of m.callouts) {
+      const n = norm(c[0]), nw = n.split(" ");
+      const sc = resto.filter((w) => nw.includes(w)).length * 2 + resto.filter((w) => n.includes(w)).length;
+      if (sc > nota) { nota = sc; melhor = c; }
+    }
+    if (nota >= 3) return conv(melhor);
+  }
+  return null;
 }
 const lugaresDo = (mapa) => [...new Set(((mapasEn || []).find((x) => x.nome.toLowerCase() === String(mapa).toLowerCase())?.callouts || []).map((c) => c[0]))].sort();
 
 /** O lugar da posição: o print da equipe (com o minimapa no canto) ou o minimapa com zoom no callout */
-function miniLugar(mapa, lugar, classe = "") {
-  const pt = pontoDo(mapa, lugar), mini = mapaPor(mapa)?.minimapa;
+function miniLugar(mapa, lugar, classe = "", ponto = null) {
+  const pt = ponto || pontoDo(mapa, lugar), mini = mapaPor(mapa)?.minimapa;
   if (!pt || !mini) return "";
   return `<span class="lugar ${classe}" style="--x:${pt.x.toFixed(4)};--y:${pt.y.toFixed(4)}"><img src="${esc(mini)}" alt="" loading="lazy" decoding="async"><i class="lugar__pino"></i></span>`;
 }
-export function imagemLugar(mapa, lugar, foto, { grande = false } = {}) {
+export function imagemLugar(mapa, lugar, foto, { grande = false, ponto = null } = {}) {
   const nome = lugar ? `<span class="lugar__nome">${esc(lugar)}</span>` : "";
   if (foto) {
-    return `<span class="lugar lugar--foto${grande ? " lugar--grande" : ""}"><img class="lugar__foto" src="${esc(foto)}" alt="Print de ${esc(lugar || "posição")}" loading="lazy" decoding="async">${miniLugar(mapa, lugar, "lugar--canto")}${nome}</span>`;
+    return `<span class="lugar lugar--foto${grande ? " lugar--grande" : ""}"><img class="lugar__foto" src="${esc(foto)}" alt="Print de ${esc(lugar || "posição")}" loading="lazy" decoding="async">${miniLugar(mapa, lugar, "lugar--canto", ponto)}${nome}</span>`;
   }
-  const mini = miniLugar(mapa, lugar, grande ? "lugar--grande" : "");
+  const mini = miniLugar(mapa, lugar, grande ? "lugar--grande" : "", ponto);
   return mini ? mini.replace("</span>", `${nome}</span>`) : `<span class="lugar lugar--vazio${grande ? " lugar--grande" : ""}">${icone("pino")}${nome}</span>`;
 }
 
@@ -206,8 +221,8 @@ function posicoesDoMapa(d, mapa, lado) {
 const conteudoMapa = (d, mapa) => ({ comp: compDe(d, mapa), ataque: posicoesDoMapa(d, mapa, "ataque"), defesa: posicoesDoMapa(d, mapa, "defesa") });
 const limparConteudo = (c) => ({
   comp: c.comp.map(({ agente, usuario }) => ({ agente: agente || "", usuario: usuario || null })),
-  ataque: c.ataque.map(({ rotulo, lugar, usuario, foto }) => ({ rotulo, lugar, usuario: usuario || null, foto: foto || null })),
-  defesa: c.defesa.map(({ rotulo, lugar, usuario, foto }) => ({ rotulo, lugar, usuario: usuario || null, foto: foto || null })),
+  ataque: c.ataque.map(({ rotulo, lugar, usuario, foto, ponto }) => ({ rotulo, lugar, usuario: usuario || null, foto: foto || null, ponto: ponto || null })),
+  defesa: c.defesa.map(({ rotulo, lugar, usuario, foto, ponto }) => ({ rotulo, lugar, usuario: usuario || null, foto: foto || null, ponto: ponto || null })),
 });
 const agenteDoJogador = (d, mapa, uid) => (uid ? compDe(d, mapa).find((c) => c.usuario === uid && c.agente)?.agente || "" : "");
 const escalados = (d, mapa) => ["ataque", "defesa"].reduce((n, l) => n + posicoesDoMapa(d, mapa, l).filter((p) => p.usuario).length, 0);
@@ -459,7 +474,7 @@ function desenharComps(d) {
       <div class="posicoes">${ps.map((p, i) => {
         const m = membroPor(d, p.usuario), ag = agenteDoJogador(d, mapa, p.usuario);
         const avisoP = p.usuario && rep.includes(p.usuario) ? "repetido neste lado" : p.usuario && nComp && !naComp.has(p.usuario) ? "fora da comp" : "";
-        const dentro = `${imagemLugar(mapa, p.lugar, p._url)}
+        const dentro = `${imagemLugar(mapa, p.lugar, p._url, { ponto: p.ponto })}
           <span class="posicao__nome">${esc(p.rotulo)}</span>
           <span class="posicao__jogador">${m ? `${fotoMembro(m, "comp__avatar")}<strong>${esc(m.apelido)}</strong>` : `<span class="suave">${edita ? `${icone("mais")} Escalar` : "Sem jogador"}</span>`}</span>
           ${ag ? `<span class="posicao__agente">${iconeAgente(ag, 20)}${esc(ag)}</span>` : ""}
@@ -510,8 +525,8 @@ async function editarComp(d, i, recarregar) {
     larga: true,
     corpo: `<fieldset class="campo"><legend>Jogador</legend><div class="escolhas escolhas--jogadores">
         <button type="button" class="escolha${atual.usuario ? "" : " ativa"}" data-jogador="">${icone("fechar")}<span>Ninguém</span></button>
-        ${(d.membros || []).map((m) => `<button type="button" class="escolha${atual.usuario === m.usuario_id ? " ativa" : ""}" data-jogador="${esc(m.usuario_id)}" data-mains="${esc((m.agentes || []).join(","))}">
-          ${fotoMembro(m, "comp__avatar")}<span>${esc(m.apelido)}</span>${(m.agentes || []).length ? `<span class="escolha__mains">${(m.agentes || []).slice(0, 3).map((a) => iconeAgente(a, 18)).join("")}</span>` : ""}</button>`).join("")}</div></fieldset>
+        ${escalaveis(d).map((m) => `<button type="button" class="escolha${atual.usuario === m.usuario_id ? " ativa" : ""}" data-jogador="${esc(m.usuario_id)}" data-mains="${esc((m.agentes || []).join(","))}">
+          ${fotoMembro(m, "comp__avatar")}<span>${esc(m.apelido)}${m.cargo === "convidado" ? ` <small class="suave">convidado</small>` : ""}</span>${(m.agentes || []).length ? `<span class="escolha__mains">${(m.agentes || []).slice(0, 3).map((a) => iconeAgente(a, 18)).join("")}</span>` : ""}</button>`).join("")}</div>${avisoFaltaAlguem()}</fieldset>
       <fieldset class="campo"><legend>Agente <small class="suave">· estrela = agente favorito do jogador escolhido</small></legend>
         <div class="segmentos" role="group">${["Todos", ...funcoesApi].map((f, k) => `<button type="button" aria-pressed="${k === 0}" data-funcao-filtro="${k === 0 ? "" : esc(f)}">${esc(f)}</button>`).join("")}</div>
         <div class="escolhas escolhas--agentes">
@@ -580,15 +595,33 @@ async function editarPosicao(d, lado, i, recarregar) {
           <small class="suave">Tire um print no jogo e <strong>cole aqui com Ctrl+V</strong>, ou arraste a imagem. Sem print, aparece o minimapa com o lugar marcado.</small>
         </div>
       </div>
+      ${mapaPor(mapa)?.minimapa ? `<div class="marcar-ponto">
+        <div class="marcar-ponto__mapa" data-marcar tabindex="0" role="button" aria-label="Toque no minimapa para marcar o ponto exato da posição">
+          <img src="${esc(mapaPor(mapa).minimapa)}" alt="Minimapa de ${esc(mapa)}" draggable="false"><i class="marcar-ponto__pino" data-pino hidden></i></div>
+        <div class="marcar-ponto__texto"><strong>Ponto no minimapa</strong>
+          <p class="suave pequeno" data-ponto-status></p>
+          <button type="button" class="botao-secundario botao-mini" data-ponto-limpar hidden>Voltar para o callout</button></div>
+      </div>` : ""}
       <fieldset class="campo"><legend>Jogador</legend><div class="escolhas escolhas--jogadores">
         <button type="button" class="escolha${p.usuario ? "" : " ativa"}" data-jogador="">${icone("fechar")}<span>Ninguém</span></button>
-        ${(d.membros || []).map((m) => { const ag = agenteDoJogador(d, mapa, m.usuario_id); return `<button type="button" class="escolha${p.usuario === m.usuario_id ? " ativa" : ""}" data-jogador="${esc(m.usuario_id)}">
-          ${fotoMembro(m, "comp__avatar")}<span>${esc(m.apelido)}</span>${ag ? `<span class="escolha__mains">${iconeAgente(ag, 18)}</span>` : ""}${m.usuario_id in tomadas ? `<small>já em ${esc(c[lado][tomadas[m.usuario_id]].rotulo)}</small>` : ""}</button>`; }).join("")}</div>
-        <p class="linha-agente" data-linha-agente>${linhaAgente(p.usuario)}</p></fieldset>`,
+        ${escalaveis(d).map((m) => { const ag = agenteDoJogador(d, mapa, m.usuario_id); return `<button type="button" class="escolha${p.usuario === m.usuario_id ? " ativa" : ""}" data-jogador="${esc(m.usuario_id)}">
+          ${fotoMembro(m, "comp__avatar")}<span>${esc(m.apelido)}${m.cargo === "convidado" ? ` <small class="suave">convidado</small>` : ""}</span>${ag ? `<span class="escolha__mains">${iconeAgente(ag, 18)}</span>` : ""}${m.usuario_id in tomadas ? `<small>já em ${esc(c[lado][tomadas[m.usuario_id]].rotulo)}</small>` : ""}</button>`; }).join("")}</div>
+        <p class="linha-agente" data-linha-agente>${linhaAgente(p.usuario)}</p>${avisoFaltaAlguem()}</fieldset>`,
     acoes: [["cancelar", "Cancelar"], ["ok", "Salvar", "botao-primario"]],
     aoAbrir: (f) => {
+      const pino = () => {
+        const el = f.querySelector("[data-pino]"), st = f.querySelector("[data-ponto-status]");
+        if (!el) return;
+        const pt = p.ponto || pontoDo(mapa, f.elements.lugar.value.trim());
+        el.hidden = !pt;
+        if (pt) { el.style.left = `${(pt.x * 100).toFixed(2)}%`; el.style.top = `${(pt.y * 100).toFixed(2)}%`; }
+        el.classList.toggle("manual", Boolean(p.ponto));
+        st.textContent = p.ponto ? "Marcado à mão. Toque em outro lugar para mudar." : pt ? "Achado pelo nome do callout. Se estiver errado, toque no lugar certo." : "Não achei esse callout no mapa. Toque no lugar certo para marcar.";
+        f.querySelector("[data-ponto-limpar]").hidden = !p.ponto;
+      };
       const previa = () => {
-        f.querySelector("[data-previa]").innerHTML = imagemLugar(mapa, f.elements.lugar.value.trim(), urlFoto, { grande: true });
+        pino();
+        f.querySelector("[data-previa]").innerHTML = imagemLugar(mapa, f.elements.lugar.value.trim(), urlFoto, { grande: true, ponto: p.ponto });
         f.querySelector("[data-foto-tirar]").hidden = !p.foto;
         f.querySelector("[data-foto-rotulo]").textContent = p.foto ? "Trocar print" : "Enviar print";
       };
@@ -608,6 +641,16 @@ async function editarPosicao(d, lado, i, recarregar) {
         finally { caixa.classList.remove("enviando"); }
       };
       f.elements.lugar.addEventListener("input", previa);
+      const marcar = f.querySelector("[data-marcar]");
+      marcar?.addEventListener("click", (ev) => {
+        const r = marcar.querySelector("img").getBoundingClientRect();
+        const x = (ev.clientX - r.left) / r.width, y = (ev.clientY - r.top) / r.height;
+        if (x < 0 || x > 1 || y < 0 || y > 1) return;
+        p.ponto = { x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000 };
+        previa();
+      });
+      f.querySelector("[data-ponto-limpar]")?.addEventListener("click", () => { p.ponto = null; previa(); });
+      pino();
       f.querySelector("[data-foto-arquivo]").addEventListener("change", (ev) => { receber(ev.target.files[0]); ev.target.value = ""; });
       f.querySelector("[data-foto-tirar]").addEventListener("click", () => { p.foto = null; urlFoto = null; previa(); });
       f.addEventListener("paste", (ev) => { const a = [...(ev.clipboardData?.files || [])].find((x) => x.type.startsWith("image/")); if (a) { ev.preventDefault(); receber(a); } });

@@ -138,7 +138,7 @@ export function htmlMidia(m, ctx, { titulo = "" } = {}) {
   if (!src) return `<div class="tat-midia tat-midia--vazia">${icone("info")} Link de vídeo inválido</div>`;
   const original = urlOriginal(m);
   // Capa do vídeo (só o YouTube dá a imagem sem login); as outras fontes ficam com o fundo padrão
-  const capa = m.fonte === "youtube" && REF_OK.youtube.test(m.ref || "") ? `https://i.ytimg.com/vi/${m.ref}/hqdefault.jpg` : "";
+  const capa = m.fonte === "youtube" && REF_OK.youtube.test(m.ref || "") ? `/api/capa?v=${encodeURIComponent(m.ref)}` : "";   // v33: pelo próprio site (ver api/capa.js)
   return `<div class="tat-midia${capa ? " tat-midia--capa" : ""}" data-embed="${esc(src)}" data-fonte="${esc(m.fonte)}">
       ${capa ? `<img class="tat-midia__capa" src="${esc(capa)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ""}
       <button class="tat-midia__play" type="button" aria-label="Assistir${titulo ? `: ${esc(titulo)}` : ""} (${esc(FONTES[m.fonte])})">
@@ -148,6 +148,8 @@ export function htmlMidia(m, ctx, { titulo = "" } = {}) {
     </div>
     ${original ? `<a class="tat-midia__original" href="${esc(original)}" target="_blank" rel="noopener noreferrer">Abrir no ${esc(FONTES[m.fonte])} ${icone("externo")}</a>` : ""}`;
 }
+// Se a capa não carregar, some (fica o fundo padrão do player, sem o ícone de imagem quebrada)
+document.addEventListener("error", (ev) => { if (ev.target?.classList?.contains("tat-midia__capa")) ev.target.closest(".tat-midia")?.classList.remove("tat-midia--capa"), ev.target.remove(); }, true);
 /** Troca a capa "Assistir" pelo player (iframe com permissões mínimas) */
 export function ligarMidias(raiz) {
   raiz.addEventListener("click", (ev) => {

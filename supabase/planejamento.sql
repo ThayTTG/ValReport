@@ -140,7 +140,7 @@ begin
   if coalesce(p_usuario, '') = '' then return null; end if;
   if p_usuario !~ '^[0-9a-f-]{36}$' then perform public.plan_erro('jogador: inválido.'); end if;
   v := p_usuario::uuid;
-  if not exists (select 1 from public.membros where equipe_id = p_equipe and usuario_id = v and cargo <> 'convidado') then
+  if not exists (select 1 from public.membros where equipe_id = p_equipe and usuario_id = v) then   -- v33: convidados também
     perform public.plan_erro('jogador: essa pessoa não está na equipe.');
   end if;
   return v;
@@ -169,6 +169,12 @@ begin
              order by array_position(array['lider', 'colider', 'jogador', 'treinador']::text[], m.cargo::text), m.entrou_em)
       from public.membros m join public.perfis p on p.id = m.usuario_id
       where m.equipe_id = p_equipe and m.cargo <> 'convidado'), '[]'::jsonb),
+    -- v33: convidados (sub, stand-in) podem entrar na comp e nas posições; não votam nem contam na agenda
+    'convidados', coalesce((
+      select jsonb_agg(jsonb_build_object('usuario_id', m.usuario_id, 'apelido', p.apelido, 'cargo', m.cargo,
+               'riot_card', p.riot_card, 'cor', p.cor, 'agentes', to_jsonb(p.agentes), 'funcoes', to_jsonb(p.funcoes)) order by m.entrou_em)
+      from public.membros m join public.perfis p on p.id = m.usuario_id
+      where m.equipe_id = p_equipe and m.cargo = 'convidado'), '[]'::jsonb),
     'votos', coalesce((
       select jsonb_agg(jsonb_build_object('usuario_id', v.usuario_id, 'ranking', to_jsonb(v.ranking), 'em', v.atualizado_em))
       from public.votos_mapas v where v.equipe_id = p_equipe
@@ -257,6 +263,7 @@ end $$;
 create or replace function public.salvar_default_mapa(p_equipe uuid, p_mapa text, p_conteudo jsonb) returns void
 language plpgsql security definer set search_path = '' as $$
 declare out_comp jsonb := '[]'::jsonb; out_lado jsonb; out jsonb := '{}'::jsonb; it jsonb; lado text; ag text; foto text; agentes text[] := '{}';
+        px numeric; py numeric; ponto jsonb;
 begin
   perform public.plan_checar(p_equipe, true);
   if not public.plan_mapa_ok(p_mapa) then perform public.plan_erro('mapa: inválido.'); end if;
@@ -281,8 +288,15 @@ begin
     for it in select * from jsonb_array_elements(coalesce(p_conteudo -> lado, '[]'::jsonb)) loop
       foto := public.plan_texto(it -> 'foto', 120, 'foto');
       if foto <> '' and foto !~ ('^' || p_equipe::text || '/[a-f0-9]{16,32}\.(webp|jpg|png)$') then perform public.plan_erro('foto: arquivo inválido.'); end if;
+      -- v33: ponto marcado no minimapa (0 a 1 em x e y), no lugar do callout achado pelo nome
+      ponto := null;
+      if jsonb_typeof(it -> 'ponto') = 'object' and jsonb_typeof(it -> 'ponto' -> 'x') = 'number' and jsonb_typeof(it -> 'ponto' -> 'y') = 'number' then
+        px := (it -> 'ponto' ->> 'x')::numeric; py := (it -> 'ponto' ->> 'y')::numeric;
+        if px < 0 or px > 1 or py < 0 or py > 1 then perform public.plan_erro('ponto: fora do mapa.'); end if;
+        ponto := jsonb_build_object('x', round(px, 4), 'y', round(py, 4));
+      end if;
       out_lado := out_lado || jsonb_build_object('rotulo', public.plan_texto(it -> 'rotulo', 40, 'posição'), 'lugar', public.plan_texto(it -> 'lugar', 40, 'lugar'),
-                                                 'usuario', public.plan_membro_ok(p_equipe, it ->> 'usuario'), 'foto', nullif(foto, ''));
+                                                 'usuario', public.plan_membro_ok(p_equipe, it ->> 'usuario'), 'foto', nullif(foto, ''), 'ponto', ponto);
     end loop;
     out := out || jsonb_build_object(lado, out_lado);
   end loop;
