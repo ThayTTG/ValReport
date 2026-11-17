@@ -561,7 +561,10 @@ language sql stable security definer set search_path = '' as $$
         'apelido', p.apelido, 'cargo', m.cargo, 'protegido', public.eh_protegido(m.usuario_id),
         'riot_id', case when p.riot_verificado_em is not null then p.riot_id end,
         'puuid', case when p.riot_verificado_em is not null then p.riot_puuid end,
-        'mostrar_elo', coalesce(p.mostrar_elo, true)) order by m.entrou_em)
+        'mostrar_elo', coalesce(p.mostrar_elo, true),
+        -- v26: para esconder o elo também de quem ainda não confirmou o Riot ID ou trocou de nick
+        'elo_oculto_ids', case when p.mostrar_elo is false then
+          to_jsonb(array_remove(array[lower(p.riot_id), lower(p.riot_id_pedido), p.riot_puuid], null)) end) order by m.entrou_em)
       from public.membros m join public.perfis p on p.id = m.usuario_id where m.equipe_id = e.id), '[]'::jsonb))
   from public.equipes e where e.slug = p_slug and e.status = 'aprovada'
 $$;

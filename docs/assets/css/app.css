@@ -2056,3 +2056,11 @@ div.posicao[data-plan-acao] { cursor: zoom-in; }
 .mappool-resumo__origem { margin-top: 8px; }
 .mappool-resumo { margin-bottom: 22px; }
 @media (max-width: 560px) { .mappool-resumo .pool__mapa { min-height: 96px; } .mappool-resumo .pool__mapa--ban { min-height: 104px; } }
+
+/* v30: ícones centralizados nos botões quadrados (o botao-mini tinha padding de botão de texto) */
+.botao-icone { padding: 0; }
+.botao-icone:disabled:not(.girando-icone) { cursor: not-allowed; opacity: .4; }
+.botao-icone:disabled:not(.girando-icone):active { transform: none; }
+/* v30: capa do vídeo nas táticas */
+.tat-midia__capa { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tat-midia--capa .tat-midia__play { background: linear-gradient(180deg, rgba(10, 8, 16, .15), rgba(10, 8, 16, .55)); }

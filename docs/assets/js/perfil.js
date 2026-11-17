@@ -258,7 +258,8 @@ function ligarFormPerfil(el) {
     try {
       await atualizar("perfis", `id=eq.${encodeURIComponent(usuario().id)}`, mudancas);
       Object.assign(B.conta.perfil, mudancas);
-      mensagem(msg, "Perfil salvo ✓");
+      mensagem(msg, mudancas.mostrar_elo === false ? "Perfil salvo ✓ · o elo some do site em 2 a 4 minutos" : "Perfil salvo ✓");
+      if ("mostrar_elo" in mudancas) window.dispatchEvent(new CustomEvent("valreport:atualizar", { detail: { mudanca: Date.now() } }));
       window.dispatchEvent(new CustomEvent("valreport:perfil"));
       const perfilEl = el.querySelector(".perfil");
       if (mudancas.cor) perfilEl.style.setProperty("--cor-perfil", mudancas.cor); else perfilEl.style.removeProperty("--cor-perfil");

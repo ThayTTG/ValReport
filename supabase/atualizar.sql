@@ -1,4 +1,4 @@
--- ValReport v26: o botão "Atualizar" do site (o das setinhas, no topo) pede a coleta na hora.
+-- ValReport v26: elo oculto mais robusto e o botão "Atualizar" do site (o das setinhas, no topo) pede a coleta na hora.
 -- A coleta refaz o site inteiro (estatísticas, atributos, Índice, recordes...), mesmo sem partida nova:
 -- serve para quando a liderança tira uma partida das contas, alguém esconde o elo ou o cálculo muda.
 --
@@ -39,6 +39,27 @@ end $$;
 
 revoke execute on function public.nuvem_disparo_manual(text) from public, anon, authenticated;
 grant execute on function public.nuvem_disparo_manual(text) to authenticated;
+
+-- v26: o elo oculto vale também para quem ainda não confirmou o Riot ID ou trocou de nick (mesma função do planejamento.sql)
+-- ---------- Elenco para a coleta: agora leva a escolha de mostrar o elo ----------
+create or replace function public.pc_elenco_equipe(p_slug text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('equipe', jsonb_build_object('slug', e.slug, 'nome', e.nome, 'tipo', e.tipo,
+                                                         'premier', case when e.tipo = 'premier' then e.premier_nome || '#' || e.premier_tag end),
+    'membros', coalesce((select jsonb_agg(jsonb_build_object(
+        'apelido', p.apelido, 'cargo', m.cargo, 'protegido', public.eh_protegido(m.usuario_id),
+        'riot_id', case when p.riot_verificado_em is not null then p.riot_id end,
+        'puuid', case when p.riot_verificado_em is not null then p.riot_puuid end,
+        'mostrar_elo', coalesce(p.mostrar_elo, true),
+        -- v26: para esconder o elo também de quem ainda não confirmou o Riot ID ou trocou de nick
+        'elo_oculto_ids', case when p.mostrar_elo is false then
+          to_jsonb(array_remove(array[lower(p.riot_id), lower(p.riot_id_pedido), p.riot_puuid], null)) end) order by m.entrou_em)
+      from public.membros m join public.perfis p on p.id = m.usuario_id where m.equipe_id = e.id), '[]'::jsonb))
+  from public.equipes e where e.slug = p_slug and e.status = 'aprovada'
+$$;
+
+revoke execute on function public.pc_elenco_equipe(text) from public, anon, authenticated;
+grant execute on function public.pc_elenco_equipe(text) to service_role;
 
 -- Conferência: deve mostrar true
 select exists (select 1 from pg_proc where proname = 'nuvem_disparo_manual') as atualizar_pronto;

@@ -644,7 +644,8 @@ def exportar(cfg=None, verificar=False):
     puuid_aut = {ctx["puuid_de"][r]: slug[r] for r in autorizados if r in ctx["puuid_de"]}
     puuid_todos = {ctx["puuid_de"][r] for r in todos if r in ctx["puuid_de"]}
     # Elo opcional (v25): quem desligou no perfil não tem o elo em nenhum dado do site
-    sem_elo_rid = {r for r in autorizados if r.lower() in set(cfg.get("_sem_elo") or [])}
+    ocultos = set(cfg.get("_sem_elo") or [])   # Riot IDs e puuids (minúsculos) de quem escondeu o elo
+    sem_elo_rid = {r for r in autorizados if r.lower() in ocultos or str(ctx["puuid_de"].get(r) or "").lower() in ocultos}
     SEM_ELO_PU.clear()
     SEM_ELO_PU.update(ctx["puuid_de"][r] for r in sem_elo_rid if r in ctx["puuid_de"])
 

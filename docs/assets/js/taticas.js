@@ -137,7 +137,10 @@ export function htmlMidia(m, ctx, { titulo = "" } = {}) {
   const src = urlEmbed(m);
   if (!src) return `<div class="tat-midia tat-midia--vazia">${icone("info")} Link de vídeo inválido</div>`;
   const original = urlOriginal(m);
-  return `<div class="tat-midia" data-embed="${esc(src)}" data-fonte="${esc(m.fonte)}">
+  // Capa do vídeo (só o YouTube dá a imagem sem login); as outras fontes ficam com o fundo padrão
+  const capa = m.fonte === "youtube" && REF_OK.youtube.test(m.ref || "") ? `https://i.ytimg.com/vi/${m.ref}/hqdefault.jpg` : "";
+  return `<div class="tat-midia${capa ? " tat-midia--capa" : ""}" data-embed="${esc(src)}" data-fonte="${esc(m.fonte)}">
+      ${capa ? `<img class="tat-midia__capa" src="${esc(capa)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ""}
       <button class="tat-midia__play" type="button" aria-label="Assistir${titulo ? `: ${esc(titulo)}` : ""} (${esc(FONTES[m.fonte])})">
         <span class="tat-midia__icone"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></span>
         <span class="tat-midia__fonte">${esc(FONTES[m.fonte])}${m.inicio ? ` · começa em ${esc(formatarTempo(m.inicio))}` : ""}</span>
