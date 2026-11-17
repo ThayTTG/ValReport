@@ -151,3 +151,10 @@ begin
 end $$;
 revoke execute on function public.definir_cargo(uuid, uuid, public.cargo) from public, anon;
 grant execute on function public.definir_cargo(uuid, uuid, public.cargo) to authenticated;
+
+-- =====================================================================
+-- Conferência final: as três colunas devem mostrar true
+-- =====================================================================
+select exists (select 1 from pg_proc where proname = 'nuvem_disparo_manual') as botao_atualizar,
+       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'membros' and column_name = 'liberado_premier') as manter_jogador_premier,
+       coalesce((select prosrc like '%v_eu in (''lider'', ''colider'')%' from pg_proc where proname = 'definir_cargo' limit 1), false) as colider_define_cargos;
