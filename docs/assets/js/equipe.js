@@ -19,7 +19,7 @@ export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["p
 const ABAS_PLAN = { agenda: ["Agenda", viewAgenda], mappool: ["Map pool", viewMapPool], comps: ["Comps e defaults", viewComps], calls: ["Calls", viewCalls] };
 const SEM_DADOS = ["taticas", ...Object.keys(ABAS_PLAN)];
 /** As abas que esta pessoa vê: Táticas e o planejamento só para a equipe (convidados não) */
-const abasEquipe = () => ABAS_EQUIPE.filter(([a]) => (a !== "taticas" || podeVerTaticas()) && (!(a in ABAS_PLAN) || podeVerPlanejamento()));
+export const abasEquipe = () => ABAS_EQUIPE.filter(([a]) => (a !== "taticas" || podeVerTaticas()) && (!(a in ABAS_PLAN) || podeVerPlanejamento()));
 const membrosCom = () => B.equipe.filter((e) => e.partidas > 0);
 
 function cabecalhoEquipe(f) {
@@ -362,7 +362,7 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
   aba = lista.some(([a]) => a === aba) ? aba : (semDados ? lista[0]?.[0] : "visao");
   if (aba in ABAS_PLAN) {
     const [titulo, view] = ABAS_PLAN[aba];
-    const t = view();
+    const t = view(q);
     return {
       titulo: `Equipe · ${titulo}`,
       html: `${semDados ? cabecalhoSimples() : cabecalhoEquipe(f)}${abas("#/equipe", aba, lista, semDados ? "" : filtrosQuery(f))}${t.html}`,

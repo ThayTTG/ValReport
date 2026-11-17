@@ -9,7 +9,7 @@ import { viewBoasVindas, viewCadastro, viewSemEquipe, viewConta, viewPainel } fr
 import { viewSync } from "./sync.js";
 import { viewDiagnostico } from "./diagnostico.js";
 import { viewConfiguracao } from "./configuracao.js";
-import { viewMeuPerfil, viewPerfilPublico, ligarBusca } from "./perfil.js";
+import { viewMeuPerfil, viewPerfilPublico } from "./perfil.js";
 import { viewMinhasEquipes, viewTime, viewConvite, guardarConvitePendente } from "./equipes.js";
 import { ligarGaveta } from "./gaveta.js";
 import { alternarOrdem, trocarMiniAba, alternarMinimizado } from "./componentes.js";
@@ -20,6 +20,7 @@ import { viewEquipe } from "./equipe.js";
 import { viewTatica, podeVerTaticas } from "./taticas.js";
 import { comAgendaNoInicio } from "./agenda.js";
 import { comMapPool } from "./planejamento.js";
+import { ligarPaleta } from "./paleta.js";
 import { carregarExcluidas } from "./planejamento.js";
 import { carregarContagem } from "./comentarios.js";
 import { viewSobre } from "./sobre.js";
@@ -541,7 +542,7 @@ async function iniciar() {
     }
     document.getElementById("conta-link").hidden = false;
     desenharChip();
-    if (B.conta.perfil) { document.getElementById("buscar-topo").hidden = false; ligarBusca(); }
+    if (B.conta.perfil) ligarPaleta();   // v31: Ctrl+K (a busca por nick#tag fica dentro da paleta)
     if (!B.conta.perfil) { tela = "cadastro"; await renderizar(); return; }
     await mostrarPendencias();
     if (!B.conta.equipes.length) { tela = "sem-equipe"; await renderizar(); return; }

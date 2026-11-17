@@ -751,7 +751,7 @@ function trocarCall(raiz, i, passo) {
 // Telas (Equipe → Map pool · Comps · Calls)
 // =====================================================================
 export const viewMapPool = () => montar((d) => desenharPool(d));
-export const viewComps = () => montar((d) => desenharComps(d));
+export const viewComps = (q) => { if (q?.get("mapa")) T.mapa = q.get("mapa"); return montar((d) => desenharComps(d)); };   // ?mapa= vem da paleta (Ctrl+K)
 export const viewCalls = () => { rascunhoCalls = null; return montar((d) => desenharCalls(d)); };
 
 // =====================================================================
