@@ -153,8 +153,30 @@ revoke execute on function public.definir_cargo(uuid, uuid, public.cargo) from p
 grant execute on function public.definir_cargo(uuid, uuid, public.cargo) to authenticated;
 
 -- =====================================================================
--- Conferência final: as três colunas devem mostrar true
+-- v36: índice de busca das táticas para o Ctrl+K (título, mapa, seções e títulos dos blocos). Precisa do taticas.sql.
+-- =====================================================================
+create or replace function public.taticas_indice(p_equipe uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.pode_ver_taticas(p_equipe) then raise exception 'Só a equipe vê as táticas (convidados não).' using errcode = '42501'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object(
+      'id', t.id, 'titulo', t.titulo, 'mapa', t.mapa, 'lado', t.lado,
+      'secoes', coalesce((select jsonb_agg(jsonb_build_object(
+          'id', s ->> 'id', 'nome', left(s ->> 'nome', 60),
+          'itens', coalesce((select jsonb_agg(left(coalesce(nullif(b ->> 'titulo', ''), nullif(b ->> 'legenda', ''), nullif(b ->> 'nome', '')), 80))
+                             from jsonb_array_elements(case when jsonb_typeof(s -> 'blocos') = 'array' then s -> 'blocos' else '[]'::jsonb end) b
+                             where coalesce(nullif(b ->> 'titulo', ''), nullif(b ->> 'legenda', ''), nullif(b ->> 'nome', '')) is not null), '[]'::jsonb)))
+        from jsonb_array_elements(case when jsonb_typeof(t.conteudo -> 'secoes') = 'array' then t.conteudo -> 'secoes' else '[]'::jsonb end) s), '[]'::jsonb))
+      order by coalesce(t.publicada_em, t.criado_em) desc)
+    from public.taticas t where t.equipe_id = p_equipe and t.conteudo is not null), '[]'::jsonb);
+end $$;
+revoke execute on function public.taticas_indice(uuid) from public, anon;
+grant execute on function public.taticas_indice(uuid) to authenticated;
+
+-- =====================================================================
+-- Conferência final: todas as colunas devem mostrar true
 -- =====================================================================
 select exists (select 1 from pg_proc where proname = 'nuvem_disparo_manual') as botao_atualizar,
        exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'membros' and column_name = 'liberado_premier') as manter_jogador_premier,
-       coalesce((select prosrc like '%v_eu in (''lider'', ''colider'')%' from pg_proc where proname = 'definir_cargo' limit 1), false) as colider_define_cargos;
+       coalesce((select prosrc like '%v_eu in (''lider'', ''colider'')%' from pg_proc where proname = 'definir_cargo' limit 1), false) as colider_define_cargos,
+       exists (select 1 from pg_proc where proname = 'taticas_indice') as busca_taticas;

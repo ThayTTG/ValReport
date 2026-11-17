@@ -7,6 +7,50 @@ import { rpc } from "./nuvem.js";
 import { esc, icone, imagem, imgCard, dataHora } from "./util.js";
 import { ABAS_JOGADOR } from "./jogador.js";
 import { abasEquipe } from "./equipe.js";
+import { podeVerTaticas, LADOS } from "./taticas.js";
+
+// ---------- Conteúdo da equipe (carregado ao abrir a paleta, guardado por 1 minuto) ----------
+let extras = { t: 0, equipe: null, itens: [] };
+async function carregarExtras() {
+  const eq = B.equipeAtual?.id;
+  if (!eq || B.editor) return [];
+  if (extras.equipe === eq && Date.now() - extras.t < 60e3) return extras.itens;
+  const out = [];
+  const add = (grupo, rotulo, href, { sub = "", ic = "seta", chaves = "" } = {}) => out.push({ grupo, rotulo, sub, ic, img: "", href, chaves: normalizar(`${rotulo} ${sub} ${chaves}`) });
+  const tarefas = [];
+  if (podeVerTaticas()) {
+    tarefas.push((async () => {
+      let lista;
+      try { lista = await rpc("taticas_indice", { p_equipe: eq }); }   // título, seções e blocos (atualizar.sql)
+      catch (e) { lista = ((await rpc("taticas_listar", { p_equipe: eq }))?.taticas || []).filter((t) => t.publicada); }   // sem o SQL novo: só os títulos
+      for (const t of lista || []) {
+        const onde = [t.mapa || "Qualquer mapa", LADOS[t.lado] || ""].filter(Boolean).join(" · ");
+        const base = `#/tatica/${encodeURIComponent(t.id)}`;
+        add("Táticas", t.titulo || "Estratégia", base, { ic: "slides", sub: onde, chaves: `tatica estrategia ${t.resumo || ""}` });
+        for (const sc of t.secoes || []) {
+          if (sc.nome) add("Dentro das táticas", `${sc.nome}`, `${base}?s=${encodeURIComponent(sc.id)}`, { ic: "slides", sub: `${t.titulo} · ${onde}`, chaves: "secao" });
+          for (const nome of sc.itens || []) add("Dentro das táticas", nome, `${base}?s=${encodeURIComponent(sc.id)}`, { ic: "video", sub: `${t.titulo}${sc.nome ? ` · ${sc.nome}` : ""}`, chaves: "bloco video" });
+        }
+      }
+    })().catch(() => null));
+  }
+  if (abasEquipe().some(([a]) => a === "agenda")) {
+    tarefas.push((async () => {
+      const { proximosEventos } = await import("./agenda.js");
+      const vistos = new Set();
+      for (const { e, dia } of (await proximosEventos(60)).slice(0, 40)) {
+        if (vistos.has(e.id) && (e.repete_dias || []).length) continue;   // evento que se repete: só a próxima data
+        vistos.add(e.id);
+        const data = new Date(`${dia}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+        add("Agenda", e.titulo || "Evento", `#/equipe/agenda?evento=${encodeURIComponent(e.id)}&dia=${dia}`,
+          { ic: "calendario", sub: `${data}${e.dia_todo ? "" : e.inicio ? ` · ${e.inicio}` : ""}${e.mapa ? ` · ${e.mapa}` : ""}${e.adversario ? ` · vs ${e.adversario}` : ""}`, chaves: `agenda evento ${e.tipo || ""}` });
+      }
+    })().catch(() => null));
+  }
+  await Promise.all(tarefas);
+  extras = { t: Date.now(), equipe: eq, itens: out };
+  return out;
+}
 
 const ICONE_ABA = { visao: "equipe", semana: "relogio", partidas: "nota", formacoes: "rota", sinergia: "rota", comparar: "filtro", mapas: "mapa",
   recordes: "trofeu", taticas: "slides", agenda: "relogio", mappool: "mapa", comps: "alvo", calls: "texto" };
@@ -63,7 +107,9 @@ function filtrar(lista, termo) {
   const t = normalizar(termo).trim();
   if (!t) {   // sem termo: o essencial (sem as abas de cada jogador e só as 5 partidas mais recentes)
     let partidas = 0;
-    return lista.filter((x) => x.grupo !== "Abas dos jogadores" && x.grupo !== "Mapas" && (x.grupo !== "Partidas recentes" || ++partidas <= 5));
+    let eventos = 0;
+    return lista.filter((x) => !["Abas dos jogadores", "Mapas", "Táticas", "Dentro das táticas"].includes(x.grupo)
+      && (x.grupo !== "Partidas recentes" || ++partidas <= 5) && (x.grupo !== "Agenda" || ++eventos <= 3));
   }
   const partes = t.split(/\s+/);
   return lista
@@ -89,7 +135,7 @@ export function abrirPaleta(inicial = "") {
   el.setAttribute("aria-label", "Ir para");
   el.innerHTML = `<div class="paleta__caixa">
       <label class="paleta__campo">${icone("busca")}<input type="text" role="combobox" aria-expanded="true" aria-controls="paleta-lista" aria-autocomplete="list"
-        placeholder="Ir para página, jogador, mapa… ou procurar Nome#TAG" autocomplete="off" spellcheck="false"><kbd>Esc</kbd></label>
+        placeholder="Ir para página, jogador, tática, evento… ou Nome#TAG" autocomplete="off" spellcheck="false"><kbd>Esc</kbd></label>
       <div class="paleta__lista" id="paleta-lista" role="listbox"></div>
       <p class="paleta__rodape"><span><kbd>↑</kbd><kbd>↓</kbd> escolher</span><span><kbd>Enter</kbd> abrir</span><span><kbd>${atalhoPaleta}</kbd> abre de qualquer tela</span></p>
     </div>`;
@@ -97,6 +143,7 @@ export function abrirPaleta(inicial = "") {
   dialogo = el;
   const campo = el.querySelector("input"), lista = el.querySelector(".paleta__lista");
   let atuais = [], sel = 0, espera = null, ultimaBusca = "", remotos = [];
+  carregarExtras().then((x) => { if (!dialogo || dialogo !== el || !x.length) return; todos.push(...x); desenhar(); });
 
   const fechar = () => { if (!dialogo) return; el.close(); el.remove(); dialogo = null; document.getElementById("buscar-topo")?.setAttribute("aria-expanded", "false"); };
   const abrirItem = (x) => {

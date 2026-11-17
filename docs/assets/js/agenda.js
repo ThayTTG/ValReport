@@ -140,7 +140,7 @@ function desenharAgenda(ag, pl) {
     </div>`;
 }
 
-function montarAgenda(desenhar, { soEquipe = true } = {}) {
+function montarAgenda(desenhar, { soEquipe = true, abrir = null } = {}) {
   return {
     html: `<div class="agenda" data-agenda><div class="carregando" role="status"><span class="girando"></span> Carregando…</div></div>`,
     depois: async (main) => {
@@ -165,11 +165,19 @@ function montarAgenda(desenhar, { soEquipe = true } = {}) {
         if (b && !b.disabled && raiz._ag && ACOES_AG[b.dataset.agAcao]) ACOES_AG[b.dataset.agAcao](b, raiz);
       });
       await pintar();
+      // v36: ?evento=<id>&dia=<AAAA-MM-DD> abre o evento (vem da paleta Ctrl+K)
+      if (abrir && raiz._ag && raiz.isConnected) abrirEvento(raiz, abrir[0], abrir[1]);
     },
   };
 }
 
-export const viewAgenda = () => montarAgenda(desenharAgenda);
+export const viewAgenda = (q) => montarAgenda(desenharAgenda, { abrir: q?.get("evento") && q?.get("dia") ? [q.get("evento"), q.get("dia")] : null });
+
+/** Os próximos compromissos (para a paleta Ctrl+K): [{ e, dia }] */
+export async function proximosEventos(dias = 60) {
+  const ag = await lerAgenda();
+  return entre(ag.eventos, hojeYmd(), ymd(somarDias(new Date(), dias)));
+}
 
 /** Início: os próximos compromissos da equipe (some sozinho se não houver agenda ou acesso) */
 export function comAgendaNoInicio(v) {
