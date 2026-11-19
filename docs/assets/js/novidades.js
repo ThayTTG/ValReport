@@ -1,5 +1,5 @@
 // Início pessoal (v40): "Desde a sua última visita" — partidas novas (da equipe e suas), elo, o próximo compromisso,
-// voto da map pool pendente e táticas novas. A "última visita" é guardada neste aparelho, por equipe:
+// e táticas novas. A "última visita" é guardada neste aparelho, por equipe:
 // abrir o site depois de 30 minutos parado conta como uma nova visita.
 
 import { B, resultadoEquipe } from "./dados.js";
@@ -64,7 +64,7 @@ function itensLocais(desde, eu) {
 async function itensDaEquipe(desde) {
   const out = [], eq = B.equipeAtual?.id;
   if (!eq || B.editor) return out;
-  const [{ podeVerPlanejamento, lerPlanejamento, resultadoPool }, { podeVerTaticas }] = await Promise.all([import("./planejamento.js"), import("./taticas.js")]);
+  const [{ podeVerPlanejamento }, { podeVerTaticas }] = await Promise.all([import("./planejamento.js"), import("./taticas.js")]);
   const tarefas = [];
   if (podeVerPlanejamento()) {
     tarefas.push((async () => {   // próximo compromisso nas próximas 24 h, com a presença da pessoa
@@ -75,14 +75,6 @@ async function itensDaEquipe(desde) {
         const resp = { vou: "você vai", talvez: "você marcou talvez", nao: "você não vai" }[prox.minha];
         out.push({ ic: "calendario", href: `#/equipe/agenda?evento=${encodeURIComponent(prox.e.id)}&dia=${prox.dia}`, classe: prox.minha ? "" : "alerta", ordem: -1,
           texto: `<strong>${esc(prox.e.titulo)}</strong> ${quando}${prox.e.dia_todo ? "" : ` às ${esc(prox.e.inicio)}`} · ${resp || "<strong>responda a presença</strong>"}` });
-      }
-    })().catch(() => null));
-    tarefas.push((async () => {   // voto da map pool
-      const d = await lerPlanejamento();
-      const r = resultadoPool(d);
-      const votei = (d.votos || []).some((v) => v.usuario_id === d.eu && v.ranking?.length === r.pool.length);
-      if (!r.manual && !votei && (d.membros || []).some((m) => m.usuario_id === d.eu)) {
-        out.push({ ic: "mapa", href: "#/equipe/mappool", classe: "alerta", texto: "Falta o <strong>seu voto</strong> na map pool" });
       }
     })().catch(() => null));
   }
