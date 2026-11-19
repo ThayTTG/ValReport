@@ -139,7 +139,7 @@ Cada um abre direto no replay 2D, e a equipe marca como "revisado", com comentá
 | 4 | ✅ Rounds para rever + fila no replay | Liga dado → VOD | feito |
 | 5 | ✅ Relatório pós-scrim no Discord | Hábito do time | feito |
 | 6 | Replay .vrf (fase 2): atalho do PC + junção | Movimento real e habilidades | G |
-| 7 | Adversários e scouting (3.3) | Preparação de oficial | M |
+| 7 | ✅ Adversários e scouting (3.3) | Preparação de oficial | feito |
 | 8 | Ferramentas da fase 3 (sobrepor rounds, posições por tempo) | Nível analista profissional | G |
 
 P = poucos dias, M = cerca de uma semana, G = mais de uma semana.

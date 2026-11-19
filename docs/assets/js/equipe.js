@@ -14,15 +14,16 @@ import { viewAgenda } from "./agenda.js";
 import { seloContexto } from "./contexto.js";
 import { viewAnalista } from "./analista.js";
 import { viewRever } from "./rever.js";
+import { viewAdversarios } from "./adversarios.js";
 
-export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["rever", "Rounds para rever"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
+export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["rever", "Rounds para rever"], ["adversarios", "Adversários"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
   ["comparar", "Comparar"], ["mapas", "Mapas"], ["analise", "Análise"], ["recordes", "Destaques"], ["taticas", "Táticas"],
   ["agenda", "Agenda"], ["mappool", "Map pool"], ["comps", "Comps"], ["calls", "Calls"]];
 // v32: as 13 telas viram 8 abas principais; as do mesmo assunto ficam como sub-abas (os endereços continuam os mesmos)
-export const GRUPOS_EQUIPE = { partidas: ["partidas", "rever"], semana: ["semana", "recordes"], formacoes: ["formacoes", "sinergia"], mapas: ["mapas", "analise", "mappool", "comps", "calls"] };
+export const GRUPOS_EQUIPE = { partidas: ["partidas", "rever", "adversarios"], semana: ["semana", "recordes"], formacoes: ["formacoes", "sinergia"], mapas: ["mapas", "analise", "mappool", "comps", "calls"] };
 export const PRINCIPAIS_EQUIPE = [["visao", "Visão geral", "equipe"], ["partidas", "Partidas", "nota"], ["semana", "Semana", "relogio"], ["comparar", "Comparar", "filtro"],
   ["formacoes", "Formações", "rota"], ["mapas", "Mapas", "mapa"], ["taticas", "Táticas", "slides"], ["agenda", "Agenda", "calendario"]];
-const NOME_SUB = { partidas: "Lista", rever: "Rounds para rever", semana: "Resumo", recordes: "Destaques", formacoes: "Formações", sinergia: "Sinergia", mapas: "Desempenho", analise: "Análise", mappool: "Map pool", comps: "Comp e defaults", calls: "Calls" };
+const NOME_SUB = { partidas: "Lista", rever: "Rounds para rever", adversarios: "Adversários", semana: "Resumo", recordes: "Destaques", formacoes: "Formações", sinergia: "Sinergia", mapas: "Desempenho", analise: "Análise", mappool: "Map pool", comps: "Comp e defaults", calls: "Calls" };
 /** A aba principal de uma tela (ex.: "comps" → "mapas") */
 export const paiDe = (aba) => Object.keys(GRUPOS_EQUIPE).find((p) => GRUPOS_EQUIPE[p].includes(aba)) || aba;
 /** As abas principais que esta pessoa vê, cada uma com o endereço da primeira tela visível: [[pai, nome, ícone, destino]] */
@@ -403,7 +404,7 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
   }
   const qs = filtrosQuery(f);
   let corpo = "", depois = null;
-  const semFiltros = ["formacoes", "semana"].includes(aba);
+  const semFiltros = ["formacoes", "semana", "adversarios"].includes(aba);
   if (!B.partidas.length) corpo = vazio("Ainda não há partidas exportadas", "<p>Rode o report no PC para gerar os dados do site.</p>");
   else if (aba === "visao") { const mp = blocoMapPool(); corpo = mp.html + visao(f); depois = mp.depois; }   // v26: a pool votada no topo
   else if (aba === "partidas") { const ps = partidasDaEquipe(f); corpo = listaEquipe(ps.slice(0, Number(q.get("n") || 40))) || vazio("Nenhuma partida com estes filtros"); if (ps.length > Number(q.get("n") || 40)) corpo += `<p style="text-align:center;margin-top:14px"><button class="limpar" type="button" data-param="n" data-valor="${Number(q.get("n") || 40) + 40}">Mostrar mais</button></p>`; }
@@ -415,6 +416,7 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
   else if (aba === "mapas") ({ html: corpo, depois } = await mapasEquipe(f, q));
   else if (aba === "analise") corpo = viewAnalista(f);   // v46: planilha do analista
   else if (aba === "rever") ({ html: corpo, depois } = viewRever(f, q));   // v47: fila de VOD review
+  else if (aba === "adversarios") ({ html: corpo, depois } = viewAdversarios(f, q));   // v49: scouting
   return {
     titulo: `Equipe · ${NOME_SUB[aba] && paiDe(aba) !== aba ? `${PRINCIPAIS_EQUIPE.find(([p]) => p === paiDe(aba))[1]} · ` : ""}${ABAS_EQUIPE.find(([a]) => a === aba)[1]}`,
     html: `${cabecalhoEquipe(f)}${abasDaEquipe(aba, lista, qs)}${semFiltros ? "" : barraFiltros(f, null, { mostrar: ["ctx", "fila", "temporada", "periodo", "mapa"] })}<div class="secao">${corpo}</div>`,

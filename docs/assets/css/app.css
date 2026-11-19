@@ -2445,3 +2445,16 @@ body.com-nav .conta-chip { order: 2; }
   background: color-mix(in srgb, var(--destaque) 18%, var(--rp-painel)); border: 1px solid var(--destaque); font-size: 13px; }
 .rp-fila[hidden] { display: none; }
 .rp-fila > span { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; }
+
+/* v49: adversários e scouting */
+.adv-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+.adv-topo h2 { font-size: 22px; } .adv-topo .bom { color: var(--vitoria, #3ccf7e); } .adv-topo .ruim { color: var(--derrota, #f06a6a); }
+.adv-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.adv-numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.adv-numeros div { padding: 8px 10px; border-radius: 10px; background: var(--superficie-2); }
+.adv-numeros small { display: block; color: var(--suave); font-size: 11.5px; } .adv-numeros b { font-size: 20px; }
+.adv-plantas { margin-top: 10px; }
+.adv-comp { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--borda); }
+.adv-comp:first-of-type { border-top: 0; } .adv-comp strong { min-width: 70px; }
+.adv-comp__ags { display: flex; gap: 4px; flex: 1; } .adv-comp__ags img, .adv-comp__ags > span > span { width: 28px; height: 28px; border-radius: 7px; }
+.adv-partidas { display: grid; gap: 4px; }

@@ -790,7 +790,9 @@ def exportar(cfg=None, verificar=False):
         indice.append({"id": a["match_id"], "t": a["inicio"].isoformat() if a["inicio"] else None,
                        "mapa": a["mapa"], "fila": a["fila_id"], "dur": round((md.get("game_length_in_ms") or 0) / 1000),
                        "temp": g(md, "season", "short"), "rounds": a["n_rounds"], "placar": placar, "nosso": nosso,
-                       "m": resumo, "rd": rounds_resumo(bruta, nosso, cfg)})
+                       "m": resumo, "rd": rounds_resumo(bruta, nosso, cfg),
+                       # v49: agentes do adversário (scouting: comps por mapa)
+                       "adv": sorted(g(p, "agent", "name") or "?" for p in bruta.get("players") or [] if p.get("team_id") != nosso)})
         det = detalhe_partida(a, bruta, nosso, puuid_aut, cfg, membros_info)
         tamanho += gravar(PASTA_DATA / "partidas" / f"{a['match_id']}.json", det)
 
