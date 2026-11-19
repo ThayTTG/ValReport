@@ -116,9 +116,10 @@ export function htmlReplay(d, rSel) {
           <span class="rp-pop__caixa rp-pop__caixa--teclas" data-pop="teclas" hidden>
             <span><kbd>Espaço</kbd> play/pausa</span><span><kbd>←</kbd><kbd>→</kbd> 5 s (Shift: 1 s)</span><span><kbd>,</kbd><kbd>.</kbd> round anterior/próximo</span>
             <span><kbd>1</kbd>…<kbd>6</kbd> velocidade</span><span><kbd>P</kbd> caneta · <kbd>A</kbd> seta · <kbd>C</kbd> círculo · <kbd>E</kbd> borracha</span>
-            <span><kbd>Esc</kbd> só assistir · <kbd>Ctrl</kbd><kbd>Z</kbd> desfazer · <kbd>F</kbd> tela cheia</span></span></span>
+            <span><kbd>Esc</kbd> só assistir · <kbd>Ctrl</kbd><kbd>Z</kbd> desfazer · <kbd>F</kbd> tela cheia</span>
+            <span>Roda do mouse: zoom · arrastar: mover o mapa · duplo clique: mapa inteiro</span></span></span>
         <i class="rp-sep"></i>
-        ${ferr("mover", icone("mover"), "Só assistir (Esc)")}
+        ${ferr("mover", icone("mover"), "Mão: arrastar o mapa · toque = play/pausa (Esc)")}
         ${ferr("caneta", icone("lapis"), "Caneta (P)")}
         ${ferr("seta", icone("seta"), "Seta (A)")}
         ${ferr("circulo", icone("circulo"), "Círculo (C)")}
@@ -128,9 +129,13 @@ export function htmlReplay(d, rSel) {
         ${acao("desfazer", icone("desfazer"), "Desfazer (Ctrl+Z)")}
         ${acao("limpar", icone("fechar"), "Limpar o desenho do round")}
         ${acao("salvar", icone("imagem"), "Salvar imagem (mapa + desenho)")}
+        ${acao("zoom-mais", icone("mais"), "Aproximar (roda do mouse)")}
+        ${acao("zoom-menos", "<b class=\"rp-menos\">−</b>", "Afastar (duplo clique volta ao mapa inteiro)")}
         ${acao("tela-cheia", icone("expandir"), "Tela cheia (F)")}
       </div>
       <div class="rp-rounds-linha">
+        <button type="button" class="rp-multi" data-acao="multi" aria-pressed="false" title="Ver vários rounds juntos (toque nos números para escolher)">${icone("slides")} Vários rounds</button>
+        <span class="rp-multi-atalhos"><button type="button" data-acao="multi-atk">Ataques</button><button type="button" data-acao="multi-def">Defesas</button></span>
         <button type="button" class="rp-seta" data-acao="anterior" aria-label="Round anterior">${icone("voltar")}</button>
         <div class="rp-rounds" data-rounds role="tablist" aria-label="Rounds">${d.rounds.map((r) => `${r.n === meio + 1 ? `<i class="rp-meio" aria-hidden="true"></i>` : ""}<button type="button" class="rp-round rp-round--${vence(r)}" data-round="${r.n}" aria-pressed="${r.n === rSel}" title="Round ${r.n} · ${ladoNosso(r)} · ${vence(r) === "nosso" ? "vitória" : "derrota"}">${r.n}</button>`).join("")}</div>
         <button type="button" class="rp-seta rp-seta--prox" data-acao="proximo" aria-label="Próximo round">${icone("voltar")}</button>
@@ -167,14 +172,26 @@ export function ligarReplay(raiz, d, rSel = 1) {
   const css = getComputedStyle(document.documentElement);
   const COR = { nosso: css.getPropertyValue("--nosso").trim() || "#4cc9f0", deles: css.getPropertyValue("--deles").trim() || "#ff5d73" };
   const imgs = new Map();
+  let manchado = false;   // alguma imagem veio sem permissão (CORS): o canvas não pode virar arquivo
   const imagemDe = (src) => {
     if (!src) return null;
-    if (!imgs.has(src)) { const im = new Image(); im.crossOrigin = "anonymous"; im.referrerPolicy = "no-referrer"; im.onload = () => pedir(); im.src = src; imgs.set(src, im); }
+    if (!imgs.has(src)) {
+      const im = new Image();
+      im.crossOrigin = "anonymous"; im.referrerPolicy = "no-referrer";
+      im.onload = () => pedir();
+      im.onerror = () => {   // o servidor (ou o cache do app) não liberou: carrega sem CORS
+        const im2 = new Image(); im2.referrerPolicy = "no-referrer";
+        im2.onload = () => { manchado = true; pedir(); };
+        im2.src = src; imgs.set(src, im2);
+      };
+      im.src = src; imgs.set(src, im);
+    }
     const im = imgs.get(src);
     return im.complete && im.naturalWidth ? im : null;
   };
   const S = { round: null, r: null, t: 0, tocando: false, vel: 1, ult: 0, op: { nomes: true, mira: true, rastro: true },
-    ferr: "mover", cor: CORES_DESENHO[0], desenhos: new Map(), atual: null, lado: 0 };
+    ferr: "mover", cor: CORES_DESENHO[0], desenhos: new Map(), atual: null, lado: 0,
+    zoom: 1, cx: 0.5, cy: 0.5, multi: null };   // multi: Set de rounds tocando juntos (null = um round só)
 
   // tamanho do palco (quadrado, nítido em telas de alta densidade)
   const medir = () => {
@@ -210,28 +227,50 @@ export function ligarReplay(raiz, d, rSel = 1) {
   // ---------- quadro ----------
   let pedido = 0;
   function pedir() { if (!pedido) pedido = requestAnimationFrame(() => { pedido = 0; desenhar(); }); }
-  function px(x, y) { const [u, v] = proj.p(x, y); return [u * S.lado, v * S.lado]; }
+  // mapa (0..1) → tela, com zoom e centro; e o inverso (para o desenho e o zoom no cursor)
+  const tela = (u, v) => [((u - S.cx) * S.zoom + 0.5) * S.lado, ((v - S.cy) * S.zoom + 0.5) * S.lado];
+  const mapaDe = (sx, sy) => [(sx / S.lado - 0.5) / S.zoom + S.cx, (sy / S.lado - 0.5) / S.zoom + S.cy];
+  function px(x, y) { const [u, v] = proj.p(x, y); return tela(u, v); }
+  function limitarCentro() {
+    const m = 0.5 / S.zoom;
+    S.cx = Math.min(1 - m, Math.max(m, S.cx)); S.cy = Math.min(1 - m, Math.max(m, S.cy));
+    if (S.zoom <= 1) { S.cx = 0.5; S.cy = 0.5; }
+  }
+  function zoomEm(fator, sx = S.lado / 2, sy = S.lado / 2) {
+    const [u, v] = mapaDe(sx, sy);
+    S.zoom = Math.min(5, Math.max(1, S.zoom * fator));
+    // mantém o ponto do cursor no mesmo lugar da tela
+    S.cx = u - (sx / S.lado - 0.5) / S.zoom; S.cy = v - (sy / S.lado - 0.5) / S.zoom;
+    limitarCentro(); pedir(); desenharTinta();
+  }
   function desenhar() {
     if (!S.lado || !S.round) return;
-    const L = S.lado, t = S.t, R = S.round, r = S.r;
+    const L = S.lado, t = S.t;
     ctx.clearRect(0, 0, L, L);
     const mini = imagemDe(imgMinimapa(d.mapa));
-    if (mini) { ctx.globalAlpha = .9; ctx.drawImage(mini, 0, 0, L, L); ctx.globalAlpha = 1; }
+    if (mini) { const [x0, y0] = tela(0, 0); ctx.globalAlpha = .9; ctx.drawImage(mini, x0, y0, L * S.zoom, L * S.zoom); ctx.globalAlpha = 1; }
     if (!proj) return;
-    const rp = Math.max(9, L * 0.022);
+    const rp = Math.max(7, L * 0.0155);   // tamanho do boneco na tela (não cresce com o zoom)
+    if (S.multi?.size) {
+      for (const n of S.multi) { const x = rodadas.get(n); if (x) desenharRound(x.r, x.R, Math.min(t, x.R.fim), rp * 0.72, n); }
+    } else desenharRound(S.r, S.round, t, rp, null);
+  }
+  const rodadas = new Map();   // n → { r, R } (vários rounds)
+  function desenharRound(r, R, t, rp, rotulo) {
+    const L = S.lado, multi = rotulo != null;
     // spike
     if (r.plant?.x != null && t >= (r.plant.t || 0)) {
       const [x, y] = px(r.plant.x, r.plant.y), pulso = 1 + 0.25 * Math.sin(t / 180);
       const desarmada = r.defuse && t >= (r.defuse.t || 0);
       ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4);
       ctx.fillStyle = desarmada ? "#4cc9f0" : "#ff5d73"; ctx.strokeStyle = "#0b0912"; ctx.lineWidth = 2;
-      const s = rp * 0.8 * (desarmada ? 1 : pulso); ctx.fillRect(-s / 2, -s / 2, s, s); ctx.strokeRect(-s / 2, -s / 2, s, s); ctx.restore();
+      const sz = rp * 0.85 * (desarmada ? 1 : pulso); ctx.fillRect(-sz / 2, -sz / 2, sz, sz); ctx.strokeRect(-sz / 2, -sz / 2, sz, sz); ctx.restore();
     }
     // abates recentes: linha de quem matou até quem morreu
-    for (const [tk, ki, vi, , , vx, vy, kx, ky] of r.kills) {
+    if (!multi) for (const [tk, ki, , , , vx, vy, kx, ky] of r.kills) {
       if (t < tk || t - tk > FLASH_KILL_MS || vx == null) continue;
       const pk = kx != null ? px(kx, ky) : null, pv = px(vx, vy), f = 1 - (t - tk) / FLASH_KILL_MS;
-      if (pk) { ctx.strokeStyle = d.jogadores[ki]?.time === d.nosso ? COR.nosso : COR.deles; ctx.globalAlpha = f; ctx.lineWidth = 2.5; ctx.setLineDash([6, 5]);
+      if (pk) { ctx.strokeStyle = d.jogadores[ki]?.time === d.nosso ? COR.nosso : COR.deles; ctx.globalAlpha = f; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
         ctx.beginPath(); ctx.moveTo(...pk); ctx.lineTo(...pv); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
     }
     // jogadores
@@ -240,31 +279,31 @@ export function ligarReplay(raiz, d, rSel = 1) {
       if (!tr.length) return;
       const cor = j.time === d.nosso ? COR.nosso : COR.deles, m = R.morte[i];
       if (m && t >= m.t) {   // morto: X onde caiu
-        const [x, y] = px(m.x, m.y);
-        ctx.globalAlpha = .75; ctx.strokeStyle = cor; ctx.lineWidth = 3; ctx.beginPath();
-        ctx.moveTo(x - rp * .6, y - rp * .6); ctx.lineTo(x + rp * .6, y + rp * .6); ctx.moveTo(x + rp * .6, y - rp * .6); ctx.lineTo(x - rp * .6, y + rp * .6); ctx.stroke(); ctx.globalAlpha = 1;
+        const [x, y] = px(m.x, m.y), k = rp * .55;
+        ctx.globalAlpha = multi ? .5 : .75; ctx.strokeStyle = cor; ctx.lineWidth = 2.5; ctx.beginPath();
+        ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k); ctx.moveTo(x + k, y - k); ctx.lineTo(x - k, y + k); ctx.stroke(); ctx.globalAlpha = 1;
         return;
       }
       const p = posicao(tr, t);
       if (!p) return;
       const [x, y] = px(p.x, p.y);
       if (S.op.rastro) {
-        ctx.strokeStyle = cor; ctx.globalAlpha = .35; ctx.lineWidth = 2; ctx.beginPath();
+        ctx.strokeStyle = cor; ctx.globalAlpha = multi ? .25 : .35; ctx.lineWidth = 2; ctx.beginPath();
         for (let k = 0; k <= 12; k++) { const q = posicao(tr, Math.max(0, t - RASTRO_MS + (k * RASTRO_MS) / 12)); const [a, b] = px(q.x, q.y); k ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }
         ctx.stroke(); ctx.globalAlpha = 1;
       }
-      if (S.op.mira && p.a != null) {
-        const [dx, dy] = proj.dir(p.a), ang = Math.atan2(dy, dx), alc = rp * 4.2;
-        ctx.globalAlpha = .3; ctx.fillStyle = cor; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, alc, ang - 0.55, ang + 0.55); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+      if (S.op.mira && p.a != null && !multi) {
+        const [dx, dy] = proj.dir(p.a), ang = Math.atan2(dy, dx), alc = rp * 4;
+        ctx.globalAlpha = .28; ctx.fillStyle = cor; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, alc, ang - 0.5, ang + 0.5); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
       }
       ctx.beginPath(); ctx.arc(x, y, rp, 0, Math.PI * 2); ctx.fillStyle = "#0b0912"; ctx.fill();
       const ic = imagemDe(imgAgente(j.ag));
-      if (ic) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, rp - 2, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(ic, x - rp, y - rp, rp * 2, rp * 2); ctx.restore(); }
-      ctx.lineWidth = 3; ctx.strokeStyle = cor; ctx.beginPath(); ctx.arc(x, y, rp, 0, Math.PI * 2); ctx.stroke();
-      if (S.op.nomes) {
-        const nome = j.slug ? j.nome : j.ag;
-        ctx.font = `600 ${Math.max(10, L * 0.017)}px Inter, system-ui, sans-serif`; ctx.textAlign = "center";
-        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(11,9,18,.85)"; ctx.strokeText(nome, x, y + rp + 13); ctx.fillStyle = "#fff"; ctx.fillText(nome, x, y + rp + 13);
+      if (ic) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, rp - 1.5, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(ic, x - rp, y - rp, rp * 2, rp * 2); ctx.restore(); }
+      ctx.lineWidth = 2.5; ctx.strokeStyle = cor; ctx.beginPath(); ctx.arc(x, y, rp, 0, Math.PI * 2); ctx.stroke();
+      const rot = multi ? `R${rotulo}` : S.op.nomes ? (j.slug ? j.nome : j.ag) : "";
+      if (rot) {
+        ctx.font = `600 ${multi ? 9.5 : Math.max(10, L * 0.0145)}px Inter, system-ui, sans-serif`; ctx.textAlign = "center";
+        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(11,9,18,.85)"; ctx.strokeText(rot, x, y + rp + 11); ctx.fillStyle = "#fff"; ctx.fillText(rot, x, y + rp + 11);
       }
     });
   }
@@ -272,6 +311,7 @@ export function ligarReplay(raiz, d, rSel = 1) {
   const nomeDe = (i) => { const j = d.jogadores[i]; return j ? (j.slug ? j.nome : j.ag) : "?"; };
   // ---------- painéis (times, placar, killfeed) ----------
   function atualizar() {
+    if (S.multi) { mostrarTempo(); pedir(); return; }
     const R = S.round, r = S.r, t = S.t;
     mostrarTempo();
     const placarAte = (n) => d.rounds.filter((x) => x.n < n).reduce((o, x) => { o[x.venc === d.nosso ? 0 : 1]++; return o; }, [0, 0]);
@@ -347,7 +387,7 @@ export function ligarReplay(raiz, d, rSel = 1) {
     cx.clearRect(0, 0, L, L);
     for (const tr of [...tinta(), ...(S.atual ? [S.atual] : [])]) {
       cx.strokeStyle = tr.cor; cx.fillStyle = tr.cor; cx.lineWidth = Math.max(3, L * 0.005); cx.lineCap = "round"; cx.lineJoin = "round";
-      const pts = tr.pts.map(([u, v]) => [u * L, v * L]);
+      const pts = tr.pts.map(([u, v]) => tela(u, v));
       if (!pts.length) continue;
       if (tr.tipo === "caneta") { cx.beginPath(); pts.forEach(([x, y], k) => (k ? cx.lineTo(x, y) : cx.moveTo(x, y))); cx.stroke(); }
       else if (tr.tipo === "seta" && pts.length > 1) {
@@ -360,22 +400,38 @@ export function ligarReplay(raiz, d, rSel = 1) {
       }
     }
   }
-  const ponto = (ev) => { const b = cd.getBoundingClientRect(); return [(ev.clientX - b.left) / b.width, (ev.clientY - b.top) / b.height]; };
+  const ponto = (ev) => { const b = cd.getBoundingClientRect(); return mapaDe(((ev.clientX - b.left) / b.width) * S.lado, ((ev.clientY - b.top) / b.height) * S.lado); };
+  // mão: arrastar move o mapa (com zoom); um toque sem arrastar dá play/pausa
+  let arrasto = null;
   cd.addEventListener("pointerdown", (ev) => {
-    if (S.ferr === "mover") { play(); return; }
+    if (S.ferr === "mover") { cd.setPointerCapture(ev.pointerId); arrasto = { x: ev.clientX, y: ev.clientY, cx: S.cx, cy: S.cy, moveu: false }; return; }
     cd.setPointerCapture(ev.pointerId);
     if (S.ferr === "borracha") { apagarPerto(ponto(ev)); return; }
     S.atual = { tipo: S.ferr, cor: S.cor, pts: [ponto(ev)] };
   });
   cd.addEventListener("pointermove", (ev) => {
+    if (arrasto) {
+      const b = cd.getBoundingClientRect(), dx = (ev.clientX - arrasto.x) / b.width, dy = (ev.clientY - arrasto.y) / b.height;
+      if (Math.abs(dx) + Math.abs(dy) > 0.006) arrasto.moveu = true;
+      if (arrasto.moveu && S.zoom > 1) { S.cx = arrasto.cx - dx / S.zoom; S.cy = arrasto.cy - dy / S.zoom; limitarCentro(); pedir(); desenharTinta(); }
+      return;
+    }
     if (S.ferr === "borracha" && ev.buttons) { apagarPerto(ponto(ev)); return; }
     if (!S.atual) return;
     const p = ponto(ev);
     if (S.atual.tipo === "caneta") S.atual.pts.push(p); else S.atual.pts[1] = p;
     desenharTinta();
   });
-  const soltar = () => { if (S.atual) { if (S.atual.pts.length > 1 || S.atual.tipo === "caneta") tinta().push(S.atual); S.atual = null; desenharTinta(); } };
+  const soltar = () => {
+    if (arrasto) { const clique = !arrasto.moveu; arrasto = null; if (clique) play(); return; }
+    if (S.atual) { if (S.atual.pts.length > 1 || S.atual.tipo === "caneta") tinta().push(S.atual); S.atual = null; desenharTinta(); } };
   cd.addEventListener("pointerup", soltar);
+  cd.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const b = cd.getBoundingClientRect();
+    zoomEm(ev.deltaY < 0 ? 1.18 : 1 / 1.18, ((ev.clientX - b.left) / b.width) * S.lado, ((ev.clientY - b.top) / b.height) * S.lado);
+  }, { passive: false });
+  cd.addEventListener("dblclick", () => { S.zoom = 1; limitarCentro(); pedir(); desenharTinta(); });
   cd.addEventListener("pointercancel", soltar);
   function apagarPerto([u, v]) {
     const lista = tinta(), antes = lista.length;
@@ -386,7 +442,7 @@ export function ligarReplay(raiz, d, rSel = 1) {
     S.ferr = f;
     el.querySelectorAll("[data-ferr]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ferr === f)));
     cd.classList.toggle("ativo", f !== "mover");
-    cd.style.cursor = f === "mover" ? "pointer" : f === "borracha" ? "cell" : "crosshair";
+    cd.style.cursor = f === "mover" ? "grab" : f === "borracha" ? "cell" : "crosshair";
   }
   function salvarImagem() {
     try {
@@ -396,12 +452,41 @@ export function ligarReplay(raiz, d, rSel = 1) {
       j.drawImage(cv, 0, 0); j.drawImage(cd, 0, 0);
       j.scale(dpr, dpr); j.font = "600 14px Inter, system-ui, sans-serif"; j.fillStyle = "#fff"; j.fillText(`${d.mapa} · R${S.r.n} · ${fmtT(S.t)} · ValReport`, 10, L - 10);
       const a = document.createElement("a"); a.download = `${d.mapa}-R${S.r.n}-${fmtT(S.t).replace(":", "m")}s.png`; a.href = junto.toDataURL("image/png"); a.click();
-    } catch (e) { alert("Não deu para salvar a imagem neste navegador."); }
+    } catch (e) { alert(manchado ? "As imagens do jogo vieram sem permissão para virar arquivo neste navegador. Use o print da tela (Win+Shift+S)." : "Não deu para salvar a imagem neste navegador."); }
+  }
+
+  // ---------- vários rounds ao mesmo tempo ----------
+  function prepararMulti() {
+    rodadas.clear();
+    for (const n of S.multi) { const r = d.rounds.find((x) => x.n === n); if (r) rodadas.set(n, { r, R: montarRound(d, r) }); }
+    const fim = Math.max(8000, ...[...rodadas.values()].map((x) => x.R.fim));
+    S.round = { ...S.round, fim };
+    el.querySelectorAll("[data-round]").forEach((b) => b.classList.toggle("rp-round--multi", S.multi.has(Number(b.dataset.round))));
+    el.querySelector("[data-placar]").innerHTML = `${S.multi.size} round${S.multi.size === 1 ? "" : "s"} juntos`;
+    el.querySelector("[data-marcas]").innerHTML = "";
+    S.t = Math.min(S.t, fim); mostrarTempo(); pedir();
+  }
+  function alternarMulti() {
+    const b = el.querySelector('[data-acao="multi"]');
+    if (S.multi) {   // sai do modo: volta para o round que estava aberto
+      S.multi = null; b.setAttribute("aria-pressed", "false"); el.classList.remove("rp--multi");
+      el.querySelectorAll("[data-round]").forEach((x) => x.classList.remove("rp-round--multi"));
+      abrirRound(S.r.n); return;
+    }
+    S.multi = new Set([S.r.n]); b.setAttribute("aria-pressed", "true"); el.classList.add("rp--multi");
+    prepararMulti();
+  }
+  function alternarRoundMulti(n) { if (S.multi.has(n) && S.multi.size > 1) S.multi.delete(n); else S.multi.add(n); prepararMulti(); }
+  function escolherLado(ataque) {
+    if (!S.multi) alternarMulti();
+    S.multi = new Set(d.rounds.filter((r) => (r.atk === d.nosso) === ataque).map((r) => r.n));
+    prepararMulti();
   }
 
   // ---------- eventos ----------
   el.addEventListener("click", (ev) => {
-    const rb = ev.target.closest("[data-round]"); if (rb) { abrirRound(Number(rb.dataset.round)); return; }
+    const rb = ev.target.closest("[data-round]");
+    if (rb) { if (S.multi) alternarRoundMulti(Number(rb.dataset.round)); else abrirRound(Number(rb.dataset.round)); return; }
     const fb = ev.target.closest("[data-ferr]"); if (fb) { escolherFerramenta(fb.dataset.ferr); return; }
     const cb = ev.target.closest("[data-cor]");
     if (cb) { S.cor = cb.dataset.cor; el.querySelectorAll("[data-cor]").forEach((x) => x.setAttribute("aria-pressed", String(x === cb))); if (S.ferr === "mover" || S.ferr === "borracha") escolherFerramenta("caneta"); return; }
@@ -415,7 +500,11 @@ export function ligarReplay(raiz, d, rSel = 1) {
     }
     if (!ev.target.closest(".rp-pop")) el.querySelectorAll("[data-pop]").forEach((x) => { x.hidden = true; });
     const ac = ev.target.closest("[data-acao]")?.dataset.acao;
-    if (ac === "vel") definirVel(VELOCIDADES[(VELOCIDADES.indexOf(S.vel) + 1) % VELOCIDADES.length]);
+    if (ac === "zoom-mais") zoomEm(1.4);
+    else if (ac === "zoom-menos") zoomEm(1 / 1.4);
+    else if (ac === "multi") alternarMulti();
+    else if (ac === "multi-atk" || ac === "multi-def") escolherLado(ac === "multi-atk");
+    else if (ac === "vel") definirVel(VELOCIDADES[(VELOCIDADES.indexOf(S.vel) + 1) % VELOCIDADES.length]);
     else if (ac === "play") play();
     else if (ac === "anterior") abrirRound(Math.max(1, S.r.n - 1));
     else if (ac === "proximo") abrirRound(Math.min(d.rounds.length, S.r.n + 1));
@@ -439,8 +528,8 @@ export function ligarReplay(raiz, d, rSel = 1) {
     const k = ev.key;
     if (k === " ") { ev.preventDefault(); play(); }
     else if (k === "ArrowRight" || k === "ArrowLeft") { ev.preventDefault(); irPara(S.t + (k === "ArrowRight" ? 1 : -1) * (ev.shiftKey ? 1000 : 5000)); }
-    else if (k === ",") abrirRound(Math.max(1, S.r.n - 1));
-    else if (k === ".") abrirRound(Math.min(d.rounds.length, S.r.n + 1));
+    else if (k === "," && !S.multi) abrirRound(Math.max(1, S.r.n - 1));
+    else if (k === "." && !S.multi) abrirRound(Math.min(d.rounds.length, S.r.n + 1));
     else if (/^[1-6]$/.test(k)) definirVel(VELOCIDADES[Number(k) - 1]);
     else if (k.toLowerCase() === "p") escolherFerramenta("caneta");
     else if (k.toLowerCase() === "a") escolherFerramenta("seta");

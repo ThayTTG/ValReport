@@ -2278,7 +2278,7 @@ body.com-nav .conta-chip { order: 2; }
   display: grid; grid-template-columns: minmax(0, 1fr) 290px; grid-template-areas: "palco times" "barra barra" "feed feed";
   gap: 10px; padding: 10px; border-radius: 16px; background: var(--rp-fundo); color: var(--rp-texto); outline: none; }
 .rp:fullscreen { padding: 14px; overflow: auto; align-content: start; }
-.rp-palco { grid-area: palco; position: relative; justify-self: center; width: 100%; max-width: min(calc(100dvh - var(--topo-altura, 60px) - 310px), 860px); min-width: min(100%, 300px); aspect-ratio: 1; }
+.rp-palco { grid-area: palco; position: relative; justify-self: center; width: 100%; max-width: min(calc(100dvh - var(--topo-altura, 60px) - 340px), 860px); min-width: min(100%, 300px); aspect-ratio: 1; }
 .rp:fullscreen .rp-palco { max-width: min(calc(100dvh - 230px), 1200px); }
 .rp-mapa, .rp-desenho { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .rp-desenho { cursor: pointer; }
@@ -2383,3 +2383,15 @@ body.com-nav .conta-chip { order: 2; }
   .rp-play { width: 44px; }
   .rp-pop__caixa--teclas { min-width: 240px; }
 }
+/* v44: replay — zoom e vários rounds */
+.rp-menos { font-size: 20px; line-height: 1; font-weight: 600; }
+.rp-multi { display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--rp-borda); border-radius: 3px; background: transparent;
+  color: var(--rp-suave); font: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.rp-multi svg { font-size: 14px; }
+.rp-multi[aria-pressed="true"] { color: #fff; border-color: var(--destaque); background: color-mix(in srgb, var(--destaque) 25%, transparent); }
+.rp-multi-atalhos { display: none; gap: 4px; }
+.rp--multi .rp-multi-atalhos { display: inline-flex; }
+.rp-multi-atalhos button { padding: 0 8px; border: 1px solid var(--rp-borda); border-radius: 3px; background: transparent; color: var(--rp-texto); font: inherit; font-size: 12px; cursor: pointer; }
+.rp--multi .rp-round[aria-pressed="true"]:not(.rp-round--multi) { background: transparent; color: var(--rp-texto); box-shadow: inset 0 -2px 0 var(--cor-venc); }
+.rp-round--multi { background: color-mix(in srgb, var(--destaque) 30%, transparent) !important; color: #fff !important; outline: 1px solid var(--destaque); }
+@media (max-width: 560px) { .rp-multi { padding: 0 6px; font-size: 10.5px; } }
