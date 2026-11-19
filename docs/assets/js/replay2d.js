@@ -89,50 +89,63 @@ function posicao(tr, t) {
 }
 
 // ---------- HTML ----------
+// Layout de analista (mapa grande, times à direita, ferramentas, rounds e linha do tempo embaixo)
 export function htmlReplay(d, rSel) {
-  const nossoGanhou = (r) => r.venc === d.nosso;
+  const vence = (r) => (r.venc === d.nosso ? "nosso" : "deles");
   const ladoNosso = (r) => (r.atk === d.nosso ? "ATQ" : "DEF");
-  const ferramenta = (id, ic, rot) => `<button type="button" class="rp-ferr" data-ferr="${id}" aria-pressed="false" title="${rot}" aria-label="${rot}">${ic}</button>`;
+  const ferr = (id, ic, rot) => `<button type="button" class="rp-ferr" data-ferr="${id}" aria-pressed="false" title="${rot}" aria-label="${rot}">${ic}</button>`;
+  const acao = (id, ic, rot) => `<button type="button" class="rp-ferr" data-acao="${id}" title="${rot}" aria-label="${rot}">${ic}</button>`;
   const temQuadros = d.rounds.some((r) => r.q?.length);
+  const meio = Math.min(12, Math.floor(d.rounds.length / 2));
   return `<div class="rp" data-replay tabindex="-1">
-    <div class="rp-rounds" role="tablist" aria-label="Rounds">${d.rounds.map((r) => `<button type="button" class="rp-round ${nossoGanhou(r) ? "ganhou" : "perdeu"}${r.n === 13 ? " meio" : ""}" data-round="${r.n}" aria-pressed="${r.n === rSel}" title="Round ${r.n} · ${ladoNosso(r)} · ${nossoGanhou(r) ? "vitória" : "derrota"}"><b>${r.n}</b><small>${ladoNosso(r)}</small></button>`).join("")}</div>
-    <div class="rp-corpo">
-      <aside class="rp-time rp-time--nosso" data-time="nosso"></aside>
-      <div class="rp-palco" data-palco>
-        <canvas class="rp-mapa" data-tela-mapa></canvas>
-        <canvas class="rp-desenho" data-tela-desenho></canvas>
-        <div class="rp-placar" data-placar></div>
-        <div class="rp-ferramentas" role="toolbar" aria-label="Desenho">
-          ${ferramenta("mover", icone("mover"), "Só assistir (sem desenhar)")}
-          ${ferramenta("caneta", icone("lapis"), "Caneta (P)")}
-          ${ferramenta("seta", icone("seta"), "Seta (A)")}
-          ${ferramenta("circulo", icone("circulo"), "Círculo (C)")}
-          ${ferramenta("borracha", icone("borracha"), "Borracha (E)")}
-          <span class="rp-cores">${CORES_DESENHO.map((c, i) => `<button type="button" class="rp-cor" data-cor="${c}" aria-pressed="${i === 0}" style="--c:${c}" aria-label="Cor ${i + 1}"></button>`).join("")}</span>
-          <button type="button" class="rp-ferr" data-acao="desfazer" title="Desfazer (Ctrl+Z)" aria-label="Desfazer">${icone("desfazer")}</button>
-          <button type="button" class="rp-ferr" data-acao="limpar" title="Limpar o desenho do round" aria-label="Limpar o desenho">${icone("fechar")}</button>
-          <button type="button" class="rp-ferr" data-acao="salvar" title="Salvar imagem (mapa + desenho)" aria-label="Salvar imagem">${icone("imagem")}</button>
+    <div class="rp-palco" data-palco>
+      <canvas class="rp-mapa" data-tela-mapa></canvas>
+      <canvas class="rp-desenho" data-tela-desenho></canvas>
+      <div class="rp-selo" data-placar></div>
+      <p class="rp-aviso-mapa" title="${temQuadros ? "Posições exatas em cada abate, plant e defuse; entre eles o caminho é estimado. Com o replay do jogo (.vrf), o movimento fica completo." : "Partida exportada antes do replay 2D: só quem matou e quem morreu."}">${icone("info")} ${temQuadros ? "Movimento estimado entre os eventos" : "Só abates (partida antiga)"}</p>
+    </div>
+    <aside class="rp-times" data-times aria-label="Times"></aside>
+    <div class="rp-barra">
+      <div class="rp-ferramentas" role="toolbar" aria-label="Ferramentas">
+        <span class="rp-pop"><button type="button" class="rp-ferr" data-abrir="config" title="Configurações" aria-label="Configurações" aria-expanded="false">${icone("filtro")}</button>
+          <span class="rp-pop__caixa" data-pop="config" hidden>
+            <label><input type="checkbox" data-op="nomes" checked> Nomes <kbd>N</kbd></label>
+            <label><input type="checkbox" data-op="mira" checked> Cone da mira <kbd>V</kbd></label>
+            <label><input type="checkbox" data-op="rastro" checked> Rastro (3 s) <kbd>R</kbd></label></span></span>
+        <span class="rp-pop"><button type="button" class="rp-ferr" data-abrir="teclas" title="Atalhos" aria-label="Atalhos do teclado" aria-expanded="false">${icone("texto")}</button>
+          <span class="rp-pop__caixa rp-pop__caixa--teclas" data-pop="teclas" hidden>
+            <span><kbd>Espaço</kbd> play/pausa</span><span><kbd>←</kbd><kbd>→</kbd> 5 s (Shift: 1 s)</span><span><kbd>,</kbd><kbd>.</kbd> round anterior/próximo</span>
+            <span><kbd>1</kbd>…<kbd>6</kbd> velocidade</span><span><kbd>P</kbd> caneta · <kbd>A</kbd> seta · <kbd>C</kbd> círculo · <kbd>E</kbd> borracha</span>
+            <span><kbd>Esc</kbd> só assistir · <kbd>Ctrl</kbd><kbd>Z</kbd> desfazer · <kbd>F</kbd> tela cheia</span></span></span>
+        <i class="rp-sep"></i>
+        ${ferr("mover", icone("mover"), "Só assistir (Esc)")}
+        ${ferr("caneta", icone("lapis"), "Caneta (P)")}
+        ${ferr("seta", icone("seta"), "Seta (A)")}
+        ${ferr("circulo", icone("circulo"), "Círculo (C)")}
+        ${ferr("borracha", icone("borracha"), "Borracha (E)")}
+        <span class="rp-cores">${CORES_DESENHO.map((c, k) => `<button type="button" class="rp-cor" data-cor="${c}" aria-pressed="${k === 0}" style="--c:${c}" aria-label="Cor ${k + 1}"></button>`).join("")}</span>
+        <i class="rp-sep"></i>
+        ${acao("desfazer", icone("desfazer"), "Desfazer (Ctrl+Z)")}
+        ${acao("limpar", icone("fechar"), "Limpar o desenho do round")}
+        ${acao("salvar", icone("imagem"), "Salvar imagem (mapa + desenho)")}
+        ${acao("tela-cheia", icone("expandir"), "Tela cheia (F)")}
+      </div>
+      <div class="rp-rounds-linha">
+        <button type="button" class="rp-seta" data-acao="anterior" aria-label="Round anterior">${icone("voltar")}</button>
+        <div class="rp-rounds" data-rounds role="tablist" aria-label="Rounds">${d.rounds.map((r) => `${r.n === meio + 1 ? `<i class="rp-meio" aria-hidden="true"></i>` : ""}<button type="button" class="rp-round rp-round--${vence(r)}" data-round="${r.n}" aria-pressed="${r.n === rSel}" title="Round ${r.n} · ${ladoNosso(r)} · ${vence(r) === "nosso" ? "vitória" : "derrota"}">${r.n}</button>`).join("")}</div>
+        <button type="button" class="rp-seta rp-seta--prox" data-acao="proximo" aria-label="Próximo round">${icone("voltar")}</button>
+      </div>
+      <div class="rp-tempo-linha">
+        <button type="button" class="rp-play" data-acao="play" title="Play/pausa (espaço)" aria-label="Play">${SVG_PLAY}</button>
+        <button type="button" class="rp-vel" data-acao="vel" title="Velocidade (1 a 6)" aria-label="Velocidade">1x</button>
+        <span class="rp-relogio">${icone("relogio")}<b data-tempo>0:00</b></span>
+        <div class="rp-trilha" data-trilha role="slider" tabindex="0" aria-label="Tempo do round" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="rp-trilha__eventos" data-marcas></div>
+          <i class="rp-cabeca" data-cabeca></i>
         </div>
       </div>
-      <aside class="rp-time rp-time--deles" data-time="deles"></aside>
-    </div>
-    <div class="rp-controles">
-      <button type="button" class="botao-icone" data-acao="anterior" title="Round anterior (,)" aria-label="Round anterior">${icone("voltar")}</button>
-      <button type="button" class="botao-icone rp-play" data-acao="play" title="Play/pausa (espaço)" aria-label="Play">${SVG_PLAY}</button>
-      <button type="button" class="botao-icone rp-proximo" data-acao="proximo" title="Próximo round (.)" aria-label="Próximo round">${icone("voltar")}</button>
-      <span class="rp-tempo" data-tempo>0:00</span>
-      <div class="rp-linha" data-linha><input type="range" min="0" max="1000" value="0" step="1" aria-label="Tempo do round" data-scrub><div class="rp-marcas" data-marcas></div></div>
-      <select class="rp-vel" data-vel aria-label="Velocidade">${VELOCIDADES.map((v) => `<option value="${v}"${v === 1 ? " selected" : ""}>${v}x</option>`).join("")}</select>
-      <label class="rp-op" title="Nomes (N)"><input type="checkbox" data-op="nomes" checked> Nomes</label>
-      <label class="rp-op" title="Cone da mira (V)"><input type="checkbox" data-op="mira" checked> Mira</label>
-      <label class="rp-op" title="Rastro dos últimos 3 s (R)"><input type="checkbox" data-op="rastro" checked> Rastro</label>
-      <button type="button" class="botao-icone" data-acao="tela-cheia" title="Tela cheia (F)" aria-label="Tela cheia">${icone("expandir")}</button>
     </div>
     <div class="rp-feed" data-feed aria-live="off"></div>
-    <p class="suave pequeno rp-aviso">${icone("info")} ${temQuadros
-      ? "Posições exatas em cada abate, plant e defuse (a API do jogo não manda mais que isso); entre eles o caminho é estimado em linha reta e o começo do round sai do spawn. Com o replay do jogo (.vrf) processado, o movimento fica completo."
-      : "Partida exportada antes do replay 2D: só aparecem quem matou e quem morreu. Na próxima coleta, as partidas ganham a posição de todos."}
-      Atalhos: espaço, ← →, , . (rounds), 1 a 6 (velocidade), P A C E (desenho), Ctrl+Z.</p>
   </div>`;
 }
 
@@ -143,7 +156,14 @@ export function ligarReplay(raiz, d, rSel = 1) {
   const proj = projetor(d.mapa);
   const palco = el.querySelector("[data-palco]"), cv = el.querySelector("[data-tela-mapa]"), cd = el.querySelector("[data-tela-desenho]");
   const ctx = cv.getContext("2d"), cx = cd.getContext("2d");
-  const scrub = el.querySelector("[data-scrub]"), tempoEl = el.querySelector("[data-tempo]"), velEl = el.querySelector("[data-vel]");
+  const trilha = el.querySelector("[data-trilha]"), cabeca = el.querySelector("[data-cabeca]"), tempoEl = el.querySelector("[data-tempo]"), velEl = el.querySelector('[data-acao="vel"]');
+  const mostrarTempo = () => {
+    const f = S.round ? S.t / S.round.fim : 0;
+    cabeca.style.left = `${(f * 100).toFixed(3)}%`;
+    trilha.setAttribute("aria-valuenow", String(Math.round(f * 100)));
+    tempoEl.textContent = fmtT(S.t);
+  };
+  const definirVel = (v) => { S.vel = v; velEl.textContent = `${v}x`; };
   const css = getComputedStyle(document.documentElement);
   const COR = { nosso: css.getPropertyValue("--nosso").trim() || "#4cc9f0", deles: css.getPropertyValue("--deles").trim() || "#ff5d73" };
   const imgs = new Map();
@@ -177,9 +197,11 @@ export function ligarReplay(raiz, d, rSel = 1) {
     // marcas na linha do tempo
     const pos = (t) => `${(100 * t / S.round.fim).toFixed(2)}%`;
     const time = (i) => (d.jogadores[i]?.time === d.nosso ? "nosso" : "deles");
-    el.querySelector("[data-marcas]").innerHTML = r.kills.map(([t, ki]) => `<i class="rp-marca rp-marca--${time(ki)}" style="left:${pos(t)}" title="${fmtT(t)}"></i>`).join("")
-      + (r.plant ? `<i class="rp-marca rp-marca--plant" style="left:${pos(r.plant.t || 0)}" title="Plant ${fmtT(r.plant.t || 0)}"></i>` : "")
-      + (r.defuse ? `<i class="rp-marca rp-marca--defuse" style="left:${pos(r.defuse.t || 0)}" title="Defuse ${fmtT(r.defuse.t || 0)}"></i>` : "");
+    const fimSpike = r.defuse ? r.defuse.t || 0 : S.round.fim;
+    el.querySelector("[data-marcas]").innerHTML = (r.plant ? `<span class="rp-spike" style="left:${pos(r.plant.t || 0)};width:${(100 * (fimSpike - (r.plant.t || 0)) / S.round.fim).toFixed(2)}%"><b>Spike${r.plant.site ? ` ${esc(r.plant.site)}` : ""}</b></span>` : "")
+      + r.kills.map(([t, ki, vi]) => `<i class="rp-evento rp-evento--${time(ki)}" style="left:${pos(t)}" title="${fmtT(t)} · ${esc(nomeDe(ki))} → ${esc(nomeDe(vi))}"></i>`).join("")
+      + (r.plant ? `<i class="rp-evento rp-evento--plant" style="left:${pos(r.plant.t || 0)}" title="Plant ${fmtT(r.plant.t || 0)}"></i>` : "")
+      + (r.defuse ? `<i class="rp-evento rp-evento--defuse" style="left:${pos(r.defuse.t || 0)}" title="Defuse ${fmtT(r.defuse.t || 0)}"></i>` : "");
     try { history.replaceState(null, "", location.hash.replace(/([?&])r=\d+/, `$1r=${r.n}`).replace(/^(#[^?]*)$/, `$1?r=${r.n}`)); } catch (e) { /* ok */ }
     desenharTinta();
     tocar ? play(true) : atualizar();
@@ -247,26 +269,40 @@ export function ligarReplay(raiz, d, rSel = 1) {
     });
   }
 
+  const nomeDe = (i) => { const j = d.jogadores[i]; return j ? (j.slug ? j.nome : j.ag) : "?"; };
   // ---------- painéis (times, placar, killfeed) ----------
   function atualizar() {
     const R = S.round, r = S.r, t = S.t;
-    scrub.value = String(Math.round((1000 * t) / R.fim));
-    tempoEl.textContent = `${fmtT(t)} / ${fmtT(R.fim)}`;
+    mostrarTempo();
     const placarAte = (n) => d.rounds.filter((x) => x.n < n).reduce((o, x) => { o[x.venc === d.nosso ? 0 : 1]++; return o; }, [0, 0]);
     const [a, b] = placarAte(r.n);
-    const ladoNosso = r.atk === d.nosso ? "ataque" : "defesa";
-    el.querySelector("[data-placar]").innerHTML = `<span class="nosso-txt">${a}</span> <small>R${r.n} · você no ${ladoNosso}</small> <span class="deles-txt">${b}</span>`;
+    el.querySelector("[data-placar]").innerHTML = `R${r.n} · ${r.atk === d.nosso ? "Equipe no ataque" : "Equipe na defesa"}`;
     const eco = Object.fromEntries((r.eco || []).map(([i, arma, escudo, carga, sobra]) => [i, { arma, escudo, carga, sobra }]));
-    const kRound = (i) => r.kills.filter(([tk, ki]) => ki === i && tk <= t).length;
+    // abates e mortes na partida até este instante (rounds anteriores + o atual até t)
+    const kd = d.jogadores.map(() => [0, 0]);
+    for (const x of d.rounds) {
+      if (x.n > r.n) break;
+      for (const [tk, ki, vi] of x.kills) { if (x.n === r.n && tk > t) continue; if (kd[ki]) kd[ki][0]++; if (kd[vi]) kd[vi][1]++; }
+    }
+    const escudo = (n) => (/heavy/i.test(n) ? "Pesado" : /light/i.test(n) ? "Leve" : /regen/i.test(n) ? "Regen." : n ? "Colete" : "");
     const linha = (j, i) => {
       const m = R.morte[i], morto = m && t >= m.t, e = eco[i] || {};
-      return `<div class="rp-j${morto ? " morto" : ""}"><span class="rp-j__ag">${imgAgente(j.ag) ? `<img src="${esc(imgAgente(j.ag))}" alt="" loading="lazy">` : ""}</span>
-        <span class="rp-j__txt"><strong>${esc(j.slug ? j.nome : j.ag)}</strong><small>${e.arma ? esc(e.arma) : "—"}${e.escudo ? ` · ${esc(e.escudo.replace(" Shields", "").replace("Light", "Leve").replace("Heavy", "Pesado"))}` : ""}${e.carga ? ` · ${e.carga}` : ""}</small></span>
-        <span class="rp-j__k">${kRound(i) ? `${kRound(i)}K` : ""}</span></div>`;
+      const arma = e.arma ? imgArmaKill(e.arma) : null;
+      return `<div class="rp-j${morto ? " morto" : ""}">
+        <span class="rp-j__topo"><span class="rp-j__ag">${imgAgente(j.ag) ? `<img src="${esc(imgAgente(j.ag))}" alt="" loading="lazy">` : ""}</span>
+          <strong>${esc(j.slug ? j.nome : j.ag)}</strong><small>${kd[i][0]} / ${kd[i][1]}</small>
+          ${arma ? `<img class="rp-j__arma" src="${esc(arma)}" alt="${esc(e.arma)}" title="${esc(e.arma)}" loading="lazy">` : `<small class="rp-j__arma-txt">${esc(e.arma || "")}</small>`}</span>
+        <span class="rp-j__vida"><i style="width:${morto ? 0 : 100}%"></i></span>
+        <span class="rp-j__base"><small>${e.sobra != null ? `$${e.sobra}` : e.carga ? `equip. ${e.carga}` : ""}</small><small>${escudo(e.escudo) ? `${icone("escudo")} ${escudo(e.escudo)}` : ""}</small>
+          <small class="rp-j__estado">${morto ? "morto" : ""}</small></span></div>`;
     };
-    const lista = (nosso) => d.jogadores.map((j, i) => [j, i]).filter(([j]) => (j.time === d.nosso) === nosso);
-    el.querySelector('[data-time="nosso"]').innerHTML = `<h4>Equipe</h4>${lista(true).map(([j, i]) => linha(j, i)).join("")}`;
-    el.querySelector('[data-time="deles"]').innerHTML = `<h4>Adversário</h4>${lista(false).map(([j, i]) => linha(j, i)).join("")}`;
+    const cartaoTime = (nosso, pts) => {
+      const lista = d.jogadores.map((j, i) => [j, i]).filter(([j]) => (j.time === d.nosso) === nosso);
+      const lado = (r.atk === d.nosso) === nosso ? "ATQ" : "DEF";
+      return `<section class="rp-time rp-time--${nosso ? "nosso" : "deles"}"><header><strong>${nosso ? esc(B.equipeAtual?.nome || "Equipe") : "Adversário"}</strong><small>${lado}</small><b>${pts}</b></header>
+        ${lista.map(([j, i]) => linha(j, i)).join("")}</section>`;
+    };
+    el.querySelector("[data-times]").innerHTML = cartaoTime(true, a) + cartaoTime(false, b);
     el.querySelector("[data-feed]").innerHTML = r.kills.map(([tk, ki, vi, arma, tipo]) => {
       const k = d.jogadores[ki] || {}, v = d.jogadores[vi] || {}, ja = tk <= t;
       const icon = tipo === "W" ? imgArmaKill(arma) : null;
@@ -291,8 +327,7 @@ export function ligarReplay(raiz, d, rSel = 1) {
   let ultPainel = 0;
   function atualizarLeve() {   // o mapa a cada quadro; os painéis 4x por segundo
     pedir();
-    scrub.value = String(Math.round((1000 * S.t) / S.round.fim));
-    tempoEl.textContent = `${fmtT(S.t)} / ${fmtT(S.round.fim)}`;
+    mostrarTempo();
     if (performance.now() - ultPainel > 250) { ultPainel = performance.now(); atualizar(); }
   }
   function play(sim = !S.tocando) {
@@ -371,8 +406,17 @@ export function ligarReplay(raiz, d, rSel = 1) {
     const cb = ev.target.closest("[data-cor]");
     if (cb) { S.cor = cb.dataset.cor; el.querySelectorAll("[data-cor]").forEach((x) => x.setAttribute("aria-pressed", String(x === cb))); if (S.ferr === "mover" || S.ferr === "borracha") escolherFerramenta("caneta"); return; }
     const ir = ev.target.closest("[data-ir]"); if (ir) { irPara(Number(ir.dataset.ir) - 1500); return; }
+    const ab = ev.target.closest("[data-abrir]");
+    if (ab) {
+      const caixa = el.querySelector(`[data-pop="${ab.dataset.abrir}"]`), abrir = caixa.hidden;
+      el.querySelectorAll("[data-pop]").forEach((x) => { x.hidden = true; });
+      el.querySelectorAll("[data-abrir]").forEach((x) => x.setAttribute("aria-expanded", "false"));
+      caixa.hidden = !abrir; ab.setAttribute("aria-expanded", String(abrir)); return;
+    }
+    if (!ev.target.closest(".rp-pop")) el.querySelectorAll("[data-pop]").forEach((x) => { x.hidden = true; });
     const ac = ev.target.closest("[data-acao]")?.dataset.acao;
-    if (ac === "play") play();
+    if (ac === "vel") definirVel(VELOCIDADES[(VELOCIDADES.indexOf(S.vel) + 1) % VELOCIDADES.length]);
+    else if (ac === "play") play();
     else if (ac === "anterior") abrirRound(Math.max(1, S.r.n - 1));
     else if (ac === "proximo") abrirRound(Math.min(d.rounds.length, S.r.n + 1));
     else if (ac === "desfazer") { tinta().pop(); desenharTinta(); }
@@ -380,9 +424,14 @@ export function ligarReplay(raiz, d, rSel = 1) {
     else if (ac === "salvar") salvarImagem();
     else if (ac === "tela-cheia") { if (document.fullscreenElement) document.exitFullscreen(); else el.requestFullscreen?.().catch(() => null); }
   });
-  scrub.addEventListener("input", () => { S.t = (Number(scrub.value) / 1000) * S.round.fim; atualizarLeve(); });
-  scrub.addEventListener("change", atualizar);
-  velEl.addEventListener("change", () => { S.vel = Number(velEl.value); });
+  // linha do tempo: tocar ou arrastar
+  const tempoDoPonteiro = (ev) => { const b = trilha.getBoundingClientRect(); return Math.max(0, Math.min(1, (ev.clientX - b.left) / b.width)) * S.round.fim; };
+  trilha.addEventListener("pointerdown", (ev) => { trilha.setPointerCapture(ev.pointerId); S.arrastando = true; S.t = tempoDoPonteiro(ev); atualizarLeve(); });
+  trilha.addEventListener("pointermove", (ev) => { if (S.arrastando) { S.t = tempoDoPonteiro(ev); atualizarLeve(); } });
+  const soltarTrilha = () => { if (S.arrastando) { S.arrastando = false; atualizar(); } };
+  trilha.addEventListener("pointerup", soltarTrilha);
+  trilha.addEventListener("pointercancel", soltarTrilha);
+  trilha.addEventListener("keydown", (ev) => { if (ev.key === "Home") irPara(0); else if (ev.key === "End") irPara(S.round.fim); });
   el.querySelectorAll("[data-op]").forEach((c) => c.addEventListener("change", () => { S.op[c.dataset.op] = c.checked; pedir(); }));
   const teclas = (ev) => {
     if (!el.isConnected) { document.removeEventListener("keydown", teclas); S.tocando = false; return; }
@@ -392,7 +441,7 @@ export function ligarReplay(raiz, d, rSel = 1) {
     else if (k === "ArrowRight" || k === "ArrowLeft") { ev.preventDefault(); irPara(S.t + (k === "ArrowRight" ? 1 : -1) * (ev.shiftKey ? 1000 : 5000)); }
     else if (k === ",") abrirRound(Math.max(1, S.r.n - 1));
     else if (k === ".") abrirRound(Math.min(d.rounds.length, S.r.n + 1));
-    else if (/^[1-6]$/.test(k)) { velEl.value = String(VELOCIDADES[Number(k) - 1]); S.vel = VELOCIDADES[Number(k) - 1]; }
+    else if (/^[1-6]$/.test(k)) definirVel(VELOCIDADES[Number(k) - 1]);
     else if (k.toLowerCase() === "p") escolherFerramenta("caneta");
     else if (k.toLowerCase() === "a") escolherFerramenta("seta");
     else if (k.toLowerCase() === "c" && !ev.ctrlKey && !ev.metaKey) escolherFerramenta("circulo");
@@ -410,4 +459,9 @@ export function ligarReplay(raiz, d, rSel = 1) {
   escolherFerramenta("mover");
   medir();
   abrirRound(rSel);
+  // ocupa a tela: rola até o replay, logo abaixo do topo fixo do site
+  requestAnimationFrame(() => {
+    const topo = (document.querySelector(".topo")?.offsetHeight || 0) + (document.querySelector("main .abas")?.offsetHeight || 0);
+    window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - topo - 8));
+  });
 }
