@@ -1,4 +1,4 @@
-// Aba "Atributos" do jogador: 7 notas de estilo de 0 a 100 (no jeito da HLTV), comparadas com quem joga a mesma função
+// Aba "Atributos" do jogador: 7 notas de estilo de 0 a 100 (no jeito da HLTV), comparadas com todos os jogadores dos lobbies (v39; antes, por função)
 // nos lobbies coletados. O cálculo é do ferramentas/atributos.py (chega em data/atributos.json).
 // v2: as notas ficam numa coluna compacta à esquerda; os dois lados (ataque e defesa) vão juntos.
 // v3: à direita das notas fica a comparação (radar com as 7 notas e os números frente a frente, "A × B"); o jeito de
@@ -94,7 +94,8 @@ function comparacao(d, e, j, vs) {
         <td class="${maior === "a" ? "atr-vs__maior" : ""}">${na ?? "—"}</td>
         ${o ? `<td class="${maior === "b" ? "atr-vs__maior" : ""}">${nb ?? "—"}</td>` : ""}</tr>`;
   }).join("");
-  const funcoes = o && o.funcao !== j.funcao
+  const todos = (d.versao || 2) >= 3;   // v39: comparação com todos os jogadores, não por função
+  const funcoes = todos ? (o ? "Os dois são comparados com todos os jogadores dos lobbies, de todas as funções." : "") : o && o.funcao !== j.funcao
     ? `Cada nota compara a pessoa com quem joga a mesma função que ela: ${esc(e.apelido)} entre quem joga de ${esc(j.funcao)}, ${esc(nome(vs))} entre quem joga de ${esc(o.funcao)}.`
     : o ? `Os dois são comparados com quem joga de ${esc(j.funcao)}.` : "";
   const pequena = [j.amostra_pequena ? e.apelido : null, o?.amostra_pequena ? nome(vs) : null].filter(Boolean);
@@ -118,7 +119,7 @@ function comparacao(d, e, j, vs) {
           <tfoot><tr><th scope="row">Rounds</th><td>${num(j.rounds)}</td>${o ? `<td>${num(o.rounds)}</td>` : ""}</tr></tfoot>
         </table>
       </div>
-      <p class="suave pequeno atr-vs__nota">O anel marcado é o 50, o normal da função. Mais para fora quer dizer que a pessoa faz mais aquilo, não que joga melhor.${funcoes ? ` ${funcoes}` : ""}${pequena.length ? ` Amostra pequena (${esc(pequena.join(" e "))}): o desenho ainda muda bastante.` : ""}</p>
+      <p class="suave pequeno atr-vs__nota">O anel marcado é o 50, ${todos ? "o normal dos lobbies" : "o normal da função"}. Mais para fora quer dizer que a pessoa faz mais aquilo, não que joga melhor.${funcoes ? ` ${funcoes}` : ""}${pequena.length ? ` Amostra pequena (${esc(pequena.join(" e "))}): o desenho ainda muda bastante.` : ""}</p>
     </section>`;
 }
 
@@ -154,8 +155,8 @@ export async function htmlAtributos(e, q) {
         <div class="atr-painel">
           <div class="cartao atr-resumo">
             <p class="atr-frase">${esc(j.frase)}</p>
-            <p class="suave pequeno">Comparado com ${num(L.base)} jogador${L.base === 1 ? "" : "es"} de ${esc(j.funcao)} nos lobbies coletados (as duas equipes de cada partida) · ${num(L.rounds)} rounds de ${esc(e.apelido)} em ${num(j.partidas)} partida${j.partidas === 1 ? "" : "s"}, ataque e defesa juntos${outras ? ` · também jogou ${esc(outras)}` : ""}.</p>
-            ${j.amostra_pequena ? `<p class="atr-amostra">${icone("relogio")} Amostra pequena: menos de ${num(d.regras.amostra_firme)} rounds na função. As notas ainda mudam bastante.</p>` : ""}
+            <p class="suave pequeno">Comparado com ${num(L.base)} jogador${L.base === 1 ? "" : "es"} ${(d.versao || 2) >= 3 ? "dos lobbies coletados, de todas as funções" : `de ${esc(j.funcao)} nos lobbies coletados`} (as duas equipes de cada partida) · ${num(L.rounds)} rounds de ${esc(e.apelido)} em ${num(j.partidas)} partida${j.partidas === 1 ? "" : "s"}, ataque e defesa juntos${outras ? ` · também jogou ${esc(outras)}` : ""}.</p>
+            ${j.amostra_pequena ? `<p class="atr-amostra">${icone("relogio")} Amostra pequena: menos de ${num(d.regras.amostra_firme)} rounds${(d.versao || 2) >= 3 ? "" : " na função"}. As notas ainda mudam bastante.</p>` : ""}
             ${ia ? `<div class="atr-ia">
                 <p class="atr-ia__selo"><span class="selo selo--destaque">${icone("estrela")} Resumo por IA</span> <small class="suave">${esc(dataCurta(ia.data))}${ia.atual ? "" : " · antes das partidas mais novas"}</small></p>
                 <p class="atr-ia__texto">${esc(ia.texto)}</p>
@@ -165,7 +166,7 @@ export async function htmlAtributos(e, q) {
               <p class="atr-texto">${esc(j.texto || "")}</p>
             </div>
           </div>
-          <p class="suave pequeno atr-nota-rodape">As notas dizem o que a pessoa costuma fazer, não o quanto ela é boa. 50 é o normal para quem joga ${esc(j.funcao)} com vocês. Usa as partidas ${nomePeriodo(per)}.${ia ? " O resumo por IA é escrito só a partir destes números, sem o nome de ninguém, e pode errar: o texto “Pelos números” é sempre a referência." : ""}</p>
+          <p class="suave pequeno atr-nota-rodape">As notas dizem o que a pessoa costuma fazer, não o quanto ela é boa. ${(d.versao || 2) >= 3 ? "50 é o normal dos jogadores dos lobbies de vocês, de todas as funções." : `50 é o normal para quem joga ${esc(j.funcao)} com vocês.`} Usa as partidas ${nomePeriodo(per)}.${ia ? " O resumo por IA é escrito só a partir destes números, sem o nome de ninguém, e pode errar: o texto “Pelos números” é sempre a referência." : ""}</p>
         </div>
       </div>
     </section>`;

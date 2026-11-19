@@ -4,10 +4,12 @@ Cada jogador da equipe ganha 7 notas que dizem o que ele costuma fazer, não o q
 Poder de fogo, Entrada, Troca, Abertura, Fechamento, Sniper e Utilitário.
 
 Como a nota sai:
-  1. Para cada estatística, a posição da pessoa (percentil, 0 a 100) entre todos os jogadores dos lobbies
-     coletados que jogaram a mesma função (as duas equipes de cada partida; quem jogou várias partidas conta uma vez).
-  2. A nota do atributo é a média dessas posições. 50 = o normal para quem joga a mesma função com a gente.
-  3. Também sai separado por lado (ataque e defesa). Com menos de 100 rounds na função, vem "amostra pequena".
+  1. Para cada estatística, a posição da pessoa (percentil, 0 a 100) entre TODOS os jogadores dos lobbies coletados,
+     de todas as funções (as duas equipes de cada partida; quem jogou várias partidas conta uma vez). v39: antes era só
+     contra quem jogava a mesma função, e isso escondia o que distingue alguém (um Chamber que usa muita sniper ficava
+     "na média" porque todo Chamber usa). A pessoa entra com todos os rounds dela, de qualquer função.
+  2. A nota do atributo é a média dessas posições. 50 = o normal dos lobbies de vocês.
+  3. Também sai separado por lado (ataque e defesa). Com menos de 100 rounds, vem "amostra pequena".
   4. Estatísticas raras (sniper, abates com habilidade) têm um mínimo: abaixo dele, a posição cai na proporção.
      Sem isso, quem comprou uma Marshal num eco passava na frente de todos os que têm zero.
   5. Um texto por regras (sempre) e, no report das 21h na nuvem, um resumo por IA (GitHub Models) por cima dele.
@@ -193,11 +195,11 @@ def _fmt(v, fmt):
 _FMT = {sid: fmt for *_, lista in ATRIBUTOS for sid, _, fmt, _ in lista}
 _NOME = {aid: nome for aid, nome, *_ in ATRIBUTOS}
 
-# Uma frase para nota alta e outra para nota baixa. {x} = valor da pessoa, {x_m} = média da função.
-# Sniper baixo não vira frase: quase todo mundo fora da função de sniper tem nota baixa ali.
+# Uma frase para nota alta e outra para nota baixa. {x} = valor da pessoa, {x_m} = média dos lobbies.
+# Sniper baixo não vira frase: quase todo mundo tem nota baixa ali.
 _FRASES = {
-    "fogo": ("Produz bastante dano: {adr} de dano por round, contra {adr_m} de quem joga a mesma função, e abate em {r_kill} dos rounds.",
-             "Produz menos dano que o normal da função ({adr} por round, média {adr_m}): o peso no jogo vem de outro lugar."),
+    "fogo": ("Produz bastante dano: {adr} de dano por round, contra {adr_m} da média dos lobbies, e abate em {r_kill} dos rounds.",
+             "Produz menos dano que o normal dos lobbies ({adr} por round, média {adr_m}): o peso no jogo vem de outro lugar."),
     "entrada": ("Costuma ir na frente e morrer abrindo espaço: {p_trocada} das mortes são trocadas pelo time (média {p_trocada_m}).",
                 "Raramente morre abrindo espaço para o time: só {p_trocada} das mortes são trocadas (média {p_trocada_m})."),
     "troca": ("Joga perto do time e pune rápido: {p_troca} dos abates são troca (média {p_troca_m}).",
@@ -208,7 +210,7 @@ _FRASES = {
                    "Raramente está de pé no fim do round: termina {vivo} dos rounds com vida (média {vivo_m})."),
     "sniper": ("Usa bastante sniper: tem uma na mão em {r_sniper} dos rounds e faz {k_sniper} dos abates com ela.", None),
     "utilitario": ("Usa muito as habilidades: {util_pr} por round (média {util_pr_m}).",
-                   "Usa menos as habilidades que o normal da função: {util_pr} por round (média {util_pr_m})."),
+                   "Usa menos as habilidades que o normal dos lobbies: {util_pr} por round (média {util_pr_m})."),
 }
 
 
@@ -239,9 +241,9 @@ def texto_regras(j):
     if altas:
         nomes = [_NOME[a].lower() for _, a in altas]
         lista = nomes[0] if len(nomes) == 1 else f"{', '.join(nomes[:-1])} e {nomes[-1]}"
-        partes.append(f"Como {fn}, tem um jeito puxado para {lista}.")
+        partes.append(f"Comparado com todos os jogadores dos lobbies, tem um jeito puxado para {lista}.")
     else:
-        partes.append(f"Como {fn}, tem um jeito equilibrado: nenhuma nota fica muito acima do normal da função.")
+        partes.append("Tem um jeito equilibrado: nenhuma nota fica muito acima do normal dos lobbies.")
     diz_algo = lambda a: vals.get(_CHAVE[a]) != vals.get(f"{_CHAVE[a]}_m")  # noqa: E731
     partes += [_FRASES[a][0].format(**vals) for _, a in altas if diz_algo(a)]
     partes += [_FRASES[a][1].format(**vals) for _, a in baixas if diz_algo(a)]
@@ -262,7 +264,7 @@ def texto_regras(j):
             lado, outro = ("no ataque", "na defesa") if na > nd else ("na defesa", "no ataque")
             partes.append(f"A nota de {_NOME[aid]} sobe {lado}: {max(na, nd)}, contra {min(na, nd)} {outro}.")
     if j["amostra_pequena"]:
-        partes.append(f"Ainda são só {j['rounds']} rounds na função, então esse retrato pode mudar bastante.")
+        partes.append(f"Ainda são só {j['rounds']} rounds, então esse retrato pode mudar bastante.")
     return " ".join(partes)
 
 
@@ -284,7 +286,7 @@ INSTRUCAO = (
     "para a própria equipe ler. Use só os dados enviados. Regras:\n"
     "- 3 ou 4 frases, no máximo 90 palavras, num parágrafo só, sem títulos nem listas.\n"
     "- As notas vão de 0 a 100 e dizem o que a pessoa costuma fazer, não o quanto ela é boa. "
-    "50 é o normal de quem joga a mesma função nesses lobbies; 65 ou mais é alto; 35 ou menos é baixo.\n"
+    "50 é o normal dos jogadores desses lobbies, de todas as funções; 65 ou mais é alto; 35 ou menos é baixo.\n"
     "- Não afirme nada que não esteja nos números: nada de agentes, mapas, posições, jogadas, mira ou comunicação.\n"
     "- Não dê conselhos nem diga se é bom ou ruim. Não cite nomes. Evite marcar gênero (prefira 'joga', 'costuma').\n"
     "- Cite ataque e defesa só se a diferença numa nota for de 15 pontos ou mais.\n"
@@ -293,7 +295,7 @@ INSTRUCAO = (
 
 
 def dados_para_ia(j, atributos_def):
-    """O que vai para a IA: só função, contagens, notas e estatísticas (com a média da função)."""
+    """O que vai para a IA: só função principal, contagens, notas e estatísticas (com a média dos lobbies)."""
     def bloco(lado):
         L = j["lados"].get(lado)
         if not L:
@@ -307,13 +309,13 @@ def dados_para_ia(j, atributos_def):
             nomes = {s["id"]: s["nome"] for s in a["stats"]}
             out["notas"][a["nome"]] = {
                 "nota": d["nota"],
-                "estatisticas": {nomes[sid]: {"valor": _fmt(v, _FMT[sid]), "media_da_funcao": _fmt(m, _FMT[sid])}
+                "estatisticas": {nomes[sid]: {"valor": _fmt(v, _FMT[sid]), "media_dos_lobbies": _fmt(m, _FMT[sid])}
                                  for sid, v, m, *_ in d["stats"]},
             }
         return out
     return {
         "quem": "o jogador",
-        "funcao": j["funcao"], "partidas": j["partidas"], "rounds": j["rounds"],
+        "funcao_principal": j["funcao"], "partidas": j["partidas"], "rounds": j["rounds"],
         "amostra_pequena": j["amostra_pequena"],
         "os_dois_lados": bloco("ambos"), "ataque": bloco("ataque"), "defesa": bloco("defesa"),
     }
@@ -392,28 +394,34 @@ def calcular(analises, membros, cfg=None):
     """membros = {puuid: slug} da equipe. Devolve o atributos.json do site."""
     analises = list(analises)
     por = _rounds_por(analises)
-    stats = {k: {l: estatisticas(rs) for l, rs in lados.items()} for k, lados in por.items()}
+    # v39: cada pessoa com todos os rounds dela (qualquer função), comparada com todo mundo dos lobbies
+    por_pu = defaultdict(lambda: {l: [] for l in LADOS})
+    for (pu, fn), lados in por.items():
+        for l, rs in lados.items():
+            por_pu[pu][l].extend(rs)
+    stats = {pu: {l: estatisticas(rs) for l, rs in lados.items()} for pu, lados in por_pu.items()}
 
-    # Base de comparação: cada função, cada lado, só quem tem rounds suficientes
+    # Base de comparação: cada lado, todos os jogadores com rounds suficientes
     base = defaultdict(list)
-    for (pu, fn), lados in stats.items():
+    for pu, lados in stats.items():
         for l, st in lados.items():
             if st and st["rounds"] >= MIN_ROUNDS_BASE:
-                base[(fn, l)].append(st)
+                base[l].append(st)
 
     jogadores = {}
     for pu, slug in membros.items():
         funcoes = Counter({fn: len(lados["ambos"]) for (p, fn), lados in por.items() if p == pu})
         if not funcoes:
             continue
-        fn, rounds = funcoes.most_common(1)[0]
-        partidas = len({r["match_id"] for r in por[(pu, fn)]["ambos"]})
+        fn = funcoes.most_common(1)[0][0]   # a função principal (só para mostrar)
+        rounds = len(por_pu[pu]["ambos"])
+        partidas = len({r["match_id"] for r in por_pu[pu]["ambos"]})
         lados_out = {}
         for l in LADOS:
-            st = stats[(pu, fn)][l]
+            st = stats[pu][l]
             if not st:
                 continue
-            grupo = base[(fn, l)]
+            grupo = base[l]
             notas = {}
             for aid, _, _, _, lista in ATRIBUTOS:
                 linhas, pcts = [], []
@@ -441,9 +449,9 @@ def calcular(analises, membros, cfg=None):
         j["texto"] = texto_regras(j)
         jogadores[slug] = j
 
-    contagem = Counter(fn for (fn, l), g in base.items() if l == "ambos" for _ in g)
+    contagem = {"todos": len(base["ambos"])}
     return {
-        "versao": 2,
+        "versao": 3,   # v39: comparação com todos os jogadores (antes, por função)
         "regras": {"amostra_firme": AMOSTRA_FIRME, "min_rounds_base": MIN_ROUNDS_BASE, "min_base": MIN_BASE,
                    "partidas": len(analises), "pisos": PISOS, "dif_lado": DIF_LADO},
         "base": dict(contagem),
@@ -467,7 +475,7 @@ def main():
     ctx = gr.carregar_contexto(datetime.now(av.FUSO_BR).date().isoformat(), cfg_tudo)
     membros = {ctx["puuid_de"][r]: gr.apelido(r, cfg) for r in cfg.get("jogadores", []) if r in ctx["puuid_de"]}
     d = calcular(ctx["analises"].values(), membros, cfg)
-    print(f"Atributos: {d['regras']['partidas']} partidas · base por função: {d['base']}\n")
+    print(f"Atributos: {d['regras']['partidas']} partidas · base: {d['base']['todos']} jogadores (todas as funções)\n")
     nomes = [a["nome"] for a in d["atributos"]]
     for quem, j in d["jogadores"].items():
         notas = j["lados"]["ambos"]["notas"]
