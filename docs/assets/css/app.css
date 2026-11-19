@@ -2222,3 +2222,51 @@ body.com-nav .conta-chip { order: 2; }
 
 /* v38: período dos Atributos */
 .atr-periodo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+
+/* =====================================================================
+   v40: esqueletos de carregamento e "Desde a sua última visita"
+   ===================================================================== */
+.so-leitor { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.esqueleto { display: grid; gap: 14px; padding-top: 6px; animation: surgir .25s ease .1s backwards; }
+.esq { display: block; border-radius: 8px; background: linear-gradient(90deg, var(--superficie-2) 0%, color-mix(in srgb, var(--superficie-2) 55%, var(--borda)) 40%, var(--superficie-2) 80%);
+  background-size: 300% 100%; animation: esq-brilho 1.4s ease-in-out infinite; }
+@keyframes esq-brilho { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) { .esq { animation: none; } }
+.esq--texto { height: 12px; }
+.esq--titulo { height: 24px; border-radius: 9px; }
+.esq--numero { height: 30px; width: 40%; margin: 8px 0; }
+.esq--foto { width: 64px; height: 64px; border-radius: 16px; flex: none; }
+.esq--icone { width: 36px; height: 36px; border-radius: 10px; flex: none; }
+.esq--pilula { height: 36px; border-radius: 999px; flex: none; }
+.esq--dia { height: 72px; border-radius: 10px; }
+.esq-cartao { display: grid; gap: 10px; align-content: start; padding: 16px; border: 1px solid var(--borda); border-radius: var(--raio, 16px); background: var(--superficie); }
+.esq-alto { min-height: 170px; }
+.esq-cabecalho { padding: 22px; }
+.esq-linha { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.esq-pilha { display: grid; gap: 10px; }
+.esq-abas { flex-wrap: nowrap; overflow: hidden; }
+.esq-tabela { flex-wrap: nowrap; padding: 6px 0; border-bottom: 1px solid var(--borda); }
+.esq-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.esq-grade--largo { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.esq-grade--5 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.esq-duas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.esq-agenda { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(240px, 1fr); gap: 14px; }
+.esq-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+@media (max-width: 760px) { .esq-agenda { grid-template-columns: 1fr; } .esq--dia { height: 46px; } .esq-duas { grid-template-columns: 1fr; } }
+
+.novidades { margin: 0 0 18px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--destaque) 35%, var(--borda)); border-radius: var(--raio, 16px);
+  background: linear-gradient(135deg, var(--destaque-suave), var(--superficie) 70%); animation: surgir .3s ease backwards; }
+.novidades[hidden] { display: none; }
+.novidades__topo { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.novidades__topo h2 { font-size: 15px; }
+.novidades__lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 6px; }
+.novidades__item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; color: var(--texto); background: color-mix(in srgb, var(--superficie) 70%, transparent); font-size: 14px; }
+.novidades__item:hover { text-decoration: none; background: var(--superficie-2); }
+.novidades__item > span:nth-child(2) { flex: 1; min-width: 0; }
+.novidades__item > svg:last-child { color: var(--suave); font-size: 14px; flex: none; }
+.novidades__ic { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 9px; background: var(--superficie-2); color: var(--destaque-texto); }
+.novidades__ic svg { font-size: 16px; }
+.novidades__item--bom .novidades__ic { color: var(--vitoria, #3ccf7e); }
+.novidades__item--ruim .novidades__ic { color: var(--derrota, #f06a6a); }
+.novidades__item--ouro .novidades__ic { color: #f5b83d; }
+.novidades__item--alerta { box-shadow: inset 3px 0 0 var(--alerta, #f5b83d); }

@@ -2,6 +2,7 @@
 // posição no minimapa ou o print enviado pela equipe), Calls e Callouts. Só a equipe vê (convidados não);
 // líder, co-líderes e treinadores editam (o banco confere de novo, em supabase/planejamento.sql).
 
+import { esqueleto } from "./esqueleto.js";
 import { esc, icone, imagem, imgCard, vazio, selo, dataHora } from "./util.js";
 import { B } from "./dados.js";
 import { rpc, assinar, enviarArquivo, apagarArquivo } from "./nuvem.js";
@@ -231,7 +232,7 @@ const T = { mapa: null, ranking: null };
 /** Moldura comum: carrega os dados e redesenha só a área do planejamento */
 function montar(desenhar) {
   return {
-    html: `<div class="plan" data-plan><div class="carregando" role="status"><span class="girando"></span> Carregando…</div></div>`,
+    html: `<div class="plan" data-plan>${esqueleto("plan")}</div>`,
     depois: async (main) => {
       const raiz = main.querySelector("[data-plan]");
       if (!raiz) return;

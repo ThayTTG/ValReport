@@ -22,6 +22,8 @@ import { comAgendaNoInicio } from "./agenda.js";
 import { comMapPool } from "./planejamento.js";
 import { ligarPaleta } from "./paleta.js";
 import { ligarNavegacao, atualizarNavegacao } from "./navegacao.js";
+import { esqueleto, esqueletoDaRota } from "./esqueleto.js";
+import { comNovidades } from "./novidades.js";
 import { carregarExcluidas } from "./planejamento.js";
 import { carregarContagem } from "./comentarios.js";
 import { viewSobre } from "./sobre.js";
@@ -80,6 +82,14 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
   const [pagina] = chaveRota(partes);
   const modo = modoForcado || (ultimoCaminho == null ? "pagina" : mesmaPagina ? (manterRolagem ? "nada" : "suave") : pagina === ultimaPagina ? "aba" : "pagina");
   const rolagem = window.scrollY;
+  // v40: se a página demorar, mostra o esqueleto dela no lugar do conteúdo antigo
+  let pronto = false;
+  const tempoEsq = ["pagina", "aba"].includes(modo) && tela !== "carregando" ? setTimeout(() => {
+    if (pronto || id !== renderizando) return;
+    main.innerHTML = esqueleto(esqueletoDaRota(partes));
+    main.setAttribute("aria-busy", "true");
+    if (!mesmaPagina) window.scrollTo(0, 0);
+  }, 150) : null;
   let v;
   try {
     if (tela === "publico") { if (partes[0] === "convite") guardarConvitePendente(partes[1] || ""); v = viewBoasVindas(erroLogin, partes[0] === "convite"); }
@@ -98,7 +108,7 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
     else if (partes[0] === "tatica" && partes[1]) v = await viewTatica(decodeURIComponent(partes[1]), partes[2] || "", q);
     else if (tela === "sem-dados" && partes[0] === "equipe" && ["taticas", "agenda", "mappool", "comps", "calls"].includes(partes[1])) v = await viewEquipe(partes[1], f, q, { semDados: true });
     else if (tela === "sem-dados") v = { titulo: "Sem dados", html: avisoSemDados };
-    else if (!partes.length) v = comAgendaNoInicio(comMapPool(viewHoje(q)));
+    else if (!partes.length) v = comAgendaNoInicio(comMapPool(q.get("dia") ? viewHoje(q) : comNovidades(viewHoje(q))));
     else if (partes[0] === "equipe") v = await viewEquipe(partes[1] || "visao", f, q);
     else if (partes[0] === "j") v = await viewJogador(decodeURIComponent(partes[1] || ""), partes[2] || "geral", f, q);
     else if (partes[0] === "p") v = await viewPartida(decodeURIComponent(partes[1] || ""), partes[2] || "placar", q);
@@ -108,7 +118,10 @@ async function renderizar(manterRolagem = false, modoForcado = null) {
     console.error(erro);
     v = { html: vazio("Algo deu errado ao montar esta página", `<p class="pequeno">${esc(erro.message)}</p>`) };
   }
+  pronto = true;
+  clearTimeout(tempoEsq);
   if (id !== renderizando) return;  // outra navegação começou depois
+  main.removeAttribute("aria-busy");
   main.innerHTML = v.html;
   animar(main, modo);
   document.title = v.titulo ? `${v.titulo} · ValReport` : "ValReport · NokyLabs";
@@ -527,6 +540,7 @@ function telaDeErro(titulo, texto) {
 }
 
 async function iniciar() {
+  if (main.querySelector(".carregando")) main.innerHTML = esqueleto(esqueletoDaRota(lerRota().partes));   // v40
   B.editor = await detectarEditor();
   if (!B.editor) {
     const login = await iniciarNuvem();

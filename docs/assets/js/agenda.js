@@ -2,6 +2,7 @@
 // toda semana, tipos personalizáveis (nome e cor) e exportação para Google Agenda, .ics e Discord.
 // Só a equipe vê (convidados não); líder, co-líderes e treinadores criam e editam (supabase/planejamento.sql).
 
+import { esqueleto } from "./esqueleto.js";
 import { esc, icone, imagem, imgCard, vazio, selo } from "./util.js";
 import { B } from "./dados.js";
 import { rpc } from "./nuvem.js";
@@ -142,7 +143,7 @@ function desenharAgenda(ag, pl) {
 
 function montarAgenda(desenhar, { soEquipe = true, abrir = null } = {}) {
   return {
-    html: `<div class="agenda" data-agenda><div class="carregando" role="status"><span class="girando"></span> Carregando…</div></div>`,
+    html: `<div class="agenda" data-agenda>${esqueleto("agenda")}</div>`,
     depois: async (main) => {
       const raiz = main.querySelector("[data-agenda]");
       if (!raiz) return;
@@ -172,6 +173,14 @@ function montarAgenda(desenhar, { soEquipe = true, abrir = null } = {}) {
 }
 
 export const viewAgenda = (q) => montarAgenda(desenharAgenda, { abrir: q?.get("evento") && q?.get("dia") ? [q.get("evento"), q.get("dia")] : null });
+
+/** Os próximos compromissos com a presença de quem está vendo (Início pessoal): [{ e, dia, inicio (ms), minha }] */
+export async function proximosComPresenca(dias = 2) {
+  const [ag, pl] = await Promise.all([lerAgenda(), lerPlanejamento()]);
+  return entre(ag.eventos, hojeYmd(), ymd(somarDias(new Date(), dias))).map(({ e, dia }) => ({
+    e, dia, inicio: new Date(`${dia}T${e.dia_todo ? "09:00" : e.inicio || "09:00"}:00`).getTime(),
+    minha: presencasDe(ag, e.id, dia)[pl.eu] || "" }));
+}
 
 /** Os próximos compromissos (para a paleta Ctrl+K): [{ e, dia }] */
 export async function proximosEventos(dias = 60) {
