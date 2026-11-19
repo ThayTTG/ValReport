@@ -200,14 +200,12 @@ export function resultadoPool(d) {
   return { pool, pts, ordem, manual: Boolean(manual), votos };
 }
 
-// ---------- Comp: função de cada agente na comp (a mesma regra da coleta para o Playmaker) ----------
-const PLAYMAKERS = { Chamber: ["Sentinela", false], Yoru: ["Duelista", true] };
-export function funcaoNaComp(agente, comp) {
-  const a = agentePor(agente), base = a?.funcao || "";
-  const regra = PLAYMAKERS[a?.nome];
-  if (!regra) return base;
-  const outros = comp.filter((c) => c.agente && c.agente !== a.nome && agentePor(c.agente)?.funcao === regra[0]).length;
-  return (regra[1] ? outros > 0 : outros === 0) ? "Playmaker" : base;
+// ---------- Comp: função de cada agente na comp ----------
+// v37: Chamber e Yoru são sempre Playmaker na comp (nas estatísticas, o Chamber de quem também joga outros sentinelas conta como Sentinela)
+const PLAYMAKERS = new Set(["Chamber", "Yoru"]);
+export function funcaoNaComp(agente) {
+  const a = agentePor(agente);
+  return PLAYMAKERS.has(a?.nome) ? "Playmaker" : a?.funcao || "";
 }
 export function compDe(d, mapa) {
   const c = d.defaults?.[mapa]?.comp || [];
@@ -497,7 +495,7 @@ function desenharComps(d) {
       <div class="secao__titulo"><h2>Comp · ${esc(mapa)}</h2><span class="suave pequeno">${nComp}/5 agentes${Object.keys(funcoes).length ? ` · ${Object.entries(funcoes).map(([f, n]) => `${n} ${f}`).join(" · ")}` : ""}</span></div>
       <div class="comp">${vagas}</div>
       ${avisos.length ? `<p class="aviso aviso--alerta" style="margin-top:10px">${icone("info")}<span>${avisos.join(" ")}</span></p>` : ""}
-      ${edita ? `<p class="suave pequeno" style="margin-top:8px">Monte a comp primeiro: o agente de cada posição vem dela (no Valorant ele é o mesmo no ataque e na defesa). Chamber sem outro sentinela e Yoru com outro duelista contam como Playmaker.</p>` : ""}
+      ${edita ? `<p class="suave pequeno" style="margin-top:8px">Monte a comp primeiro: o agente de cada posição vem dela (no Valorant ele é o mesmo no ataque e na defesa). Chamber e Yoru contam como Playmaker.</p>` : ""}
     </section>
     <div class="grade-2 secao">${lado("ataque")}${lado("defesa")}</div>
     ${edita ? `<p class="lp-acoes" style="margin-top:10px"><button class="botao-secundario botao-mini" type="button" data-plan-acao="restaurar">Restaurar nomes e lugares das posições</button></p>` : ""}

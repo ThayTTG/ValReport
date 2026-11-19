@@ -196,7 +196,14 @@ def carregar_contexto(dia, cfg):
 
     modelo = armazem.carregar_modelo(cfg)
     analises = {}
-    for mid in armazem.partidas_no_periodo(ini_ref, fim):
+    mids = list(armazem.partidas_no_periodo(ini_ref, fim))
+    # v37: antes de analisar, anota os agentes de cada um em todas as partidas (o Chamber de quem também joga
+    # outros sentinelas conta como Sentinela; de quem não joga, como Playmaker)
+    for mid in mids:
+        p = armazem.ler_partida(mid)
+        if p and av.partida_valida(p):
+            av.lembrar_agentes(p)
+    for mid in mids:
         p = armazem.ler_partida(mid)
         if p and av.partida_valida(p):
             analises[mid] = av.analisar_partida_completa(p, modelo, cfg)

@@ -42,12 +42,30 @@ FUNCOES_PADRAO = {
 }
 FUNCOES = ["Duelista", "Iniciador", "Controlador", "Sentinela", "Playmaker", "Outra"]
 
-# Playmaker (v25): agentes que, dependendo da comp, jogam de criar jogada (pick, lurk, Operator) e não na função do jogo.
-#   Chamber: Playmaker quando o time não tem outro sentinela (ele não está segurando bomb sozinho de sentinela).
-#   Yoru:    Playmaker quando o time tem outro duelista (alguém faz o entry e ele joga de lurk / flanco).
-# Jett, Vyse e Phoenix ficam fora da conta automática (podem fazer o entry ou ser sentinela de verdade).
-# Para desligar: "playmaker": false no config.json.
-PLAYMAKERS = {"Chamber": ("Sentinela", "sem_outro"), "Yoru": ("Duelista", "com_outro")}
+# Playmaker (v37): agentes de criar jogada (pick, lurk, Operator), no lugar da função do jogo.
+#   Yoru:    sempre Playmaker.
+#   Chamber: Playmaker, a não ser que a pessoa também jogue outros sentinelas (Killjoy, Cypher, Sage...): aí ela é
+#            sentinela de verdade e o Chamber dela conta como Sentinela. "Também joga" = em pelo menos 2 partidas e
+#            10% das partidas dela guardadas (uma partida de Killjoy de vez em quando não muda nada).
+# Jett, Vyse e Phoenix ficam fora da conta automática. Para desligar: "playmaker": false no config.json.
+PLAYMAKERS = {"Chamber": "Sentinela", "Yoru": "Duelista"}
+SENTINELA_MIN_PARTIDAS, SENTINELA_MIN_FRACAO = 2, 0.10
+_AGENTES_DE = defaultdict(dict)   # puuid -> {match_id: agente}, de todas as partidas lidas nesta execução
+
+
+def lembrar_agentes(partida):
+    """Anota o agente de cada jogador na partida (para saber quem joga outros sentinelas além do Chamber)."""
+    mid = g(partida, "metadata", "match_id")
+    for p in partida.get("players", []) or []:
+        if p.get("puuid") and mid:
+            _AGENTES_DE[p["puuid"]][mid] = g(p, "agent", "name") or "?"
+
+
+def joga_outros_sentinelas(puuid, cfg=None):
+    ags = list(_AGENTES_DE.get(puuid, {}).values())
+    outros = sum(1 for a in ags if a != "Chamber" and funcao_do_agente(a, cfg) == "Sentinela")
+    return outros >= SENTINELA_MIN_PARTIDAS and outros >= SENTINELA_MIN_FRACAO * len(ags)
+
 
 # Métricas (todas por round). "menor_melhor" inverte o sinal na comparação.
 METRICAS = {
@@ -128,24 +146,18 @@ def opcoes(cfg):
 
 
 def aplicar_playmaker(jogadores, cfg=None):
-    """Troca a função para "Playmaker" conforme a comp do time de cada um (ver PLAYMAKERS). Muda os dicts no lugar."""
+    """Troca a função para "Playmaker" (ver PLAYMAKERS). Muda os dicts no lugar."""
     cfg = cfg or {}
     if cfg.get("playmaker") is False:
         return
     extras = cfg.get("funcoes_extras") or {}
-    por_time = defaultdict(list)
     for j in jogadores.values():
-        por_time[j.get("time")].append(j)
-    for time in por_time.values():
-        base = {id(j): j["funcao"] for j in time}   # a comp como o jogo define (antes de qualquer troca)
-        for j in time:
-            regra = PLAYMAKERS.get(j.get("agente"))
-            if not regra or j["agente"] in extras:
-                continue
-            funcao_base, quando = regra
-            outros = sum(1 for o in time if o is not j and base[id(o)] == funcao_base)
-            if (quando == "sem_outro" and outros == 0) or (quando == "com_outro" and outros > 0):
-                j["funcao"] = "Playmaker"
+        ag = j.get("agente")
+        if ag not in PLAYMAKERS or ag in extras:
+            continue
+        if ag == "Chamber" and joga_outros_sentinelas(j.get("puuid"), cfg):
+            continue
+        j["funcao"] = "Playmaker"
 
 
 def funcao_do_agente(agente, cfg=None):
@@ -385,6 +397,7 @@ def analisar_partida_completa(partida, modelo=None, cfg=None):
             "rounds_afk": 0,
         }
 
+    lembrar_agentes(partida)   # garante ao menos esta partida (o carregar_contexto já anota todas antes)
     aplicar_playmaker(jogadores, cfg)
 
     for pos, r in enumerate(rounds):
