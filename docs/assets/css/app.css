@@ -2219,3 +2219,6 @@ body.com-nav .conta-chip { order: 2; }
 .marcar-ponto__texto { display: grid; gap: 8px; justify-items: start; }
 .escolhas__dica { margin-top: 8px; }
 @media (max-width: 560px) { .marcar-ponto { grid-template-columns: 1fr; } }
+
+/* v38: período dos Atributos */
+.atr-periodo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }

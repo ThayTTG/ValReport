@@ -111,6 +111,10 @@ def gravar(caminho, dados, compacto=True):
     return len(texto.encode("utf-8"))
 
 
+ATR_PADRAO_DIAS = 90
+ATR_PERIODOS = (("7", 7), ("30", 30), ("90", 90), ("tudo", None))
+
+
 def slug_de(rid, cfg):
     return gr.nome_arquivo(gr.apelido(rid, cfg)).lower()
 
@@ -744,12 +748,23 @@ def exportar(cfg=None, verificar=False):
     tamanho += gravar(PASTA_DATA / "elo.json", elo_json([r for r in autorizados if r not in sem_elo_rid], slug))
     atualizar_previa(site)
     tamanho += gravar(PASTA_DATA / "formacoes.json", formacoes_json(ctx, cfg, autorizados, slug))
-    atr = atributos.calcular(ctx["analises"].values(), puuid_aut, cfg)
+    # v38: Atributos por período (o site tem o filtro 7 dias · 30 dias · 3 meses · tudo; o padrão é 3 meses)
+    agora_atr = datetime.now(av.FUSO_BR)
+    def janela_atr(dias):
+        return [a for a in ctx["analises"].values() if dias is None or (a["inicio"] and a["inicio"] >= agora_atr - timedelta(days=dias))]
+    atr = atributos.calcular(janela_atr(ATR_PADRAO_DIAS), puuid_aut, cfg)
     # Resumo por IA: só no report das 21h na nuvem (VALREPORT_RESUMO_IA=1 e o GITHUB_TOKEN com models: read).
     # Nas outras execuções, só reaproveita o resumo guardado.
     atributos.aplicar_resumos(atr, PASTA / "dados" / "cache" / "resumos_ia.json",
                               gerar=os.environ.get("VALREPORT_RESUMO_IA") == "1",
                               token=os.environ.get("GITHUB_TOKEN"), hoje=datetime.now(av.FUSO_BR).date().isoformat())
+    atr["periodo"] = str(ATR_PADRAO_DIAS)
+    atr["periodos"] = {}
+    for chave, dias in ATR_PERIODOS:
+        if dias == ATR_PADRAO_DIAS:
+            continue
+        outro = atributos.calcular(janela_atr(dias), puuid_aut, cfg)
+        atr["periodos"][chave] = {k: outro[k] for k in ("jogadores", "base", "regras")}
     tamanho += gravar(PASTA_DATA / "atributos.json", atr)
 
     # Quem ainda não tem partida guardada usa o card que o Sync buscou (dados/cache/contas.json)

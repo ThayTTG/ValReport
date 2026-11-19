@@ -122,18 +122,28 @@ function comparacao(d, e, j, vs) {
     </section>`;
 }
 
+// v38: filtro por período (a coleta calcula as notas de cada um; o padrão é 3 meses)
+const PERIODOS_ATR = [["7", "7 dias"], ["30", "30 dias"], ["90", "3 meses"], ["tudo", "Tudo"]];
+const nomePeriodo = (p) => ({ 7: "dos últimos 7 dias", 30: "dos últimos 30 dias", 90: "dos últimos 3 meses", tudo: "coletadas" })[p] || "coletadas";
+
 export async function htmlAtributos(e, q) {
-  let d;
-  try { d = await atributosDados(); } catch (err) { d = null; }
+  let bruto;
+  try { bruto = await atributosDados(); } catch (err) { bruto = null; }
+  const padrao = bruto?.periodo || "tudo", temPeriodos = Boolean(bruto?.periodos);
+  const pedido = q?.get("atr") || padrao;
+  const per = temPeriodos && (pedido === padrao || bruto.periodos[pedido]) ? pedido : padrao;
+  const d = bruto && per !== padrao ? { ...bruto, ...bruto.periodos[per] } : bruto;
+  const filtro = temPeriodos ? `<div class="atr-periodo"><span class="suave pequeno">Período</span><div class="segmentos" role="group" aria-label="Período dos Atributos">${PERIODOS_ATR
+    .map(([k, t]) => `<button type="button" data-param="atr" data-valor="${k}" aria-pressed="${k === per}">${t}</button>`).join("")}</div></div>` : "";
   const j = d?.jogadores?.[e.slug];
   if (!j) {
-    return `<div class="vazio"><strong>Ainda sem Atributos</strong><p>${d ? `${esc(e.apelido)} ainda não tem rounds suficientes nas partidas coletadas.`
+    return `${filtro}<div class="vazio"><strong>${per !== "tudo" && temPeriodos ? "Sem Atributos neste período" : "Ainda sem Atributos"}</strong><p>${d ? `${esc(e.apelido)} não tem rounds suficientes nas partidas ${nomePeriodo(per)}.${per !== "tudo" && temPeriodos ? " Escolha um período maior." : ""}`
       : "Os Atributos aparecem depois da próxima coleta (eles chegam junto com os dados do site)."}</p></div>`;
   }
   const L = j.lados.ambos;
   const outras = Object.entries(j.outras_funcoes || {}).map(([f, n]) => `${f} (${n} rounds)`).join(", ");
   const ia = j.resumo_ia;
-  return `<section class="atr">
+  return `${filtro}<section class="atr">
       <div class="atr-layout${j.amostra_pequena ? " atr-layout--pequena" : ""}">
         ${comparacao(d, e, j, q?.get("vs"))}
         <aside class="cartao atr-notas" aria-label="Notas dos atributos">
@@ -155,7 +165,7 @@ export async function htmlAtributos(e, q) {
               <p class="atr-texto">${esc(j.texto || "")}</p>
             </div>
           </div>
-          <p class="suave pequeno atr-nota-rodape">As notas dizem o que a pessoa costuma fazer, não o quanto ela é boa. 50 é o normal para quem joga ${esc(j.funcao)} com vocês. Usa todas as partidas coletadas.${ia ? " O resumo por IA é escrito só a partir destes números, sem o nome de ninguém, e pode errar: o texto “Pelos números” é sempre a referência." : ""}</p>
+          <p class="suave pequeno atr-nota-rodape">As notas dizem o que a pessoa costuma fazer, não o quanto ela é boa. 50 é o normal para quem joga ${esc(j.funcao)} com vocês. Usa as partidas ${nomePeriodo(per)}.${ia ? " O resumo por IA é escrito só a partir destes números, sem o nome de ninguém, e pode errar: o texto “Pelos números” é sempre a referência." : ""}</p>
         </div>
       </div>
     </section>`;
