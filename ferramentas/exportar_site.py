@@ -331,6 +331,32 @@ def detalhe_partida(a, bruta, nosso, slug_de_puuid, cfg, membros_info):
             return {"t": ev.get("round_time_in_ms"), "site": ev.get("site"), "x": g(ev, "location", "x"),
                     "y": g(ev, "location", "y"), "por": idx.get(g(ev, "player", "puuid"), -1)}
 
+        # v41: replay 2D — a posição e a mira de cada jogador vivo em cada abate, plant e defuse (a API não manda o
+        # movimento contínuo; o site estima o caminho entre esses instantes) e a economia de cada um no round
+        def quadro(t, locs):
+            ps = []
+            for pl in locs or []:
+                i = idx.get(g(pl, "player", "puuid"))
+                x, y = g(pl, "location", "x"), g(pl, "location", "y")
+                if i is None or x is None or y is None:
+                    continue
+                vr = pl.get("view_radians")
+                ps.append([i, round(x), round(y), None if vr is None else round(float(vr), 3)])
+            return [t or 0, ps] if ps else None
+        quadros = [quadro(k.get("time_in_round_in_ms"), k.get("player_locations")) for k in kills_r.get(rid, [])]
+        for ev in (r.get("plant"), r.get("defuse")):
+            if ev:
+                quadros.append(quadro(ev.get("round_time_in_ms"), ev.get("player_locations")))
+        quadros = sorted((q for q in quadros if q), key=lambda q: q[0])
+        eco = []
+        for st_r in r.get("stats") or []:
+            i = idx.get(g(st_r, "player", "puuid"))
+            if i is None:
+                continue
+            e = st_r.get("economy") or {}
+            eco.append([i, g(e, "weapon", "name") or "", g(e, "armor", "name") or "", g(e, "loadout_value", padrao=0) or 0,
+                        e.get("remaining") if isinstance(e.get("remaining"), (int, float)) else None])
+
         membros = {}
         for slug, (por_n, agente) in recs_por_slug.items():
             rec = por_n.get(rid + 1)
@@ -342,6 +368,7 @@ def detalhe_partida(a, bruta, nosso, slug_de_puuid, cfg, membros_info):
             "n": rid + 1, "venc": r.get("winning_team"), "fim": r.get("result"),
             "cer": (r.get("ceremony") or "").replace("Ceremony", "") or None, "atk": atk,
             "plant": spike(r.get("plant")), "defuse": spike(r.get("defuse")), "econ": econ, "kills": ks,
+            "q": quadros, "eco": eco,
             "membros": membros,
         })
 

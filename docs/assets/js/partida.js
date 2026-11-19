@@ -6,10 +6,11 @@ import { B, detalhe, notaPartida, notaRound } from "./dados.js";
 import { tabela, blocoNota } from "./componentes.js";
 import { moldeMapa, svgRound } from "./graficos.js";
 import { abas } from "./jogador.js";
+import { htmlReplay, ligarReplay } from "./replay2d.js";
 import { htmlUsoPartida, utilPorRound, temContagem } from "./habilidades.js";
 import { podeVerComentarios, lerComentarios, htmlComentarios, ligarComentarios, roundTemComentario, totalComentarios, htmlNotasPendentes, ligarNotasPendentes } from "./comentarios.js";
 
-const ABAS = [["placar", "Placar"], ["rounds", "Rounds"], ["mapa", "Mapa 2D"], ["leitura", "Leitura da equipe"], ["notas", "Notas da IGL"]];
+const ABAS = [["placar", "Placar"], ["rounds", "Rounds"], ["mapa", "Replay 2D"], ["leitura", "Leitura da equipe"], ["notas", "Notas da IGL"]];
 /** No site, "Notas da IGL" virou "Comentários" (toda a equipe comenta; convidados não veem a aba). No editor do PC, continua igual. */
 const abasPartida = () => (B.editor ? ABAS : ABAS.filter(([a]) => a !== "notas").concat(podeVerComentarios() ? [["notas", "Comentários"]] : []));
 const marcaRound = (id, n) => (B.editor ? Boolean(notaRound(id, n)) : roundTemComentario(id, n));
@@ -163,9 +164,7 @@ export async function viewPartida(id, aba, q) {
       + (B.editor ? `<p class="suave pequeno" style="margin-top:12px">Para anotar um round, abra a aba Rounds e escolha o round.</p>` : "");
   }
   else if (aba === "rounds") corpo = secao("Linha do tempo", `<div class="cartao">${linhaRounds(d, rSel, rota)}</div>`) + (erroCom ? `<p class="aviso aviso--erro secao">${esc(erroCom)}</p>` : "") + (r ? detalheRound(d, r, com) : "");
-  else if (aba === "mapa") corpo = secao("Abates no mapa", `<div class="cartao">${linhaRounds(d, rSel, rota)}</div>`)
-    + `<div class="grade-mapa secao"><div class="cartao">${moldeMapa(d.mapa, svgRound(d.mapa, r, d.jogadores, d.nosso))}</div><div class="pilha">${cartao(`Round ${r.n}`, `<div class="chips"><span class="chip"><span style="width:10px;height:10px;border-radius:50%;background:var(--nosso);display:inline-block"></span>Equipe</span><span class="chip"><span style="width:10px;height:10px;border-radius:50%;background:var(--deles);display:inline-block"></span>Adversário</span></div>
-        <p class="suave pequeno" style="margin-top:10px">Círculo = onde estava quem matou · X = onde a pessoa morreu · losango = spike. Passe o dedo/mouse para ver quem foi.</p>`)}${cartao("Abates", killfeed(d, r))}</div></div>`;
+  else if (aba === "mapa") corpo = htmlReplay(d, rSel);   // v41: replay 2D (substitui o mapa de abates do round)
   else corpo = leituraEquipe(d);
   // Deixa o round escolhido à vista na linha do tempo (no celular ela rola de lado)
   const depois = (el) => {
@@ -177,6 +176,7 @@ export async function viewPartida(id, aba, q) {
     }));
     ligarNotasPendentes(el, () => window.dispatchEvent(new HashChangeEvent("hashchange")));
     ligarExclusoes(el, () => window.dispatchEvent(new HashChangeEvent("hashchange")));
+    if (aba === "mapa") ligarReplay(el, d, rSel);
   };
   if (aba === "placar") corpo += cartaoExclusoes(p);   // v25: liderança tira a partida das contas de alguém
   return { titulo: `${d.mapa} · ${dataHora(d.t)}`, html: `${cabecalho(d, p)}${abas(`#/p/${id}`, aba, lista)}<div class="secao">${corpo}</div>`, depois };
