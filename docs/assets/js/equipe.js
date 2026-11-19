@@ -13,15 +13,16 @@ import { viewMapPool, viewComps, viewCalls, podeVerPlanejamento, blocoMapPool } 
 import { viewAgenda } from "./agenda.js";
 import { seloContexto } from "./contexto.js";
 import { viewAnalista } from "./analista.js";
+import { viewRever } from "./rever.js";
 
-export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
+export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["rever", "Rounds para rever"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
   ["comparar", "Comparar"], ["mapas", "Mapas"], ["analise", "Análise"], ["recordes", "Destaques"], ["taticas", "Táticas"],
   ["agenda", "Agenda"], ["mappool", "Map pool"], ["comps", "Comps"], ["calls", "Calls"]];
 // v32: as 13 telas viram 8 abas principais; as do mesmo assunto ficam como sub-abas (os endereços continuam os mesmos)
-export const GRUPOS_EQUIPE = { semana: ["semana", "recordes"], formacoes: ["formacoes", "sinergia"], mapas: ["mapas", "analise", "mappool", "comps", "calls"] };
+export const GRUPOS_EQUIPE = { partidas: ["partidas", "rever"], semana: ["semana", "recordes"], formacoes: ["formacoes", "sinergia"], mapas: ["mapas", "analise", "mappool", "comps", "calls"] };
 export const PRINCIPAIS_EQUIPE = [["visao", "Visão geral", "equipe"], ["partidas", "Partidas", "nota"], ["semana", "Semana", "relogio"], ["comparar", "Comparar", "filtro"],
   ["formacoes", "Formações", "rota"], ["mapas", "Mapas", "mapa"], ["taticas", "Táticas", "slides"], ["agenda", "Agenda", "calendario"]];
-const NOME_SUB = { semana: "Resumo", recordes: "Destaques", formacoes: "Formações", sinergia: "Sinergia", mapas: "Desempenho", analise: "Análise", mappool: "Map pool", comps: "Comp e defaults", calls: "Calls" };
+const NOME_SUB = { partidas: "Lista", rever: "Rounds para rever", semana: "Resumo", recordes: "Destaques", formacoes: "Formações", sinergia: "Sinergia", mapas: "Desempenho", analise: "Análise", mappool: "Map pool", comps: "Comp e defaults", calls: "Calls" };
 /** A aba principal de uma tela (ex.: "comps" → "mapas") */
 export const paiDe = (aba) => Object.keys(GRUPOS_EQUIPE).find((p) => GRUPOS_EQUIPE[p].includes(aba)) || aba;
 /** As abas principais que esta pessoa vê, cada uma com o endereço da primeira tela visível: [[pai, nome, ícone, destino]] */
@@ -413,6 +414,7 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
   else if (aba === "comparar") corpo = comparar(f, q);
   else if (aba === "mapas") ({ html: corpo, depois } = await mapasEquipe(f, q));
   else if (aba === "analise") corpo = viewAnalista(f);   // v46: planilha do analista
+  else if (aba === "rever") ({ html: corpo, depois } = viewRever(f, q));   // v47: fila de VOD review
   return {
     titulo: `Equipe · ${NOME_SUB[aba] && paiDe(aba) !== aba ? `${PRINCIPAIS_EQUIPE.find(([p]) => p === paiDe(aba))[1]} · ` : ""}${ABAS_EQUIPE.find(([a]) => a === aba)[1]}`,
     html: `${cabecalhoEquipe(f)}${abasDaEquipe(aba, lista, qs)}${semFiltros ? "" : barraFiltros(f, null, { mostrar: ["ctx", "fila", "temporada", "periodo", "mapa"] })}<div class="secao">${corpo}</div>`,

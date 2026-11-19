@@ -9,6 +9,7 @@
 
 import { B } from "./dados.js";
 import { esc, icone, imgAgente, imgMinimapa, imgArmaKill } from "./util.js";
+import { posicaoNaFila } from "./rever.js";
 
 const VELOCIDADES = [0.25, 0.5, 1, 2, 4, 8];
 const CORES_DESENHO = ["#ffd166", "#ff5d73", "#4cc9f0", "#ffffff"];
@@ -151,6 +152,7 @@ export function htmlReplay(d, rSel) {
       </div>
     </div>
     <div class="rp-feed" data-feed aria-live="off"></div>
+    <div class="rp-fila" data-fila hidden></div>
   </div>`;
 }
 
@@ -220,6 +222,15 @@ export function ligarReplay(raiz, d, rSel = 1) {
       + (r.plant ? `<i class="rp-evento rp-evento--plant" style="left:${pos(r.plant.t || 0)}" title="Plant ${fmtT(r.plant.t || 0)}"></i>` : "")
       + (r.defuse ? `<i class="rp-evento rp-evento--defuse" style="left:${pos(r.defuse.t || 0)}" title="Defuse ${fmtT(r.defuse.t || 0)}"></i>` : "");
     try { history.replaceState(null, "", location.hash.replace(/([?&])r=\d+/, `$1r=${r.n}`).replace(/^(#[^?]*)$/, `$1?r=${r.n}`)); } catch (e) { /* ok */ }
+    // v47: veio da fila "Rounds para rever"? mostra a posição e o próximo
+    const fila = posicaoNaFila(d.id, r.n), barra = el.querySelector("[data-fila]");
+    barra.hidden = !fila;
+    if (fila) {
+      const ir = (x) => `#/p/${encodeURIComponent(x[0])}/mapa?r=${x[1]}`;
+      barra.innerHTML = `<span>${icone("video")} Fila de revisão · <b>${fila.i + 1}</b> de ${fila.total}</span>
+        ${fila.anterior ? `<a class="botao-secundario botao-mini" href="${ir(fila.anterior)}">Anterior</a>` : ""}
+        ${fila.proximo ? `<a class="botao-primario botao-mini" href="${ir(fila.proximo)}">Próximo da fila ${icone("seta")}</a>` : `<a class="botao-secundario botao-mini" href="#/equipe/rever">Fim da fila · voltar à lista</a>`}`;
+    }
     desenharTinta();
     tocar ? play(true) : atualizar();
   }

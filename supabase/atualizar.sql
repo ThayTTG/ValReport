@@ -221,10 +221,50 @@ revoke execute on function public.partidas_contexto_listar(uuid), public.partida
 grant execute on function public.partidas_contexto_listar(uuid), public.partida_definir_contexto(uuid, text, text, text) to authenticated;
 
 -- =====================================================================
+-- v47: rounds revisados (fila de VOD review): quem da equipe já reviu cada round
+-- =====================================================================
+create table if not exists public.rounds_revisados (
+  equipe_id uuid not null references public.equipes (id) on delete cascade,
+  partida_id text not null check (partida_id ~ '^[0-9a-f-]{36}$'),
+  n smallint not null check (n between 1 and 60),
+  por uuid references auth.users (id) on delete set null,
+  em timestamptz not null default now(),
+  primary key (equipe_id, partida_id, n)
+);
+alter table public.rounds_revisados enable row level security;
+revoke all on public.rounds_revisados from anon, public, authenticated;
+
+create or replace function public.rounds_revisados_listar(p_equipe uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not (public.eh_membro(p_equipe) or public.eh_admin()) then raise exception 'Só a equipe vê isso.' using errcode = '42501'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('partida', r.partida_id, 'n', r.n, 'por', (select apelido from public.perfis where id = r.por), 'em', r.em))
+                   from public.rounds_revisados r where r.equipe_id = p_equipe), '[]'::jsonb);
+end $$;
+
+create or replace function public.round_marcar_revisado(p_equipe uuid, p_partida text, p_n int, p_sim boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not (public.eh_admin() or coalesce(public.cargo_em(p_equipe)::text, 'convidado') <> 'convidado') then
+    raise exception 'Só a equipe marca rounds revisados (convidados não).' using errcode = '42501';
+  end if;
+  if coalesce(p_partida, '') !~ '^[0-9a-f-]{36}$' or p_n is null or p_n not between 1 and 60 then raise exception 'round: inválido.' using errcode = 'P0001'; end if;
+  if coalesce(p_sim, false) then
+    insert into public.rounds_revisados (equipe_id, partida_id, n, por) values (p_equipe, p_partida, p_n, auth.uid())
+    on conflict (equipe_id, partida_id, n) do update set por = auth.uid(), em = now();
+  else
+    delete from public.rounds_revisados where equipe_id = p_equipe and partida_id = p_partida and n = p_n;
+  end if;
+end $$;
+revoke execute on function public.rounds_revisados_listar(uuid), public.round_marcar_revisado(uuid, text, int, boolean) from public, anon;
+grant execute on function public.rounds_revisados_listar(uuid), public.round_marcar_revisado(uuid, text, int, boolean) to authenticated;
+
+-- =====================================================================
 -- Conferência final: todas as colunas devem mostrar true
 -- =====================================================================
 select exists (select 1 from pg_proc where proname = 'nuvem_disparo_manual') as botao_atualizar,
        exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'membros' and column_name = 'liberado_premier') as manter_jogador_premier,
        coalesce((select prosrc like '%v_eu in (''lider'', ''colider'')%' from pg_proc where proname = 'definir_cargo' limit 1), false) as colider_define_cargos,
        exists (select 1 from pg_proc where proname = 'taticas_indice') as busca_taticas,
-       exists (select 1 from pg_proc where proname = 'partida_definir_contexto') as contexto_partidas;
+       exists (select 1 from pg_proc where proname = 'partida_definir_contexto') as contexto_partidas,
+       exists (select 1 from pg_proc where proname = 'round_marcar_revisado') as rounds_revisados;

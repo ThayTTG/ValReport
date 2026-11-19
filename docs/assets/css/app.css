@@ -2275,7 +2275,7 @@ body.com-nav .conta-chip { order: 2; }
    v43: Replay 2D (layout de analista: mapa grande, times à direita, ferramentas, rounds e linha do tempo)
    ===================================================================== */
 .rp { --rp-fundo: #0d0b14; --rp-painel: #15121e; --rp-borda: #2a2536; --rp-texto: #e9e4f3; --rp-suave: #8f86a3;
-  display: grid; grid-template-columns: minmax(0, 1fr) 290px; grid-template-areas: "palco times" "barra barra" "feed feed";
+  display: grid; grid-template-columns: minmax(0, 1fr) 290px; grid-template-areas: "fila fila" "palco times" "barra barra" "feed feed";
   gap: 10px; padding: 10px; border-radius: 16px; background: var(--rp-fundo); color: var(--rp-texto); outline: none; }
 .rp:fullscreen { padding: 14px; overflow: auto; align-content: start; }
 .rp-palco { grid-area: palco; position: relative; justify-self: center; width: 100%; max-width: min(calc(100dvh - var(--topo-altura, 60px) - 340px), 860px); min-width: min(100%, 300px); aspect-ratio: 1; }
@@ -2372,7 +2372,7 @@ body.com-nav .conta-chip { order: 2; }
 .rp-kill.futuro { opacity: .4; }
 
 @media (max-width: 1100px) {
-  .rp { grid-template-columns: 1fr; grid-template-areas: "palco" "barra" "times" "feed"; }
+  .rp { grid-template-columns: 1fr; grid-template-areas: "fila" "palco" "barra" "times" "feed"; }
   .rp-palco { max-width: 100%; }
   .rp-times { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 }
@@ -2425,3 +2425,23 @@ body.com-nav .conta-chip { order: 2; }
 .an-treinar__item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--derrota, #f06a6a) 45%, var(--borda)); background: var(--superficie); }
 .an-treinar__n { font-size: 22px; font-weight: 800; color: var(--derrota, #f06a6a); }
 .an-treinar__item small { display: block; color: var(--suave); font-size: 12px; }
+
+/* v47: rounds para rever e fila no replay */
+.rever__tipos { margin-bottom: 8px; }
+.rever__tipos small { opacity: .7; margin-left: 2px; }
+.rever__lista { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.rever__item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie); }
+.rever__item.feito { opacity: .55; }
+.rever__res { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 8px; font-weight: 800; font-size: 13px; background: var(--superficie-2); }
+.rever__res.bom { color: var(--vitoria, #3ccf7e); } .rever__res.ruim { color: var(--derrota, #f06a6a); }
+.rever__txt { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.rever__txt strong small { font-weight: 600; color: var(--suave); margin-left: 4px; }
+.rever__txt > small { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--suave); }
+.rever__tag { padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--superficie-2); }
+.rever__tag--ruim { color: var(--derrota, #f06a6a); } .rever__tag--bom { color: var(--vitoria, #3ccf7e); }
+.rever__feito[aria-pressed="true"] { border-color: var(--vitoria, #3ccf7e); color: var(--vitoria, #3ccf7e); }
+@media (max-width: 560px) { .rever__item { flex-wrap: wrap; } .rever__txt { flex-basis: calc(100% - 40px); } }
+.rp-fila { grid-area: fila; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-radius: 6px;
+  background: color-mix(in srgb, var(--destaque) 18%, var(--rp-painel)); border: 1px solid var(--destaque); font-size: 13px; }
+.rp-fila[hidden] { display: none; }
+.rp-fila > span { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; }
