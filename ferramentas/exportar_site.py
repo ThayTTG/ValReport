@@ -249,6 +249,37 @@ def resumo_membro(a, bruta, j, membros_time, cfg, refs, mvp_partida, mvp_times, 
 # Detalhe de uma partida (placar, rounds, abates com posição, leitura dos membros)
 # ----------------------------------------------------------------------------
 
+def rounds_resumo(bruta, nosso, cfg):
+    """v46: um resumo compacto de cada round para a planilha do analista (o site agrega com os filtros).
+    [lado (0 ataque, 1 defesa), venceu (1/0), compra nossa, compra deles (CODIGO_TIPO), primeiro abate
+    (1 nosso, 0 deles, -1 nenhum), site do plant ("" sem plant), tempo do plant em s (-1), defuse (1/0),
+    quem plantou (1 nosso, 0 deles, -1 ninguém)]"""
+    op = av.opcoes(cfg)
+    times = av.times_da_partida(bruta)
+    ids = sorted(set(t for t in times.values() if t))
+    rounds = av.rounds_validos(bruta)
+    atacantes = av.lados_dos_rounds(rounds, ids)
+    time_de = {p.get("puuid"): p.get("team_id") for p in bruta.get("players") or []}
+    kills_r = defaultdict(list)
+    for k in bruta.get("kills") or []:
+        kills_r[k.get("round")].append(k)
+    out = []
+    for pos, r in enumerate(rounds):
+        rid = r.get("id", pos)
+        cargas = av._cargas(r)
+        outro = av._outro(ids, nosso)
+        ks = sorted(kills_r.get(rid, []), key=lambda k: k.get("time_in_round_in_ms", 0))
+        fk = -1 if not ks else (1 if time_de.get(g(ks[0], "killer", "puuid")) == nosso else 0)
+        pl = r.get("plant") or {}
+        quem_pl = g(pl, "player", "team")
+        out.append([0 if atacantes.get(rid) == nosso else 1, 1 if r.get("winning_team") == nosso else 0,
+                    CODIGO_TIPO.get(av.tipo_de_round(rid, cargas.get(nosso, 0), cargas.get(outro, 0), op), -1),
+                    CODIGO_TIPO.get(av.tipo_de_round(rid, cargas.get(outro, 0), cargas.get(nosso, 0), op), -1),
+                    fk, (pl.get("site") or "") if pl else "", round((pl.get("round_time_in_ms") or 0) / 1000) if pl else -1,
+                    1 if r.get("defuse") else 0, -1 if not pl else (1 if quem_pl == nosso else 0)])
+    return out
+
+
 def detalhe_partida(a, bruta, nosso, slug_de_puuid, cfg, membros_info):
     op = av.opcoes(cfg)
     times = av.times_da_partida(bruta)
@@ -759,7 +790,7 @@ def exportar(cfg=None, verificar=False):
         indice.append({"id": a["match_id"], "t": a["inicio"].isoformat() if a["inicio"] else None,
                        "mapa": a["mapa"], "fila": a["fila_id"], "dur": round((md.get("game_length_in_ms") or 0) / 1000),
                        "temp": g(md, "season", "short"), "rounds": a["n_rounds"], "placar": placar, "nosso": nosso,
-                       "m": resumo})
+                       "m": resumo, "rd": rounds_resumo(bruta, nosso, cfg)})
         det = detalhe_partida(a, bruta, nosso, puuid_aut, cfg, membros_info)
         tamanho += gravar(PASTA_DATA / "partidas" / f"{a['match_id']}.json", det)
 

@@ -2408,3 +2408,20 @@ body.com-nav .conta-chip { order: 2; }
 .evento-partida:hover { text-decoration: none; outline: 1px solid var(--destaque); }
 .evento-partida b.bom { color: var(--vitoria, #3ccf7e); } .evento-partida b.ruim { color: var(--derrota, #f06a6a); }
 .evento-partida svg { margin-left: auto; color: var(--suave); }
+
+/* v46: planilha do analista */
+.an-tabela { font-size: 13px; }
+.an-tabela th, .an-tabela td { text-align: center; white-space: nowrap; }
+.an-tabela thead th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
+.an-tabela tbody th { text-align: left; font-weight: 700; }
+.an-tabela tbody th small { display: block; font-weight: 500; font-size: 11px; color: var(--suave); }
+.an-v b { display: block; font-size: 14px; } .an-v small { font-size: 10.5px; color: var(--suave); }
+.an-v--bom b { color: var(--vitoria, #3ccf7e); } .an-v--ruim b { color: var(--derrota, #f06a6a); }
+.an-v--pouco { opacity: .45; } .an-v--vazio { color: var(--suave); }
+.an-sites { text-align: left !important; } .an-sites small { display: block; color: var(--suave); font-size: 10.5px; }
+.an-site { display: inline-block; margin-right: 8px; } .an-site b { color: var(--destaque-texto); }
+.an-total { background: var(--superficie-2); }
+.an-treinar { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.an-treinar__item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--derrota, #f06a6a) 45%, var(--borda)); background: var(--superficie); }
+.an-treinar__n { font-size: 22px; font-weight: 800; color: var(--derrota, #f06a6a); }
+.an-treinar__item small { display: block; color: var(--suave); font-size: 12px; }
