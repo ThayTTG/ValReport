@@ -631,7 +631,7 @@ def _rapido_travado(chave, cfg):
     incluidas = [f.lower() for f in cfg.get("filas_incluidas", ["competitive", "premier", "custom"])]
     log("Coleta rápida: procurando partidas novas...")
     pend = ler_json(ARQ_PENDENTES, {"jogadores": {}})
-    novas_total, erros, com_novas = 0, 0, []
+    novas_total, erros, com_novas, novas_ids = 0, 0, [], []
     for riot_id in cfg.get("jogadores", []):
         bloco = processar_jogador(chave, cfg, estado, riot_id, incluidas)
         if bloco["status"] != "ok":
@@ -646,6 +646,7 @@ def _rapido_travado(chave, cfg):
         if bloco["partidas"]:
             novas_total += len(bloco["partidas"])
             com_novas.append(riot_id)
+            novas_ids += [p["match_id"] for p in bloco["partidas"] if p.get("match_id")]
         time.sleep(1)
     salvar_json(ARQ_ESTADO, estado)
     if pend["jogadores"]:
@@ -678,6 +679,13 @@ def _rapido_travado(chave, cfg):
     site = cfg.get("site") or {}
     if site.get("ativo", True) is not False and not exportar_site.exportar_e_publicar(cfg):
         log("Site exportado, mas não enviado ao Supabase (veja a mensagem acima).")
+    try:   # v48: relatório pós-scrim (personalizadas e Premier) no canal da equipe
+        import pos_scrim
+        enviados = pos_scrim.enviar(list(dict.fromkeys(novas_ids)), cfg)
+        if enviados:
+            log(f"Coleta rápida: {enviados} relatório(s) pós-scrim no Discord.")
+    except Exception as e:  # noqa: BLE001
+        log(f"Coleta rápida: relatório pós-scrim não enviado ({e}).")
     log(f"Coleta rápida: {novas_total} partida(s) nova(s); entram também no report das 21h.")
     return True
 

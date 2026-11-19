@@ -137,7 +137,7 @@ Cada um abre direto no replay 2D, e a equipe marca como "revisado", com comentá
 | 2 | ✅ Contexto da partida + filtro (Ranked · Scrim · Oficial) + ligar agenda ↔ partida | Sem isso, scrim e ranked se misturam | feito |
 | 3 | ✅ Planilha do analista por mapa/lado (3.1) | O que mais muda o treino | feito |
 | 4 | ✅ Rounds para rever + fila no replay | Liga dado → VOD | feito |
-| 5 | Relatório pós-scrim no Discord | Hábito do time | P |
+| 5 | ✅ Relatório pós-scrim no Discord | Hábito do time | feito |
 | 6 | Replay .vrf (fase 2): atalho do PC + junção | Movimento real e habilidades | G |
 | 7 | Adversários e scouting (3.3) | Preparação de oficial | M |
 | 8 | Ferramentas da fase 3 (sobrepor rounds, posições por tempo) | Nível analista profissional | G |
