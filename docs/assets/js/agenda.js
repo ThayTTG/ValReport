@@ -211,6 +211,18 @@ async function abrirEvento(raiz, id, dia) {
   const pessoas = (rot, lista, cls) => (lista.length ? `<div class="presenca-grupo presenca-grupo--${cls}"><strong>${rot} · ${lista.length}</strong><span>${lista.map((m) => `<span class="pessoa">${fotoMembro(m, "")}${esc(m.apelido)}</span>`).join("")}</span></div>` : "");
   const rep = e.repete_dias?.length ? `Toda ${e.repete_dias.map((d) => SEMANA[d].toLowerCase()).join(", ")}${e.repete_ate ? ` até ${nomeDia(e.repete_ate, { day: "2-digit", month: "2-digit", year: "numeric" })}` : ""}` : "";
   const link = /^https?:\/\//.test(e.local || "");
+  // v45: as partidas jogadas no horário do evento (scrim, oficial, treino)
+  let jogadas = "";
+  try {
+    const { partidasDoEvento } = await import("./contexto.js");
+    const ps = partidasDoEvento(e.id, dia);
+    if (ps.length) {
+      jogadas = `<div class="evento-partidas"><strong class="pequeno">Partidas</strong>${ps.map((p) => {
+        const nos = p.placar?.[p.nosso] ?? 0, eles = Object.entries(p.placar || {}).find(([x]) => x !== p.nosso)?.[1] ?? 0;
+        return `<a class="evento-partida" href="#/p/${esc(p.id)}"><b class="${nos > eles ? "bom" : nos < eles ? "ruim" : ""}">${nos}–${eles}</b> ${esc(p.mapa)} <span class="suave">${esc(new Date(p.t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))}</span>${icone("seta")}</a>`;
+      }).join("")}</div>`;
+    }
+  } catch (er) { /* sem partidas carregadas */ }
   const r = await janela({
     titulo: `<span class="evento-ponto" style="--cor-evento:${esc(t.cor)}"></span>${esc(e.titulo)}`,
     corpo: `<div class="evento-detalhe">
@@ -221,6 +233,7 @@ async function abrirEvento(raiz, id, dia) {
       ${e.mapa ? `<p>${icone("mapa")} ${esc(e.mapa)}</p>` : ""}
       ${e.local ? `<p>${icone("pino")} ${link ? `<a href="${esc(e.local)}" target="_blank" rel="noopener noreferrer">${esc(e.local.replace(/^https?:\/\//, "").slice(0, 60))}</a>` : esc(e.local)}</p>` : ""}
       ${e.notas ? `<p class="evento-notas">${esc(e.notas)}</p>` : ""}
+      ${jogadas}
       <div><strong class="pequeno">Sua presença</strong>${botoesPresenca(ag, pl, e, dia)}</div>
       <div class="presenca-grupos">${pessoas("Vão", grupo("vou"), "vou")}${pessoas("Talvez", grupo("talvez"), "talvez")}${pessoas("Não vão", grupo("nao"), "nao")}${pessoas("Sem resposta", grupo(""), "sem")}</div>
       <div class="lp-acoes evento-exportar"><a class="botao-secundario botao-mini" href="${linkGoogle(pl, e)}" target="_blank" rel="noopener noreferrer">${icone("externo")} Google Agenda</a>

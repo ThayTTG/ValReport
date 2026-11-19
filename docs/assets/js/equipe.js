@@ -11,6 +11,7 @@ import { abas, filtrosQuery } from "./jogador.js";
 import { viewTaticas, podeVerTaticas, contarTaticasPorMapa } from "./taticas.js";
 import { viewMapPool, viewComps, viewCalls, podeVerPlanejamento, blocoMapPool } from "./planejamento.js";
 import { viewAgenda } from "./agenda.js";
+import { seloContexto } from "./contexto.js";
 
 export const ABAS_EQUIPE = [["visao", "Visão geral"], ["semana", "Semana"], ["partidas", "Partidas"], ["formacoes", "Formações"], ["sinergia", "Sinergia"],
   ["comparar", "Comparar"], ["mapas", "Mapas"], ["recordes", "Destaques"], ["taticas", "Táticas"],
@@ -85,7 +86,7 @@ function linhaEquipe(p) {
     <span class="partida__fundo" style="${imgMapaFaixa(p.mapa) ? `background-image:url('${esc(imgMapaFaixa(p.mapa))}')` : ""}"></span>
     ${imagem(imgAgente(ms[0][1].ag), ms[0][1].ag, "partida__ag")}
     <div class="partida__meio"><div class="partida__titulo"><span>${esc(p.mapa)}</span><span class="placar ${res === "V" ? "bom" : res === "D" ? "ruim" : ""}">${a}–${b}</span></div>
-      <div class="partida__sub"><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span><span>${(() => { const eq = Math.max(...ms.map(([, m]) => m.eq || 1)); return eq > 1 ? `${eq} da equipe no time` : "sem a equipe"; })()}</span>${!B.editor && B.comentarios?.[p.id]?.t ? `<span class="selo selo--destaque" title="Comentários da equipe">${icone("nota")} ${B.comentarios[p.id].t}</span>` : ""}</div></div>
+      <div class="partida__sub">${seloContexto(p) || `<span>${esc(nomeFila(p.fila))}</span>`}<span>${hora(p.t)}</span><span>${(() => { const eq = Math.max(...ms.map(([, m]) => m.eq || 1)); return eq > 1 ? `${eq} da equipe no time` : "sem a equipe"; })()}</span>${!B.editor && B.comentarios?.[p.id]?.t ? `<span class="selo selo--destaque" title="Comentários da equipe">${icone("nota")} ${B.comentarios[p.id].t}</span>` : ""}</div></div>
     <div class="partida__nums">${ms.map(([slug, m]) => `<div title="${esc(B.porSlug.get(slug)?.apelido)} de ${esc(m.ag)}"><small>${esc(B.porSlug.get(slug)?.apelido || slug)}</small><strong>${m.k}/${m.d}/${m.a}</strong></div>`).join("")}</div></a>`;
 }
 export function listaEquipe(ps) {
@@ -412,7 +413,7 @@ export async function viewEquipe(aba, f, q, { semDados = false } = {}) {
   else if (aba === "mapas") ({ html: corpo, depois } = await mapasEquipe(f, q));
   return {
     titulo: `Equipe · ${NOME_SUB[aba] && paiDe(aba) !== aba ? `${PRINCIPAIS_EQUIPE.find(([p]) => p === paiDe(aba))[1]} · ` : ""}${ABAS_EQUIPE.find(([a]) => a === aba)[1]}`,
-    html: `${cabecalhoEquipe(f)}${abasDaEquipe(aba, lista, qs)}${semFiltros ? "" : barraFiltros(f, null, { mostrar: ["fila", "temporada", "periodo", "mapa"] })}<div class="secao">${corpo}</div>`,
+    html: `${cabecalhoEquipe(f)}${abasDaEquipe(aba, lista, qs)}${semFiltros ? "" : barraFiltros(f, null, { mostrar: ["ctx", "fila", "temporada", "periodo", "mapa"] })}<div class="secao">${corpo}</div>`,
     depois,
   };
 }

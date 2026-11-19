@@ -7,6 +7,7 @@ import { tabela, blocoNota } from "./componentes.js";
 import { moldeMapa, svgRound } from "./graficos.js";
 import { abas } from "./jogador.js";
 import { htmlReplay, ligarReplay } from "./replay2d.js";
+import { seloContexto, podeMudarContexto, editarContexto } from "./contexto.js";
 import { htmlUsoPartida, utilPorRound, temContagem } from "./habilidades.js";
 import { podeVerComentarios, lerComentarios, htmlComentarios, ligarComentarios, roundTemComentario, totalComentarios, htmlNotasPendentes, ligarNotasPendentes } from "./comentarios.js";
 
@@ -27,7 +28,7 @@ function cabecalho(d, p) {
     <div class="cabecalho__corpo" style="align-items:center">
       <div class="cabecalho__info">
         <h1>${esc(d.mapa)}</h1>
-        <div class="sub"><span>${esc(nomeFila(d.fila))}</span><span>${esc(dataHora(d.t))}</span><span>${duracao(d.dur)}</span>${d.temp ? `<span>Temporada ${esc(d.temp.toUpperCase())}</span>` : ""}</div>
+        <div class="sub">${p ? seloContexto(p, { completo: true }) : ""}<span>${esc(nomeFila(d.fila))}</span>${p && podeMudarContexto() ? `<button type="button" class="botao-secundario botao-mini" data-mudar-contexto>Mudar</button>` : ""}<span>${esc(dataHora(d.t))}</span><span>${duracao(d.dur)}</span>${d.temp ? `<span>Temporada ${esc(d.temp.toUpperCase())}</span>` : ""}</div>
         <div class="chips" style="margin-top:10px">${membros.map((j) => `<a class="chip" href="#/j/${esc(j.slug)}">${imagem(imgAgente(j.ag), j.ag, "mini-ag")}${esc(j.nome)}</a>`).join("")}</div>
       </div>
       <div class="placar-grande ${res}" aria-label="Placar ${nos} a ${eles}"><span class="nosso">${nos}</span><span class="sep">:</span><span class="deles">${eles}</span></div>
@@ -177,6 +178,7 @@ export async function viewPartida(id, aba, q) {
     ligarNotasPendentes(el, () => window.dispatchEvent(new HashChangeEvent("hashchange")));
     ligarExclusoes(el, () => window.dispatchEvent(new HashChangeEvent("hashchange")));
     if (aba === "mapa") ligarReplay(el, d, rSel);
+    el.querySelector("[data-mudar-contexto]")?.addEventListener("click", async () => { if (await editarContexto(p)) window.dispatchEvent(new HashChangeEvent("hashchange")); });
   };
   if (aba === "placar") corpo += cartaoExclusoes(p);   // v25: liderança tira a partida das contas de alguém
   return { titulo: `${d.mapa} · ${dataHora(d.t)}`, html: `${cabecalho(d, p)}${abas(`#/p/${id}`, aba, lista)}<div class="secao">${corpo}</div>`, depois };

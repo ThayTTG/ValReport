@@ -1,10 +1,11 @@
 // Componentes compartilhados: barra de filtros, linha de partida, tabela ordenável, agrupamento por dia
 
 import { esc, num, pct, sinal, imagem, imgAgente, imgMapaFaixa, imgCard, nomeFila, hora, diaLongo, classeSinal, icone, selo, md } from "./util.js";
+import { opcoesContexto, seloContexto } from "./contexto.js";
 import { B, PERIODOS, FILTROS_PADRAO, opcoes, porDia, stats } from "./dados.js";
 
 // ---------- Filtros ----------
-export function barraFiltros(f, slug, { mostrar = ["fila", "temporada", "periodo", "mapa", "agente", "com"] } = {}) {
+export function barraFiltros(f, slug, { mostrar = ["ctx", "fila", "temporada", "periodo", "mapa", "agente", "com"] } = {}) {
   const op = opcoes(slug);
   const sel = (nome, rotulo, itens) => {
     if (!mostrar.includes(nome)) return "";
@@ -18,6 +19,7 @@ export function barraFiltros(f, slug, { mostrar = ["fila", "temporada", "periodo
   const algumLigado = Object.keys(FILTROS_PADRAO).some((k) => mostrar.includes(k) && f[k] !== FILTROS_PADRAO[k]);
   return `<div class="filtros" role="group" aria-label="Filtros">
     ${icone("filtro", "filtros__icone")}
+    ${opcoesContexto().length > 1 ? sel("ctx", "Contexto", [["todos", "Todos os contextos"], ...opcoesContexto()]) : ""}
     ${sel("fila", "Fila", [["todas", "Todas as filas"], ...op.filas.map((x) => [x, nomeFila(x)])])}
     ${Object.keys(B.meta.temporadas || {}).length > 1 ? sel("temporada", "Temporada", [["todas", "Todas as temporadas"], ...Object.keys(B.meta.temporadas).sort().reverse().map((t) => [t, `Temporada ${t.toUpperCase()}`])]) : ""}
     ${sel("periodo", "Período", Object.entries(PERIODOS).map(([v, t]) => [v, t]))}
@@ -76,7 +78,7 @@ export function linhaPartida({ p, m, slug }, { mostrarNome = false } = {}) {
     <div class="partida__meio">
       <div class="partida__titulo">${mostrarNome && membro ? `<span>${esc(membro.apelido)}</span><span class="suave">·</span>` : ""}<span>${esc(p.mapa)}</span>
         <span class="placar ${m.res === "V" ? "bom" : m.res === "D" ? "ruim" : ""}">${esc(a)}–${esc(b)}</span></div>
-      <div class="partida__sub"><span>${esc(m.ag)}</span><span>${esc(nomeFila(p.fila))}</span><span>${hora(p.t)}</span>${m.eq > 1 ? `<span>com ${m.eq - 1} da equipe</span>` : ""}${temNota(p.id) ? (B.editor ? `<span class="selo selo--destaque" title="Tem nota da IGL">${icone("nota")} nota</span>` : `<span class="selo selo--destaque" title="Tem comentários da equipe">${icone("nota")} ${B.comentarios[p.id].t}</span>`) : ""}${posicao}</div>
+      <div class="partida__sub"><span>${esc(m.ag)}</span>${seloContexto(p) || `<span>${esc(nomeFila(p.fila))}</span>`}<span>${hora(p.t)}</span>${m.eq > 1 ? `<span>com ${m.eq - 1} da equipe</span>` : ""}${temNota(p.id) ? (B.editor ? `<span class="selo selo--destaque" title="Tem nota da IGL">${icone("nota")} nota</span>` : `<span class="selo selo--destaque" title="Tem comentários da equipe">${icone("nota")} ${B.comentarios[p.id].t}</span>`) : ""}${posicao}</div>
       ${com.length ? `<div class="com" title="Jogou com ${esc(com.map((c) => c.apelido).join(", "))}">${com.map((c) => imagem(imgCard(c.card), c.apelido, "", c.apelido)).join("")}</div>` : ""}
     </div>
     <div class="partida__nums">

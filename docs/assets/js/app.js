@@ -24,6 +24,7 @@ import { ligarPaleta } from "./paleta.js";
 import { ligarNavegacao, atualizarNavegacao } from "./navegacao.js";
 import { esqueleto, esqueletoDaRota } from "./esqueleto.js";
 import { comNovidades } from "./novidades.js";
+import { carregarContextos } from "./contexto.js";
 import { carregarExcluidas } from "./planejamento.js";
 import { carregarContagem } from "./comentarios.js";
 import { viewSobre } from "./sobre.js";
@@ -337,6 +338,7 @@ async function conferirDados(manual = false) {
     const antes = B.meta.contagem.partidas;
     limparCache();
     await carregarBase();
+    await carregarContextos();
     await carregarContagem();
     preencherTopo();
     await renderizar(true, "nada");
@@ -586,6 +588,7 @@ async function iniciar() {
   }
   tela = "app";
   await carregarExcluidas();   // v25: partidas que a liderança tirou das contas de alguém
+  await carregarContextos();   // v45: ranked, scrim, oficial...
   await carregarContagem();
   preencherTopo();
   ultimaConferida = Date.now();

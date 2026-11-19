@@ -174,9 +174,57 @@ revoke execute on function public.taticas_indice(uuid) from public, anon;
 grant execute on function public.taticas_indice(uuid) to authenticated;
 
 -- =====================================================================
+-- v45: contexto de cada partida (Ranked · Scrim · Oficial · Treino · Personalizada · Outra)
+-- O site descobre sozinho (fila e agenda); aqui fica só o que a liderança marcou à mão (e o adversário).
+-- =====================================================================
+create table if not exists public.partidas_contexto (
+  equipe_id uuid not null references public.equipes (id) on delete cascade,
+  partida_id text not null check (partida_id ~ '^[0-9a-f-]{36}$'),
+  contexto text not null check (contexto in ('ranked', 'scrim', 'oficial', 'treino', 'personalizada', 'outra')),
+  adversario text check (char_length(adversario) <= 40),
+  por uuid references auth.users (id) on delete set null,
+  em timestamptz not null default now(),
+  primary key (equipe_id, partida_id)
+);
+alter table public.partidas_contexto enable row level security;
+revoke all on public.partidas_contexto from anon, public, authenticated;
+
+create or replace function public.partidas_contexto_listar(p_equipe uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not (public.eh_membro(p_equipe) or public.eh_admin()) then raise exception 'Só a equipe vê isso.' using errcode = '42501'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('partida', c.partida_id, 'contexto', c.contexto, 'adversario', c.adversario,
+                    'por', (select apelido from public.perfis where id = c.por), 'em', c.em))
+                   from public.partidas_contexto c where c.equipe_id = p_equipe), '[]'::jsonb);
+end $$;
+
+-- p_contexto '' (ou nulo) volta para o automático
+create or replace function public.partida_definir_contexto(p_equipe uuid, p_partida text, p_contexto text, p_adversario text default null)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not (public.eh_admin() or public.e_lideranca(p_equipe) or public.cargo_em(p_equipe) = 'treinador') then
+    raise exception 'Só a liderança e os treinadores mudam o contexto da partida.' using errcode = '42501';
+  end if;
+  if coalesce(p_partida, '') !~ '^[0-9a-f-]{36}$' then raise exception 'partida: inválida.' using errcode = 'P0001'; end if;
+  if coalesce(p_contexto, '') = '' then
+    delete from public.partidas_contexto where equipe_id = p_equipe and partida_id = p_partida;
+    return;
+  end if;
+  if p_contexto not in ('ranked', 'scrim', 'oficial', 'treino', 'personalizada', 'outra') then
+    raise exception 'contexto: inválido.' using errcode = 'P0001';
+  end if;
+  insert into public.partidas_contexto (equipe_id, partida_id, contexto, adversario, por)
+  values (p_equipe, p_partida, p_contexto, nullif(left(btrim(coalesce(p_adversario, '')), 40), ''), auth.uid())
+  on conflict (equipe_id, partida_id) do update set contexto = excluded.contexto, adversario = excluded.adversario, por = auth.uid(), em = now();
+end $$;
+revoke execute on function public.partidas_contexto_listar(uuid), public.partida_definir_contexto(uuid, text, text, text) from public, anon;
+grant execute on function public.partidas_contexto_listar(uuid), public.partida_definir_contexto(uuid, text, text, text) to authenticated;
+
+-- =====================================================================
 -- Conferência final: todas as colunas devem mostrar true
 -- =====================================================================
 select exists (select 1 from pg_proc where proname = 'nuvem_disparo_manual') as botao_atualizar,
        exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'membros' and column_name = 'liberado_premier') as manter_jogador_premier,
        coalesce((select prosrc like '%v_eu in (''lider'', ''colider'')%' from pg_proc where proname = 'definir_cargo' limit 1), false) as colider_define_cargos,
-       exists (select 1 from pg_proc where proname = 'taticas_indice') as busca_taticas;
+       exists (select 1 from pg_proc where proname = 'taticas_indice') as busca_taticas,
+       exists (select 1 from pg_proc where proname = 'partida_definir_contexto') as contexto_partidas;

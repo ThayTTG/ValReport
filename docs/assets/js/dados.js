@@ -74,7 +74,7 @@ export const notaMapa = (mapa) => B.notas.mapas?.[mapa];
 export const calor = (slug) => json(`data/calor/${slug}.json`).catch(() => ({ partidas: [], e: [] }));
 
 // ---------- Filtros ----------
-export const FILTROS_PADRAO = { fila: "todas", temporada: "todas", periodo: "tudo", mapa: "todos", agente: "todos", com: "todos" };
+export const FILTROS_PADRAO = { fila: "todas", temporada: "todas", periodo: "tudo", mapa: "todos", agente: "todos", com: "todos", ctx: "todos" };
 export const PERIODOS = { 7: "Últimos 7 dias", 14: "Últimos 14 dias", 30: "Últimos 30 dias", 90: "Últimos 90 dias", tudo: "Todo o período" };
 
 function limiteData(periodo) {
@@ -85,6 +85,10 @@ function limiteData(periodo) {
 
 export function passaPartida(p, f) {
   if (f.fila !== "todas" && p.fila !== f.fila) return false;
+  if (f.ctx && f.ctx !== "todos") {   // v45: contexto (ver contexto.js); sem a agenda, pela fila
+    const c = B.contextos?.get(p.id)?.ctx || (p.fila === "premier" ? "oficial" : p.fila === "custom" ? "personalizada" : p.fila === "competitive" ? "ranked" : "outra");
+    if (c !== f.ctx) return false;
+  }
   if (f.temporada !== "todas" && p.temp !== f.temporada) return false;
   if (f.mapa !== "todos" && p.mapa !== f.mapa) return false;
   const lim = limiteData(f.periodo);

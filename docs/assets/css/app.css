@@ -2395,3 +2395,16 @@ body.com-nav .conta-chip { order: 2; }
 .rp--multi .rp-round[aria-pressed="true"]:not(.rp-round--multi) { background: transparent; color: var(--rp-texto); box-shadow: inset 0 -2px 0 var(--cor-venc); }
 .rp-round--multi { background: color-mix(in srgb, var(--destaque) 30%, transparent) !important; color: #fff !important; outline: 1px solid var(--destaque); }
 @media (max-width: 560px) { .rp-multi { padding: 0 6px; font-size: 10.5px; } }
+
+/* v45: contexto das partidas (scrim, oficial, treino) e partidas do evento */
+.selo--ctx { font-weight: 700; }
+.selo--ctx-scrim { background: color-mix(in srgb, #3f8fd8 22%, transparent); color: #7fb6ec; }
+.selo--ctx-oficial { background: color-mix(in srgb, #ff4655 22%, transparent); color: #ff8a94; }
+.selo--ctx-treino { background: color-mix(in srgb, #3fae6a 22%, transparent); color: #74d39a; }
+:root[data-tema="claro"] .selo--ctx-scrim { color: #1f5e9c; } :root[data-tema="claro"] .selo--ctx-oficial { color: #b3202e; } :root[data-tema="claro"] .selo--ctx-treino { color: #1f7a45; }
+.partida__sub .selo--ctx { font-size: 11px; padding: 1px 7px; }
+.evento-partidas { display: grid; gap: 4px; }
+.evento-partida { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; background: var(--superficie-2); color: var(--texto); }
+.evento-partida:hover { text-decoration: none; outline: 1px solid var(--destaque); }
+.evento-partida b.bom { color: var(--vitoria, #3ccf7e); } .evento-partida b.ruim { color: var(--derrota, #f06a6a); }
+.evento-partida svg { margin-left: auto; color: var(--suave); }

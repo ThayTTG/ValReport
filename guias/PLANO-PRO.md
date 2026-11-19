@@ -134,7 +134,7 @@ Cada um abre direto no replay 2D, e a equipe marca como "revisado", com comentá
 | # | Entrega | Por que primeiro | Tamanho |
 | :--- | :--- | :--- | :--- |
 | 1 | ✅ Replay 2D (fase 1) | Base de tudo, já funciona em todas as partidas | feito |
-| 2 | Contexto da partida + filtro (Ranked · Scrim · Oficial) + ligar agenda ↔ partida | Sem isso, scrim e ranked se misturam | M |
+| 2 | ✅ Contexto da partida + filtro (Ranked · Scrim · Oficial) + ligar agenda ↔ partida | Sem isso, scrim e ranked se misturam | feito |
 | 3 | Planilha do analista por mapa/lado (3.1) | O que mais muda o treino | M |
 | 4 | Rounds para rever + playlists no replay | Liga dado → VOD | M |
 | 5 | Relatório pós-scrim no Discord | Hábito do time | P |
