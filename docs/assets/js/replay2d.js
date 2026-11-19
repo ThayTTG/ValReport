@@ -17,6 +17,88 @@ const RAIO_SPAWN = 450;          // espalha os 5 no spawn (unidades do jogo)
 const RASTRO_MS = 3000;
 const FLASH_KILL_MS = 1400;
 const DETONA_MS = 45000;
+const K_PREF = "valreport.replay";
+export const lerPref = () => { try { return JSON.parse(localStorage.getItem(K_PREF)) || {}; } catch (e) { return {}; } };
+const salvarPref = (o) => { try { localStorage.setItem(K_PREF, JSON.stringify({ ...lerPref(), ...o })); } catch (e) { /* sem armazenamento */ } };
+
+// ---------- Corredores do mapa (para o caminho estimado não atravessar parede) ----------
+// O minimapa é transparente fora das áreas andáveis: lemos os pixels (pelo próprio site, /api/mapa) numa grade
+// e achamos o caminho mais curto por dentro dela (A*), entre duas posições conhecidas.
+const GRADE = 128;
+const mascaras = new Map();
+function carregarMascara(mapa) {
+  const url = imgMinimapa(mapa), uuid = url?.match(/maps\/([0-9a-f-]{36})\//i)?.[1];
+  if (!uuid) return Promise.resolve(null);
+  if (!mascaras.has(uuid)) {
+    mascaras.set(uuid, (async () => {
+      const r = await fetch(`/api/mapa?u=${uuid}`);
+      if (!r.ok) throw new Error("minimapa");
+      const bmp = await createImageBitmap(await r.blob());
+      const c = document.createElement("canvas"); c.width = c.height = GRADE;
+      const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(bmp, 0, 0, GRADE, GRADE);
+      const px = x.getImageData(0, 0, GRADE, GRADE).data, andavel = new Uint8Array(GRADE * GRADE);
+      for (let k = 0; k < GRADE * GRADE; k++) andavel[k] = px[k * 4 + 3] > 40 ? 1 : 0;
+      return andavel;
+    })().catch(() => null));
+  }
+  return mascaras.get(uuid);
+}
+function celulaLivre(m, u, v) {   // a célula andável mais perto (posições na borda do mapa)
+  let cx = Math.min(GRADE - 1, Math.max(0, Math.floor(u * GRADE))), cy = Math.min(GRADE - 1, Math.max(0, Math.floor(v * GRADE)));
+  if (m[cy * GRADE + cx]) return [cx, cy];
+  for (let r = 1; r < 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const x = cx + dx, y = cy + dy;
+    if (x >= 0 && y >= 0 && x < GRADE && y < GRADE && m[y * GRADE + x]) return [x, y];
+  }
+  return [cx, cy];
+}
+function aEstrela(m, a, b) {
+  const N = GRADE, ini = a[1] * N + a[0], fim = b[1] * N + b[0];
+  if (ini === fim) return [a];
+  const g = new Float32Array(N * N).fill(Infinity), de = new Int32Array(N * N).fill(-1), fechado = new Uint8Array(N * N);
+  const h = (k) => { const dx = Math.abs((k % N) - b[0]), dy = Math.abs(((k / N) | 0) - b[1]); return Math.max(dx, dy) + 0.414 * Math.min(dx, dy); };
+  const heap = [[h(ini), ini]]; g[ini] = 0;
+  const sobe = (i) => { while (i) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const desce = () => { let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m2 = i; if (l < heap.length && heap[l][0] < heap[m2][0]) m2 = l; if (r < heap.length && heap[r][0] < heap[m2][0]) m2 = r; if (m2 === i) break; [heap[m2], heap[i]] = [heap[i], heap[m2]]; i = m2; } };
+  let passos = 0;
+  while (heap.length && passos++ < N * N) {
+    const [, k] = heap[0]; const ult = heap.pop(); if (heap.length) { heap[0] = ult; desce(); }
+    if (fechado[k]) continue;
+    if (k === fim) break;
+    fechado[k] = 1;
+    const x = k % N, y = (k / N) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+      const n = ny * N + nx;
+      if (!m[n] || fechado[n]) continue;
+      if (dx && dy && (!m[y * N + nx] || !m[ny * N + x])) continue;   // não corta quina de parede
+      const custo = g[k] + (dx && dy ? 1.414 : 1);
+      if (custo < g[n]) { g[n] = custo; de[n] = k; heap.push([custo + h(n), n]); sobe(heap.length - 1); }
+    }
+  }
+  if (de[fim] < 0) return null;
+  const cam = [];
+  for (let k = fim; k !== -1; k = de[k]) cam.push([k % N, (k / N) | 0]);
+  return cam.reverse();
+}
+function livreEntre(m, [x0, y0], [x1, y1]) {   // linha reta sem parede no meio (para alisar o caminho)
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  for (let k = 1; k < n; k++) { const x = Math.round(x0 + ((x1 - x0) * k) / n), y = Math.round(y0 + ((y1 - y0) * k) / n); if (!m[y * GRADE + x]) return false; }
+  return true;
+}
+/** Caminho por dentro do mapa entre dois pontos (u, v de 0 a 1): [[u, v], ...] ou null */
+function caminhoEntre(m, u0, v0, u1, v1) {
+  const a = celulaLivre(m, u0, v0), b = celulaLivre(m, u1, v1), cam = aEstrela(m, a, b);
+  if (!cam) return null;
+  const liso = [cam[0]];   // puxa a corda: só os cantos necessários
+  let i = 0;
+  while (i < cam.length - 1) { let j = cam.length - 1; while (j > i + 1 && !livreEntre(m, cam[i], cam[j])) j--; liso.push(cam[j]); i = j; }
+  const pts = liso.map(([x, y]) => [(x + 0.5) / GRADE, (y + 0.5) / GRADE]);
+  pts[0] = [u0, v0]; pts[pts.length - 1] = [u1, v1];
+  return pts;
+}
 
 const SVG_PLAY = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>`;
 const SVG_PAUSA = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg>`;
@@ -58,21 +140,34 @@ export function montarRound(d, r) {
   // começo: cada um no spawn do seu lado, espalhado num círculo
   const lado = (i) => (d.jogadores[i]?.time === r.atk ? "atk" : "def");
   const vagas = { atk: 0, def: 0 };
+  // fim do freeze (compra): 30 s (45 s nos pistols), nunca depois de 3 s antes do primeiro evento
+  const tempos = [...(r.q || []).map((q) => q[0]), ...r.kills.map((k) => k[0]), r.plant?.t, r.defuse?.t].filter((x) => x > 0);
+  const primeiro = tempos.length ? Math.min(...tempos) : 0;
+  const compra = r.n === 1 || r.n === 13 ? 45000 : 30000;
+  const inicio = Math.max(0, Math.min(compra, primeiro - 3000));
   d.jogadores.forEach((j, i) => {
     const s = sp[lado(i)];
     trilhas[i].sort((a, b) => a[0] - b[0]);
-    if (s) {
-      const k = vagas[lado(i)]++, ang = (k / 5) * Math.PI * 2;
-      trilhas[i].unshift([0, s[0] + Math.cos(ang) * RAIO_SPAWN, s[1] + Math.sin(ang) * RAIO_SPAWN, null]);
-    } else if (trilhas[i].length) trilhas[i].unshift([0, trilhas[i][0][1], trilhas[i][0][2], null]);
+    if (s) {   // no spawn, parado durante o freeze (o 5º campo marca "posição não vista")
+      const k = vagas[lado(i)]++, ang = (k / 5) * Math.PI * 2, x = s[0] + Math.cos(ang) * RAIO_SPAWN, y = s[1] + Math.sin(ang) * RAIO_SPAWN;
+      trilhas[i].unshift([0, x, y, null, true], [inicio, x, y, null, true]);
+    } else if (trilhas[i].length) trilhas[i].unshift([0, trilhas[i][0][1], trilhas[i][0][2], null, true]);
   });
   // fim do round: depois do último evento (ou a explosão da spike)
   const ultimo = Math.max(0, ...r.kills.map((k) => k[0]), r.plant?.t || 0, r.defuse?.t || 0);
   const fim = /detona/i.test(r.fim || "") && r.plant?.t ? r.plant.t + DETONA_MS : ultimo + 3000;
-  return { trilhas, morte, fim: Math.max(fim, 8000), exato, lado };
+  return { trilhas, morte, fim: Math.max(fim, 8000), exato, lado, inicio, caminhos: null };
 }
 
-/** Posição (x, y do jogo) e mira de um jogador no instante t */
+/** Modo "real": a última posição vista (não inventa caminho). idade = há quanto tempo foi vista. */
+function posicaoReal(tr, t) {
+  if (!tr.length) return null;
+  let k = 0;
+  while (k + 1 < tr.length && tr[k + 1][0] <= t) k++;
+  const s = tr[k];
+  return { x: s[1], y: s[2], a: s[3] ?? [...tr.slice(0, k + 1)].reverse().find((q) => q[3] != null)?.[3] ?? null, idade: Math.max(0, t - s[0]), visto: !s[4] };
+}
+/** Posição (x, y do jogo) e mira de um jogador no instante t (linha reta entre as posições conhecidas) */
 function posicao(tr, t) {
   if (!tr.length) return null;
   if (t <= tr[0][0]) return { x: tr[0][1], y: tr[0][2], a: tr.find((s) => s[3] != null)?.[3] ?? null };
@@ -112,7 +207,13 @@ export function htmlReplay(d, rSel) {
           <span class="rp-pop__caixa" data-pop="config" hidden>
             <label><input type="checkbox" data-op="nomes" checked> Nomes <kbd>N</kbd></label>
             <label><input type="checkbox" data-op="mira" checked> Cone da mira <kbd>V</kbd></label>
-            <label><input type="checkbox" data-op="rastro" checked> Rastro (3 s) <kbd>R</kbd></label></span></span>
+            <label><input type="checkbox" data-op="rastro" checked> Rastro (3 s) <kbd>R</kbd></label>
+            <label><input type="checkbox" data-op="pularFreeze"> Sempre pular o freeze (fica só 3 s)</label>
+            <span class="rp-pop__grupo"><small>Movimento entre os eventos</small>
+              <label title="Cada um fica onde foi visto pela última vez (em cada abate, plant e defuse). Não inventa caminho."><input type="radio" name="rp-mov" value="real"> Posições reais (sem estimar)</label>
+              <label title="Estima o caminho pelos corredores do mapa, sem atravessar parede."><input type="radio" name="rp-mov" value="caminho"> Caminho pelo mapa (estimado)</label>
+              <label title="Linha reta entre as posições conhecidas (pode atravessar parede)."><input type="radio" name="rp-mov" value="reta"> Linha reta (estimado)</label></span>
+            <small class="rp-pop__nota">Movimento contínuo de verdade só com o replay do jogo (.vrf).</small></span></span>
         <span class="rp-pop"><button type="button" class="rp-ferr" data-abrir="teclas" title="Atalhos" aria-label="Atalhos do teclado" aria-expanded="false">${icone("texto")}</button>
           <span class="rp-pop__caixa rp-pop__caixa--teclas" data-pop="teclas" hidden>
             <span><kbd>Espaço</kbd> play/pausa</span><span><kbd>←</kbd><kbd>→</kbd> 5 s (Shift: 1 s)</span><span><kbd>,</kbd><kbd>.</kbd> round anterior/próximo</span>
@@ -145,6 +246,7 @@ export function htmlReplay(d, rSel) {
         <button type="button" class="rp-play" data-acao="play" title="Play/pausa (espaço)" aria-label="Play">${SVG_PLAY}</button>
         <button type="button" class="rp-vel" data-acao="vel" title="Velocidade (1 a 6)" aria-label="Velocidade">1x</button>
         <span class="rp-relogio">${icone("relogio")}<b data-tempo>0:00</b></span>
+        <button type="button" class="rp-pular" data-acao="pular-freeze" title="Pular o freeze (vai para o fim da compra)">Pular freeze ${icone("seta")}</button>
         <div class="rp-trilha" data-trilha role="slider" tabindex="0" aria-label="Tempo do round" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div class="rp-trilha__eventos" data-marcas></div>
           <i class="rp-cabeca" data-cabeca></i>
@@ -193,7 +295,11 @@ export function ligarReplay(raiz, d, rSel = 1) {
   };
   const S = { round: null, r: null, t: 0, tocando: false, vel: 1, ult: 0, op: { nomes: true, mira: true, rastro: true },
     ferr: "mover", cor: CORES_DESENHO[0], desenhos: new Map(), atual: null, lado: 0,
-    zoom: 1, cx: 0.5, cy: 0.5, multi: null };   // multi: Set de rounds tocando juntos (null = um round só)
+    zoom: 1, cx: 0.5, cy: 0.5, multi: null, mascara: null };
+  const pref = lerPref();
+  S.op.movimento = ["real", "caminho", "reta"].includes(pref.movimento) ? pref.movimento : "real";
+  S.op.pularFreeze = Boolean(pref.pularFreeze);
+  carregarMascara(d.mapa).then((m) => { S.mascara = m; if (m && S.op.movimento === "caminho") pedir(); });   // multi: Set de rounds tocando juntos (null = um round só)
 
   // tamanho do palco (quadrado, nítido em telas de alta densidade)
   const medir = () => {
@@ -210,14 +316,16 @@ export function ligarReplay(raiz, d, rSel = 1) {
   function abrirRound(n, { tocar = false } = {}) {
     const r = d.rounds.find((x) => x.n === n) || d.rounds[0];
     if (!r) return;
-    S.r = r; S.round = montarRound(d, r); S.t = 0;
+    S.r = r; S.round = montarRound(d, r);
+    S.t = S.op.pularFreeze ? Math.max(0, S.round.inicio - 3000) : 0;   // "sempre pular": o freeze dura 3 s
     el.querySelectorAll("[data-round]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.round) === r.n)));
     el.querySelector(`[data-round="${r.n}"]`)?.scrollIntoView({ block: "nearest", inline: "center" });
     // marcas na linha do tempo
     const pos = (t) => `${(100 * t / S.round.fim).toFixed(2)}%`;
     const time = (i) => (d.jogadores[i]?.time === d.nosso ? "nosso" : "deles");
     const fimSpike = r.defuse ? r.defuse.t || 0 : S.round.fim;
-    el.querySelector("[data-marcas]").innerHTML = (r.plant ? `<span class="rp-spike" style="left:${pos(r.plant.t || 0)};width:${(100 * (fimSpike - (r.plant.t || 0)) / S.round.fim).toFixed(2)}%"><b>Spike${r.plant.site ? ` ${esc(r.plant.site)}` : ""}</b></span>` : "")
+    el.querySelector('[data-acao="pular-freeze"]').hidden = S.round.inicio < 4000;
+    el.querySelector("[data-marcas]").innerHTML = (S.round.inicio > 0 ? `<span class="rp-freeze" style="width:${pos(S.round.inicio)}"><b>Freeze</b></span>` : "") + (r.plant ? `<span class="rp-spike" style="left:${pos(r.plant.t || 0)};width:${(100 * (fimSpike - (r.plant.t || 0)) / S.round.fim).toFixed(2)}%"><b>Spike${r.plant.site ? ` ${esc(r.plant.site)}` : ""}</b></span>` : "")
       + r.kills.map(([t, ki, vi]) => `<i class="rp-evento rp-evento--${time(ki)}" style="left:${pos(t)}" title="${fmtT(t)} · ${esc(nomeDe(ki))} → ${esc(nomeDe(vi))}"></i>`).join("")
       + (r.plant ? `<i class="rp-evento rp-evento--plant" style="left:${pos(r.plant.t || 0)}" title="Plant ${fmtT(r.plant.t || 0)}"></i>` : "")
       + (r.defuse ? `<i class="rp-evento rp-evento--defuse" style="left:${pos(r.defuse.t || 0)}" title="Defuse ${fmtT(r.defuse.t || 0)}"></i>` : "");
@@ -261,12 +369,51 @@ export function ligarReplay(raiz, d, rSel = 1) {
     const mini = imagemDe(imgMinimapa(d.mapa));
     if (mini) { const [x0, y0] = tela(0, 0); ctx.globalAlpha = .9; ctx.drawImage(mini, x0, y0, L * S.zoom, L * S.zoom); ctx.globalAlpha = 1; }
     if (!proj) return;
-    const rp = Math.max(7, L * 0.0155);   // tamanho do boneco na tela (não cresce com o zoom)
+    const rp = Math.max(7, L * 0.0155) * Math.min(3, S.zoom) ** 0.75;   // cresce com o zoom (um pouco menos que o mapa)
     if (S.multi?.size) {
       for (const n of S.multi) { const x = rodadas.get(n); if (x) desenharRound(x.r, x.R, Math.min(t, x.R.fim), rp * 0.72, n); }
     } else desenharRound(S.r, S.round, t, rp, null);
   }
   const rodadas = new Map();   // n → { r, R } (vários rounds)
+  // caminhos pelo mapa de um round (calculados uma vez, quando a máscara do mapa chega)
+  function caminhosDo(R) {
+    if (R.caminhos || !S.mascara || !proj) return R.caminhos;
+    R.caminhos = R.trilhas.map((tr) => {
+      const segs = [];
+      for (let k = 1; k < tr.length; k++) {
+        const [t0, x0, y0] = tr[k - 1], [t1, x1, y1] = tr[k];
+        const [u0, v0] = proj.p(x0, y0), [u1, v1] = proj.p(x1, y1);
+        const pts = (Math.hypot(u1 - u0, v1 - v0) < 0.01 ? null : caminhoEntre(S.mascara, u0, v0, u1, v1)) || [[u0, v0], [u1, v1]];
+        const ac = [0]; for (let q = 1; q < pts.length; q++) ac.push(ac[q - 1] + Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1]));
+        segs.push({ t0, t1, pts, ac });
+      }
+      return segs;
+    });
+    return R.caminhos;
+  }
+  /** {u, v, a, apagado} de um jogador no instante t, no modo de movimento escolhido */
+  function ondeEsta(R, i, t) {
+    const tr = R.trilhas[i];
+    if (!tr.length) return null;
+    if (S.op.movimento === "real") {
+      const p = posicaoReal(tr, t); if (!p) return null;
+      const [u, v] = proj.p(p.x, p.y);
+      return { u, v, a: p.a, apagado: !p.visto || p.idade > 1500, idade: p.idade };
+    }
+    const p = posicao(tr, t); if (!p) return null;
+    const cams = S.op.movimento === "caminho" ? caminhosDo(R) : null;
+    if (cams?.[i]) {
+      const seg = cams[i].find((sg) => t >= sg.t0 && t <= sg.t1);
+      if (seg) {
+        const alvo = (seg.t1 > seg.t0 ? (t - seg.t0) / (seg.t1 - seg.t0) : 1) * seg.ac[seg.ac.length - 1];
+        let q = 1; while (q < seg.ac.length - 1 && seg.ac[q] < alvo) q++;
+        const f = seg.ac[q] > seg.ac[q - 1] ? (alvo - seg.ac[q - 1]) / (seg.ac[q] - seg.ac[q - 1]) : 1;
+        return { u: seg.pts[q - 1][0] + (seg.pts[q][0] - seg.pts[q - 1][0]) * f, v: seg.pts[q - 1][1] + (seg.pts[q][1] - seg.pts[q - 1][1]) * f, a: p.a };
+      }
+    }
+    const [u, v] = proj.p(p.x, p.y);
+    return { u, v, a: p.a };
+  }
   function desenharRound(r, R, t, rp, rotulo) {
     const L = S.lado, multi = rotulo != null;
     // spike
@@ -295,14 +442,15 @@ export function ligarReplay(raiz, d, rSel = 1) {
         ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k); ctx.moveTo(x + k, y - k); ctx.lineTo(x - k, y + k); ctx.stroke(); ctx.globalAlpha = 1;
         return;
       }
-      const p = posicao(tr, t);
+      const p = ondeEsta(R, i, t);
       if (!p) return;
-      const [x, y] = px(p.x, p.y);
-      if (S.op.rastro) {
+      const [x, y] = tela(p.u, p.v);
+      if (S.op.rastro && S.op.movimento !== "real") {
         ctx.strokeStyle = cor; ctx.globalAlpha = multi ? .25 : .35; ctx.lineWidth = 2; ctx.beginPath();
-        for (let k = 0; k <= 12; k++) { const q = posicao(tr, Math.max(0, t - RASTRO_MS + (k * RASTRO_MS) / 12)); const [a, b] = px(q.x, q.y); k ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }
+        for (let k = 0; k <= 16; k++) { const q = ondeEsta(R, i, Math.max(0, t - RASTRO_MS + (k * RASTRO_MS) / 16)); const [a, b] = tela(q.u, q.v); k ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }
         ctx.stroke(); ctx.globalAlpha = 1;
       }
+      if (p.apagado) ctx.globalAlpha = multi ? .4 : .5;   // modo real: posição antiga (ainda não visto de novo)
       if (S.op.mira && p.a != null && !multi) {
         const [dx, dy] = proj.dir(p.a), ang = Math.atan2(dy, dx), alc = rp * 4;
         ctx.globalAlpha = .28; ctx.fillStyle = cor; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, alc, ang - 0.5, ang + 0.5); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
@@ -310,7 +458,9 @@ export function ligarReplay(raiz, d, rSel = 1) {
       ctx.beginPath(); ctx.arc(x, y, rp, 0, Math.PI * 2); ctx.fillStyle = "#0b0912"; ctx.fill();
       const ic = imagemDe(imgAgente(j.ag));
       if (ic) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, rp - 1.5, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(ic, x - rp, y - rp, rp * 2, rp * 2); ctx.restore(); }
-      ctx.lineWidth = 2.5; ctx.strokeStyle = cor; ctx.beginPath(); ctx.arc(x, y, rp, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = cor; ctx.beginPath(); ctx.arc(x, y, rp, 0, Math.PI * 2);
+      if (p.apagado) ctx.setLineDash([3, 3]);
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
       const rot = multi ? `R${rotulo}` : S.op.nomes ? (j.slug ? j.nome : j.ag) : "";
       if (rot) {
         ctx.font = `600 ${multi ? 9.5 : Math.max(10, L * 0.0145)}px Inter, system-ui, sans-serif`; ctx.textAlign = "center";
@@ -328,7 +478,15 @@ export function ligarReplay(raiz, d, rSel = 1) {
     const placarAte = (n) => d.rounds.filter((x) => x.n < n).reduce((o, x) => { o[x.venc === d.nosso ? 0 : 1]++; return o; }, [0, 0]);
     const [a, b] = placarAte(r.n);
     el.querySelector("[data-placar]").innerHTML = `R${r.n} · ${r.atk === d.nosso ? "Equipe no ataque" : "Equipe na defesa"}`;
-    const eco = Object.fromEntries((r.eco || []).map(([i, arma, escudo, carga, sobra]) => [i, { arma, escudo, carga, sobra }]));
+    const eco = Object.fromEntries((r.eco || []).map(([i, arma, escudo, carga, sobra, casts]) => [i, { arma, escudo, carga, sobra, casts }]));
+    const habs = (j, e) => {   // C, Q, E, X usadas no round (a API não manda as compras)
+      if (!Array.isArray(e.casts)) return "";
+      const info = B.meta?.hab_agentes?.[j.ag];
+      return `<span class="rp-j__habs">${["C", "Q", "E", "X"].map((tecla, k) => {
+        const [nome, ic] = info?.h?.[k] || [tecla, null], n = e.casts[k] || 0;
+        return `<span class="rp-hab${n ? "" : " zero"}" title="${esc(`${tecla} · ${nome}: usou ${n}x no round`)}">${ic ? `<img src="${esc(ic)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<kbd>${tecla}</kbd>`}${n > 1 ? `<i>${n}</i>` : ""}</span>`;
+      }).join("")}</span>`;
+    };
     // abates e mortes na partida até este instante (rounds anteriores + o atual até t)
     const kd = d.jogadores.map(() => [0, 0]);
     for (const x of d.rounds) {
@@ -345,7 +503,7 @@ export function ligarReplay(raiz, d, rSel = 1) {
           ${arma ? `<img class="rp-j__arma" src="${esc(arma)}" alt="${esc(e.arma)}" title="${esc(e.arma)}" loading="lazy">` : `<small class="rp-j__arma-txt">${esc(e.arma || "")}</small>`}</span>
         <span class="rp-j__vida"><i style="width:${morto ? 0 : 100}%"></i></span>
         <span class="rp-j__base"><small>${e.sobra != null ? `$${e.sobra}` : e.carga ? `equip. ${e.carga}` : ""}</small><small>${escudo(e.escudo) ? `${icone("escudo")} ${escudo(e.escudo)}` : ""}</small>
-          <small class="rp-j__estado">${morto ? "morto" : ""}</small></span></div>`;
+          ${habs(j, e)}</span></div>`;
     };
     const cartaoTime = (nosso, pts) => {
       const lista = d.jogadores.map((j, i) => [j, i]).filter(([j]) => (j.time === d.nosso) === nosso);
@@ -511,6 +669,7 @@ export function ligarReplay(raiz, d, rSel = 1) {
     }
     if (!ev.target.closest(".rp-pop")) el.querySelectorAll("[data-pop]").forEach((x) => { x.hidden = true; });
     const ac = ev.target.closest("[data-acao]")?.dataset.acao;
+    if (ac === "pular-freeze") { irPara(Math.max(0, S.round.inicio)); return; }
     if (ac === "zoom-mais") zoomEm(1.4);
     else if (ac === "zoom-menos") zoomEm(1 / 1.4);
     else if (ac === "multi") alternarMulti();
@@ -532,7 +691,23 @@ export function ligarReplay(raiz, d, rSel = 1) {
   trilha.addEventListener("pointerup", soltarTrilha);
   trilha.addEventListener("pointercancel", soltarTrilha);
   trilha.addEventListener("keydown", (ev) => { if (ev.key === "Home") irPara(0); else if (ev.key === "End") irPara(S.round.fim); });
-  el.querySelectorAll("[data-op]").forEach((c) => c.addEventListener("change", () => { S.op[c.dataset.op] = c.checked; pedir(); }));
+  el.querySelectorAll("[data-op]").forEach((c) => {
+    if (c.dataset.op === "pularFreeze") c.checked = S.op.pularFreeze;
+    c.addEventListener("change", () => {
+      S.op[c.dataset.op] = c.checked;
+      if (c.dataset.op === "pularFreeze") { salvarPref({ pularFreeze: c.checked }); if (c.checked && S.t < S.round.inicio - 3000) irPara(S.round.inicio - 3000); }
+      pedir();
+    });
+  });
+  el.querySelectorAll('input[name="rp-mov"]').forEach((r) => {
+    r.checked = r.value === S.op.movimento;
+    r.addEventListener("change", () => { if (!r.checked) return; S.op.movimento = r.value; salvarPref({ movimento: r.value }); pedir(); atualizarAviso(); });
+  });
+  function atualizarAviso() {
+    const av = el.querySelector(".rp-aviso-mapa");
+    if (av && S.round?.exato) av.lastChild.textContent = S.op.movimento === "real" ? " Posições reais (em cada evento)" : " Movimento estimado entre os eventos";
+  }
+  atualizarAviso();
   const teclas = (ev) => {
     if (!el.isConnected) { document.removeEventListener("keydown", teclas); S.tocando = false; return; }
     if (ev.target.closest("input:not([type=range]), textarea, select, [contenteditable]") || document.querySelector("dialog[open]")) return;

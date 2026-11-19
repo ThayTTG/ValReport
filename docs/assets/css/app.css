@@ -2458,3 +2458,20 @@ body.com-nav .conta-chip { order: 2; }
 .adv-comp:first-of-type { border-top: 0; } .adv-comp strong { min-width: 70px; }
 .adv-comp__ags { display: flex; gap: 4px; flex: 1; } .adv-comp__ags img, .adv-comp__ags > span > span { width: 28px; height: 28px; border-radius: 7px; }
 .adv-partidas { display: grid; gap: 4px; }
+/* v50: replay — freeze, modo de movimento e habilidades do round */
+.rp-freeze { position: absolute; top: 0; bottom: 0; left: 0; background: repeating-linear-gradient(135deg, rgba(143, 134, 163, .16) 0 6px, transparent 6px 12px); border-right: 1px dashed var(--rp-suave); }
+.rp-freeze b { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--rp-suave); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.rp-pular { display: inline-flex; align-items: center; gap: 4px; margin: 8px 6px; padding: 0 10px; border: 1px solid var(--rp-borda); border-radius: 4px; background: transparent;
+  color: var(--rp-texto); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.rp-pular[hidden] { display: none; }
+.rp-pular svg { font-size: 12px; }
+.rp-pop__grupo { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--rp-borda); }
+.rp-pop__grupo small, .rp-pop__nota { color: var(--rp-suave); font-size: 11px; }
+.rp-j__habs { display: flex; gap: 3px; margin-left: auto; }
+.rp-hab { position: relative; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; background: #221d2e; }
+.rp-hab img { width: 15px; height: 15px; filter: brightness(1.4); }
+.rp-hab kbd { font: 700 9px/1 inherit; font-family: inherit; color: var(--rp-suave); }
+.rp-hab.zero { opacity: .3; }
+.rp-hab i { position: absolute; right: -4px; bottom: -4px; min-width: 12px; height: 12px; padding: 0 2px; border-radius: 6px; background: var(--destaque); color: #fff; font: 700 8.5px/12px inherit; font-family: inherit; font-style: normal; text-align: center; }
+.rp-times { max-height: min(calc(100dvh - var(--topo-altura, 60px) - 340px), 860px); overflow-y: auto; scrollbar-width: thin; }
+@media (max-width: 1100px) { .rp-times { max-height: none; } }

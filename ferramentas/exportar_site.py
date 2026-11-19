@@ -385,8 +385,10 @@ def detalhe_partida(a, bruta, nosso, slug_de_puuid, cfg, membros_info):
             if i is None:
                 continue
             e = st_r.get("economy") or {}
+            hab = st_r.get("ability_casts") or {}   # v50: habilidades usadas no round (C, Q, E, X), se a API mandar
+            casts = [int(hab.get(k) or hab.get(k.replace("ability", "ability_")) or 0) for k in ("grenade", "ability1", "ability2", "ultimate")] if hab else None
             eco.append([i, g(e, "weapon", "name") or "", g(e, "armor", "name") or "", g(e, "loadout_value", padrao=0) or 0,
-                        e.get("remaining") if isinstance(e.get("remaining"), (int, float)) else None])
+                        e.get("remaining") if isinstance(e.get("remaining"), (int, float)) else None, casts])
 
         membros = {}
         for slug, (por_n, agente) in recs_por_slug.items():
