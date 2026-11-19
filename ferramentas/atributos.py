@@ -166,9 +166,10 @@ def _percentil(valor, base, maior_e_mais):
 
 def _frase(funcao, notas):
     altas = sorted(((v, nome) for nome, v in notas.items() if v is not None and v >= 65), reverse=True)[:2]
-    baixas = sorted((v, nome) for nome, v in notas.items() if v is not None and v <= 35)[:1]
+    # Sniper baixo não vira destaque: quase todo mundo que não joga de sniper tem nota baixa ali (mesma regra do texto)
+    baixas = sorted((v, nome) for nome, v in notas.items() if v is not None and v <= 35 and nome != _NOME["sniper"])[:1]
     if not altas and not baixas:
-        return f"{funcao} equilibrado: nenhuma nota muito acima ou abaixo da média."
+        return f"{funcao} equilibrado: nenhuma nota se destaca."
     partes = []
     if altas:
         nomes = [n for _, n in altas]
