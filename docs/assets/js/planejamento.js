@@ -202,11 +202,18 @@ export function resultadoPool(d) {
 }
 
 // ---------- Comp: função de cada agente na comp ----------
-// v37: Chamber e Yoru são sempre Playmaker na comp (nas estatísticas, o Chamber de quem também joga outros sentinelas conta como Sentinela)
+// v51: Chamber e Yoru são sempre Playmaker na comp; Jett, Reyna, Iso e Phoenix são Playmaker quando a comp tem
+// outro duelista (alguém faz a entrada) e Duelista quando são o único (nas estatísticas, a mesma regra por partida)
 const PLAYMAKERS = new Set(["Chamber", "Yoru"]);
-export function funcaoNaComp(agente) {
+const DUELISTAS_PLAYMAKER = new Set(["Jett", "Reyna", "Iso", "Phoenix"]);
+export function funcaoNaComp(agente, comp = []) {
   const a = agentePor(agente);
-  return PLAYMAKERS.has(a?.nome) ? "Playmaker" : a?.funcao || "";
+  if (PLAYMAKERS.has(a?.nome)) return "Playmaker";
+  if (DUELISTAS_PLAYMAKER.has(a?.nome)) {
+    const outro = comp.some((c) => c.agente && c.agente !== a.nome && agentePor(c.agente)?.funcao === "Duelista");
+    return outro ? "Playmaker" : a.funcao || "Duelista";
+  }
+  return a?.funcao || "";
 }
 export function compDe(d, mapa) {
   const c = d.defaults?.[mapa]?.comp || [];
@@ -496,7 +503,7 @@ function desenharComps(d) {
       <div class="secao__titulo"><h2>Comp · ${esc(mapa)}</h2><span class="suave pequeno">${nComp}/5 agentes${Object.keys(funcoes).length ? ` · ${Object.entries(funcoes).map(([f, n]) => `${n} ${f}`).join(" · ")}` : ""}</span></div>
       <div class="comp">${vagas}</div>
       ${avisos.length ? `<p class="aviso aviso--alerta" style="margin-top:10px">${icone("info")}<span>${avisos.join(" ")}</span></p>` : ""}
-      ${edita ? `<p class="suave pequeno" style="margin-top:8px">Monte a comp primeiro: o agente de cada posição vem dela (no Valorant ele é o mesmo no ataque e na defesa). Chamber e Yoru contam como Playmaker.</p>` : ""}
+      ${edita ? `<p class="suave pequeno" style="margin-top:8px">Monte a comp primeiro: o agente de cada posição vem dela (no Valorant ele é o mesmo no ataque e na defesa). Chamber e Yoru contam como Playmaker; Jett, Reyna, Iso e Phoenix também, quando a comp tem outro duelista.</p>` : ""}
     </section>
     <div class="grade-2 secao">${lado("ataque")}${lado("defesa")}</div>
     ${edita ? `<p class="lp-acoes" style="margin-top:10px"><button class="botao-secundario botao-mini" type="button" data-plan-acao="restaurar">Restaurar nomes e lugares das posições</button></p>` : ""}

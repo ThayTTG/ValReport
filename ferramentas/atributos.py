@@ -28,6 +28,8 @@ MIN_BASE = 5               # jogadores na base para a nota sair
 AMOSTRA_FIRME = 100        # rounds na função para a nota deixar de ser "amostra pequena"
 LADOS = ("ambos", "ataque", "defesa")
 OPERATOR = {"Operator", "Tour de Force"}
+# v51: agentes de playmaking com rifle: os rounds com eles não contam para o Sniper (nem da pessoa, nem da base)
+SEM_SNIPER = {"Jett", "Reyna", "Iso", "Phoenix"}
 # Mínimo para uma estatística rara contar de verdade. Abaixo dele, posição × (valor / mínimo).
 PISOS = {
     "r_sniper": 0.05,   # 5% dos rounds com sniper
@@ -99,11 +101,14 @@ def estatisticas(recs):
     fk = soma(lambda r: r["first_kill"])
     vencidos = soma(lambda r: r["venceu"])
     duelos = [r["tempo_duelo_s"] for r in recs if r.get("tempo_duelo_s") is not None]
+    # Sniper: só os rounds com agentes que podem jogar de sniper (fora Jett, Reyna, Iso e Phoenix)
+    sn = [r for r in recs if r.get("_ag") not in SEM_SNIPER]
     armas = Counter()
-    for r in recs:
+    for r in sn:
         armas.update(r["armas_kills"])
     k_sniper = sum(v for k, v in armas.items() if k in catalogo.SNIPERS)
     k_op = sum(v for k, v in armas.items() if k in OPERATOR)
+    kills_sn = sum(r["kills"] for r in sn)
     partidas = len({r["match_id"] for r in recs})
     util = soma(lambda r: r["util"])
     tentados = [r for r in recs if r["clutch_tentado"] and r.get("clutch_esperado") is not None]
@@ -127,9 +132,9 @@ def estatisticas(recs):
         "clutch": 100 * sum((1 if r["clutch_vs"] else 0) - r["clutch_esperado"] for r in tentados) / n,
         "vivo": (n - mortes) / n,
         "pos_plant": soma(lambda r: r.get("kills_pos_plant", 0)) / n,
-        "r_sniper": soma(lambda r: r["arma"] in catalogo.SNIPERS) / n,
-        "k_sniper": _div(k_sniper, kills),
-        "k_op": _div(k_op, kills),
+        "r_sniper": sum(r["arma"] in catalogo.SNIPERS for r in sn) / len(sn) if sn else None,
+        "k_sniper": _div(k_sniper, kills_sn) if sn else None,
+        "k_op": _div(k_op, kills_sn) if sn else None,
         "util_pr": util / n,
         "ult_partida": soma(lambda r: r["ult"]) / partidas if partidas else None,
         "hab_pr": soma(lambda r: r["kills_hab"]) / n,
@@ -145,6 +150,7 @@ def _rounds_por(analises):
             if not pu:
                 continue
             for r in j["rounds"]:
+                r = dict(r, _ag=j.get("agente"))   # o agente da partida (o Sniper ignora Jett, Reyna, Iso e Phoenix)
                 d = por[(pu, j["funcao"])]
                 d["ambos"].append(r)
                 if r["lado"] in d:

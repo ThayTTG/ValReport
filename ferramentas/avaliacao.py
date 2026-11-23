@@ -42,13 +42,15 @@ FUNCOES_PADRAO = {
 }
 FUNCOES = ["Duelista", "Iniciador", "Controlador", "Sentinela", "Playmaker", "Outra"]
 
-# Playmaker (v37): agentes de criar jogada (pick, lurk, Operator), no lugar da função do jogo.
+# Playmaker (v51): agentes de criar jogada (pick, lurk, Operator, entrada pelo flanco), no lugar da função do jogo.
 #   Yoru:    sempre Playmaker.
 #   Chamber: Playmaker, a não ser que a pessoa também jogue outros sentinelas (Killjoy, Cypher, Sage...): aí ela é
 #            sentinela de verdade e o Chamber dela conta como Sentinela. "Também joga" = em pelo menos 2 partidas e
-#            10% das partidas dela guardadas (uma partida de Killjoy de vez em quando não muda nada).
-# Jett, Vyse e Phoenix ficam fora da conta automática. Para desligar: "playmaker": false no config.json.
-PLAYMAKERS = {"Chamber": "Sentinela", "Yoru": "Duelista"}
+#            10% das partidas dela guardadas.
+#   Jett, Reyna, Iso e Phoenix: Playmaker quando o time tem outro duelista (alguém faz a entrada); sozinhos, Duelista.
+# Vyse fica fora da conta automática. Para desligar: "playmaker": false no config.json.
+DUELISTAS_PLAYMAKER = {"Jett", "Reyna", "Iso", "Phoenix"}
+PLAYMAKERS = {"Chamber": "Sentinela", "Yoru": "Duelista", **{a: "Duelista" for a in DUELISTAS_PLAYMAKER}}
 SENTINELA_MIN_PARTIDAS, SENTINELA_MIN_FRACAO = 2, 0.10
 _AGENTES_DE = defaultdict(dict)   # puuid -> {match_id: agente}, de todas as partidas lidas nesta execução
 
@@ -151,13 +153,20 @@ def aplicar_playmaker(jogadores, cfg=None):
     if cfg.get("playmaker") is False:
         return
     extras = cfg.get("funcoes_extras") or {}
+    base = {id(j): funcao_do_agente(j.get("agente"), cfg) for j in jogadores.values()}   # a comp como o jogo define
+    por_time = defaultdict(list)
     for j in jogadores.values():
-        ag = j.get("agente")
-        if ag not in PLAYMAKERS or ag in extras:
-            continue
-        if ag == "Chamber" and joga_outros_sentinelas(j.get("puuid"), cfg):
-            continue
-        j["funcao"] = "Playmaker"
+        por_time[j.get("time")].append(j)
+    for time in por_time.values():
+        for j in time:
+            ag = j.get("agente")
+            if ag not in PLAYMAKERS or ag in extras:
+                continue
+            if ag == "Chamber" and joga_outros_sentinelas(j.get("puuid"), cfg):
+                continue
+            if ag in DUELISTAS_PLAYMAKER and not any(o is not j and base[id(o)] == "Duelista" for o in time):
+                continue   # único duelista do time: faz a entrada, conta como Duelista
+            j["funcao"] = "Playmaker"
 
 
 def funcao_do_agente(agente, cfg=None):
